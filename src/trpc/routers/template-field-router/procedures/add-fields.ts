@@ -34,7 +34,12 @@ export function EncodeEmailToken({
 }
 
 export async function DecodeEmailToken(jwt: string) {
-  const { payload } = await decode(jwt);
+  const { payload } = await decode(jwt).catch(() => {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "This signing link is invalid or has expired.",
+    });
+  });
   return emailTokenPayloadSchema.parse(payload);
 }
 

@@ -19,14 +19,21 @@ interface SigningPageProps {
 export default async function SigningPage(props: SigningPageProps) {
   const { token } = props.params;
 
-  const {
-    fields,
-    url,
-    signableFields,
-    status: templateStatus,
-  } = await api.template.getSigningFields.query({
-    token,
-  });
+  const signing = await api.template.getSigningFields
+    .query({ token })
+    .catch(() => null);
+
+  if (!signing) {
+    return (
+      <EmptyState
+        title="Link not valid"
+        subtitle="This signing link is invalid or has expired. Ask the sender for a new one."
+        error={true}
+      />
+    );
+  }
+
+  const { fields, url, signableFields, status: templateStatus } = signing;
 
   const session = await getServerComponentAuthSession();
   const companyPublicId = session?.user.companyPublicId;
