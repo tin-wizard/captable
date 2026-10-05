@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi";
+import { requirePermission } from "../../middlewares/permission";
 import {
   PaginationQuerySchema,
   PaginationResponseSchema,
@@ -31,7 +32,7 @@ export const getMany = withAuthApiV1
     tags: ["Stakeholder"],
     method: "get",
     path: "/v1/{companyId}/stakeholders",
-    middleware: [authMiddleware()],
+    middleware: [authMiddleware(), requirePermission("stakeholder", "read")],
     request: {
       query: PaginationQuerySchema,
       params: ParamsSchema,

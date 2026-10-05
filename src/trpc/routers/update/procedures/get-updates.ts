@@ -1,5 +1,5 @@
 import { encode } from "@/lib/jwt";
-import { withTenant } from "@/trpc/api/trpc";
+import { withAccessControl, withTenant } from "@/trpc/api/trpc";
 import { z } from "zod";
 
 export const getUpdatesProcedure = withTenant.query(async ({ ctx }) => {
@@ -20,7 +20,8 @@ export const getUpdatesProcedure = withTenant.query(async ({ ctx }) => {
   return { data };
 });
 
-export const getRecipientsProcedure = withTenant
+export const getRecipientsProcedure = withAccessControl
+  .meta({ policies: { updates: { allow: ["read"] } } })
   .input(z.object({ updateId: z.string() }))
   .query(async ({ ctx, input }) => {
     const { db, companyId } = ctx.tenant;

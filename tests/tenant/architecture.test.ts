@@ -47,6 +47,17 @@ const ALLOWLIST_REST_GLOBAL: Record<string, string> = {
   [`${API}_example.ts`]: "example route, not registered",
 };
 
+// Rule (g) exceptions: REST routes with no role check.
+const ALLOWLIST_REST_NO_PERMISSION: Record<string, string> = {
+  [`${API}company/getMany.ts`]: "cross-company list of the caller's companies",
+  [`${API}company/getOne.ts`]: "cross-company; checks the caller's membership",
+  [`${API}_example.ts`]: "example route, not registered",
+  [`${API}share/getMany.ts`]:
+    "share reads are open to every member, like tRPC securities reads (D2)",
+  [`${API}share/getOne.ts`]:
+    "share reads are open to every member, like tRPC securities reads (D2)",
+};
+
 // Rule (a) migration to-do list (Tasks 6-7): shrink to zero. Must stay exact.
 const CURRENT_OFFENDERS: string[] = [];
 
@@ -109,6 +120,14 @@ const violatesD = (src: string) => SERVICES_DB.test(stripComments(src));
 const violatesF = (src: string) => IMPORTS_GLOBAL_DB.test(stripComments(src));
 const violatesB = (src: string) => RAW_SQL.test(stripComments(src));
 const violatesC = (src: string) => CHILD_CREATE.test(stripComments(src));
+// a route (createRoute) whose middleware list has no requirePermission(...)
+const violatesG = (src: string) => {
+  const s = stripComments(src);
+  return (
+    /\.createRoute\(/.test(s) &&
+    !/middleware\s*:\s*\[[^\]]*\brequirePermission\(/.test(s)
+  );
+};
 
 function walk(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -137,6 +156,7 @@ describe("tenant architecture guard", () => {
       ...Object.keys(ALLOWLIST_TENANTLESS),
       ...Object.keys(ALLOWLIST_CHILD_CREATE),
       ...Object.keys(ALLOWLIST_REST_GLOBAL),
+      ...Object.keys(ALLOWLIST_REST_NO_PERMISSION),
       ...CURRENT_OFFENDERS,
     ])
       expect(files, `allowlisted file missing: ${f}`).toContain(f);
@@ -203,6 +223,18 @@ describe("tenant architecture guard", () => {
     expect(
       bad,
       `use c.get("tenantDb") instead of the global services db:\n${bad.join(
+        "\n",
+      )}`,
+    ).toEqual([]);
+  });
+
+  it("(g) every REST route checks a role with requirePermission(...)", () => {
+    const bad = hits(violatesG).filter(
+      (f) => f.startsWith(API) && !(f in ALLOWLIST_REST_NO_PERMISSION),
+    );
+    expect(
+      bad,
+      `add requirePermission(subject, action) after authMiddleware():\n${bad.join(
         "\n",
       )}`,
     ).toEqual([]);
@@ -287,5 +319,19 @@ describe("tenant architecture guard", () => {
       false,
     );
     expect(violatesF('// import { db } from "@/server/db";')).toBe(false);
+    expect(violatesG("x.createRoute({ middleware: [authMiddleware()] })")).toBe(
+      true,
+    );
+    expect(
+      violatesG(
+        'x.createRoute({ middleware: [authMiddleware(), requirePermission("stakeholder", "read")] })',
+      ),
+    ).toBe(false);
+    expect(
+      violatesG(
+        "x.createRoute({ middleware: [authMiddleware()] }) // requirePermission(",
+      ),
+    ).toBe(true);
+    expect(violatesG("export const registerRoutes = (api) => {}")).toBe(false);
   });
 });

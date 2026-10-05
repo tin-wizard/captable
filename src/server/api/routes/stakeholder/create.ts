@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi";
+import { requirePermission } from "../../middlewares/permission";
 import {
   CreateStakeholderSchema,
   StakeholderSchema,
@@ -29,7 +30,7 @@ export const create = withAuthApiV1
     summary: "Create stakeholders",
     description: "Add one or more stakeholder accounts to a company.",
     tags: ["Stakeholder"],
-    middleware: [authMiddleware()],
+    middleware: [authMiddleware(), requirePermission("stakeholder", "create")],
     request: {
       params: ParamsSchema,
       body: {

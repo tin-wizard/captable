@@ -1,5 +1,8 @@
 import { Audit } from "@/server/audit";
-import { assertNotLastActiveAdmin } from "@/server/tenant-guard";
+import {
+  assertMayManageMember,
+  assertNotLastActiveAdmin,
+} from "@/server/tenant-guard";
 import { withAccessControl } from "@/trpc/api/trpc";
 import { ZodToggleActivationMutationSchema } from "../schema";
 
@@ -13,6 +16,7 @@ export const toggleActivation = withAccessControl
       const { memberId, status } = input;
 
       await tenant.db.$transaction(async (tx) => {
+        await assertMayManageMember(tx, companyId, tenant.role, memberId);
         if (status !== "ACTIVE") {
           await assertNotLastActiveAdmin(tx, companyId, memberId);
         }

@@ -1,5 +1,6 @@
 import { z } from "@hono/zod-openapi";
 import { ApiError } from "../../error";
+import { requirePermission } from "../../middlewares/permission";
 import {
   StakeholderSchema,
   type TStakeholderSchema,
@@ -38,7 +39,7 @@ export const getOne = withAuthApiV1
     tags: ["Stakeholder"],
     method: "get",
     path: "/v1/{companyId}/stakeholders/{id}",
-    middleware: [authMiddleware()],
+    middleware: [authMiddleware(), requirePermission("stakeholder", "read")],
     request: {
       params: ParamsSchema,
     },

@@ -1,7 +1,8 @@
 import { getRoleById } from "@/lib/rbac/access-control";
 import { Audit } from "@/server/audit";
 import {
-  assertMayGrantRole,
+  assertAdmin,
+  assertMayManageMember,
   assertNotLastActiveAdmin,
 } from "@/server/tenant-guard";
 import { withAccessControl } from "@/trpc/api/trpc";
@@ -21,15 +22,28 @@ export const updateMemberProcedure = withAccessControl
       const user = session.user;
 
       await tenant.db.$transaction(async (tx) => {
+        const current = await assertMayManageMember(
+          tx,
+          companyId,
+          tenant.role,
+          memberId,
+        );
         // no roleId: leave the role alone (it used to clear it)
         const role =
           roleId === undefined
             ? undefined
             : await getRoleById({ tx, id: roleId, companyId });
 
-        assertMayGrantRole(tenant.role, role?.role);
-        if (role && role.role !== "ADMIN") {
-          await assertNotLastActiveAdmin(tx, companyId, memberId);
+        // the UI always resends roleId: only a different role is a change
+        const roleChanged =
+          role &&
+          (role.role !== current?.role ||
+            role.customRoleId !== current?.customRoleId);
+        if (roleChanged) {
+          assertAdmin(tenant.role, "Only an admin can change a member's role.");
+          if (role.role !== "ADMIN") {
+            await assertNotLastActiveAdmin(tx, companyId, memberId);
+          }
         }
 
         const member = await tx.member.update({

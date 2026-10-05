@@ -1,5 +1,8 @@
 import { Audit } from "@/server/audit";
-import { assertNotLastActiveAdmin } from "@/server/tenant-guard";
+import {
+  assertMayManageMember,
+  assertNotLastActiveAdmin,
+} from "@/server/tenant-guard";
 import {
   withAccessControl,
   type withTenantTrpcContextType,
@@ -40,6 +43,7 @@ export async function removeMemberHandler({
   const { memberId } = input;
   const { companyId } = tenant;
 
+  await assertMayManageMember(db, companyId, tenant.role, memberId);
   await assertNotLastActiveAdmin(db, companyId, memberId);
 
   const member = await db.member.delete({

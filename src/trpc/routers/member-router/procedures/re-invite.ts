@@ -6,6 +6,7 @@ import {
   generateMemberIdentifier,
   revokeExistingInviteTokens,
 } from "@/server/member";
+import { assertMayManageMember } from "@/server/tenant-guard";
 import { withAccessControl } from "@/trpc/api/trpc";
 import { ZodReInviteMutationSchema } from "../schema";
 
@@ -21,6 +22,12 @@ export const reInviteProcedure = withAccessControl
 
       const { company, verificationToken, email, passwordResetToken } =
         await tenant.db.$transaction(async (tx) => {
+          await assertMayManageMember(
+            tx,
+            companyId,
+            tenant.role,
+            input.memberId,
+          );
           const company = await tx.company.findFirstOrThrow({
             where: {
               id: companyId,

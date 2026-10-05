@@ -2,6 +2,7 @@ import type { TActions } from "@/lib/rbac/actions";
 import type { TPermission } from "@/lib/rbac/schema";
 import type { TSubjects } from "@/lib/rbac/subjects";
 import { Audit } from "@/server/audit";
+import { assertAdmin } from "@/server/tenant-guard";
 import { withAccessControl } from "@/trpc/api/trpc";
 import {
   type TypeZodCreateRoleMutationSchema,
@@ -19,12 +20,13 @@ export const createRolesProcedure = withAccessControl
     async ({
       input,
       ctx: {
-        tenant: { db, companyId },
+        tenant: { db, companyId, role: callerRole },
         requestIp,
         userAgent,
         session,
       },
     }) => {
+      assertAdmin(callerRole);
       const { user } = session;
       const permissions = extractPermission(input.permissions);
       const role = await db.customRole.create({

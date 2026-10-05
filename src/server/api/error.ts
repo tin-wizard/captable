@@ -86,6 +86,10 @@ export const ErrorResponses: ReturnType<typeof generateErrorResponse> = {
     description: "Unauthorized",
   }),
   ...generateErrorResponse({
+    status: 403,
+    description: "Forbidden",
+  }),
+  ...generateErrorResponse({
     status: 404,
     description: "Not found",
   }),

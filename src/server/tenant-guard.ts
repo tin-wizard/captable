@@ -44,18 +44,34 @@ export async function assertBucketUsable(
     throw new Error("Invalid reference");
 }
 
-// Managing members (members:create / members:update) must not be a way to mint
-// admins: only an ADMIN may grant the ADMIN role.
-export function assertMayGrantRole(
-  callerRole: "ADMIN" | "CUSTOM" | null,
-  grantedRole: "ADMIN" | "CUSTOM" | null | undefined,
+type Role = "ADMIN" | "CUSTOM" | null;
+
+// Defining roles and assigning them are admin matters (D2): a grant on
+// roles:* or members:* is not a way to raise anyone's (or one's own) access.
+export function assertAdmin(
+  callerRole: Role,
+  message = "Only an admin can manage roles.",
 ) {
-  if (grantedRole === "ADMIN" && callerRole !== "ADMIN") {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Only an admin can grant the admin role.",
-    });
+  if (callerRole !== "ADMIN")
+    throw new TRPCError({ code: "FORBIDDEN", message });
+}
+
+// A non-admin may not act on an admin (update, deactivate, remove, re-invite,
+// revoke). Returns the target's current role (null when not in the company).
+export async function assertMayManageMember(
+  tx: TPrismaOrTransaction,
+  companyId: string,
+  callerRole: Role,
+  memberId: string,
+) {
+  const target = await tx.member.findFirst({
+    where: { id: memberId, companyId },
+    select: { role: true, customRoleId: true },
+  });
+  if (target?.role === "ADMIN") {
+    assertAdmin(callerRole, "Only an admin can manage an admin.");
   }
+  return target;
 }
 
 // A company must always keep at least one ACTIVE ADMIN. Call before removing,

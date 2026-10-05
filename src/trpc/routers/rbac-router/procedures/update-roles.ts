@@ -1,5 +1,6 @@
 import { getRoleById } from "@/lib/rbac/access-control";
 import { Audit } from "@/server/audit";
+import { assertAdmin } from "@/server/tenant-guard";
 import { withAccessControl } from "@/trpc/api/trpc";
 import { ZodUpdateRoleMutationSchema } from "../schema";
 import { extractPermission } from "./create-role";
@@ -15,12 +16,13 @@ export const updateRolesProcedure = withAccessControl
     async ({
       input,
       ctx: {
-        tenant: { db, companyId },
+        tenant: { db, companyId, role: callerRole },
         userAgent,
         requestIp,
         session,
       },
     }) => {
+      assertAdmin(callerRole);
       const permissions = extractPermission(input.permissions);
       const { user } = session;
       await db.$transaction(async (tx) => {

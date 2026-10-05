@@ -5,17 +5,14 @@ import { encode } from "@/lib/jwt";
 import { ShareRecipientSchema } from "@/schema/contacts";
 import { Audit } from "@/server/audit";
 import { assertTenantOwns } from "@/server/tenant-guard";
-import {
-  createTRPCRouter,
-  withAccessControl,
-  withTenant,
-} from "@/trpc/api/trpc";
+import { createTRPCRouter, withAccessControl } from "@/trpc/api/trpc";
 import type { DataRoom } from "@prisma/client";
 import { z } from "zod";
 import { DataRoomSchema } from "./schema";
 
 export const dataRoomRouter = createTRPCRouter({
-  getDataRoom: withTenant
+  getDataRoom: withAccessControl
+    .meta({ policies: { "data-rooms": { allow: ["read"] } } })
     .input(
       z.object({
         dataRoomPublicId: z.string(),

@@ -5,6 +5,7 @@ import {
   type CreateShareSchemaType,
 } from "../../schema/shares";
 
+import { requirePermission } from "../../middlewares/permission";
 import { authMiddleware, withAuthApiV1 } from "../../utils/endpoint-creator";
 
 const ResponseSchema = z.object({
@@ -31,7 +32,7 @@ export const create = withAuthApiV1
     summary: "Create shares",
     description: "Issue shares to a stakeholder in a company.",
     tags: ["Shares"],
-    middleware: [authMiddleware()],
+    middleware: [authMiddleware(), requirePermission("securities", "create")],
     request: {
       params: ParamsSchema,
       body: {

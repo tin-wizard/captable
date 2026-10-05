@@ -900,6 +900,22 @@ describe("roles inside a tenant", () => {
     expect(await code(readOnlyCustom.bucket.getUrl(input))).toBe("resolved");
     expect(await code(admin.bucket.getUrl(input))).toBe("resolved");
   });
+
+  // these reads mint working public-link tokens for every recipient
+  it("dataRoom.getDataRoom needs data-rooms:read", async () => {
+    const input = {
+      dataRoomPublicId: fx.dataRoomPublicId,
+      include: { recipients: true },
+    };
+    expect(await code(noRole.dataRoom.getDataRoom(input))).toBe("UNAUTHORIZED");
+    expect(await code(admin.dataRoom.getDataRoom(input))).toBe("resolved");
+  });
+
+  it("update.getRecipients needs updates:read", async () => {
+    const input = { updateId: fx.updateId };
+    expect(await code(noRole.update.getRecipients(input))).toBe("UNAUTHORIZED");
+    expect(await code(admin.update.getRecipients(input))).toBe("resolved");
+  });
 });
 
 describe("policy coverage guard", () => {
