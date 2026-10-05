@@ -39,6 +39,8 @@ export const onboardingRouter = createTRPCRouter({
 
           await tx.member.create({
             data: {
+              // the company creator is its first admin (there is no schema default)
+              role: "ADMIN",
               isOnboarded: true,
               status: "ACTIVE",
               title: input.user.title,

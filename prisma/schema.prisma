@@ -211,7 +211,7 @@ model Member {
   title        String?
   status       MemberStatusEnum @default(PENDING)
   isOnboarded  Boolean          @default(false)
-  role         Roles?           @default(ADMIN)
+  role         Roles?
   workEmail    String?
   lastAccessed DateTime         @default(now())
   createdAt    DateTime         @default(now())
