@@ -1,60 +1,56 @@
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
 import { revokeExistingInviteTokens } from "@/server/member";
-import { withAuth } from "@/trpc/api/trpc";
+import { withTenant } from "@/trpc/api/trpc";
+import { TRPCError } from "@trpc/server";
 import { ZodRevokeInviteMutationSchema } from "../schema";
 import { removeMemberHandler } from "./remove-member";
 
-export const revokeInviteProcedure = withAuth
+export const revokeInviteProcedure = withTenant
   .input(ZodRevokeInviteMutationSchema)
   .mutation(async ({ ctx, input }) => {
-    const { db, session, requestIp, userAgent } = ctx;
+    const { tenant, session, requestIp, userAgent } = ctx;
     const user = session.user;
-    const { memberId, email } = input;
+    const { memberId } = input;
 
-    await db.$transaction(async (tx) => {
-      await checkMembership({ session, tx });
-
-      await revokeExistingInviteTokens({ memberId, email, tx });
-
+    await tenant.db.$transaction(async (tx) => {
+      // Look the member up through the caller's company first: another
+      // company's invite must be indistinguishable from a missing one, and
+      // nothing (tokens, names) may be touched or read before this passes.
       const member = await tx.member.findFirst({
-        where: {
-          id: memberId,
-        },
+        where: { id: memberId, companyId: tenant.companyId },
         select: {
           userId: true,
-          user: {
-            select: {
-              name: true,
-            },
-          },
-          company: {
-            select: {
-              name: true,
-            },
-          },
+          user: { select: { name: true, email: true } },
+          company: { select: { name: true } },
         },
       });
+
+      if (!member) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "member not found" });
+      }
+
+      // the stored email, not the client-supplied one, names the tokens
+      const email = member.user.email;
+      if (email) {
+        await revokeExistingInviteTokens({ memberId, email, tx });
+      }
 
       await Audit.create(
         {
           action: "member.revoked-invite",
-          companyId: user.companyId,
+          companyId: tenant.companyId,
           actor: { type: "user", id: user.id },
           context: {
             requestIp,
             userAgent,
           },
-          target: [{ type: "user", id: member?.userId }],
-          summary: `${user.name} revoked ${member?.user?.name} to join ${member?.company?.name}`,
+          target: [{ type: "user", id: member.userId }],
+          summary: `${user.name} revoked ${member.user?.name} to join ${member.company?.name}`,
         },
         tx,
       );
 
-      await removeMemberHandler({
-        ctx: { ...ctx, db: tx },
-        input: { memberId: input.memberId },
-      });
+      await removeMemberHandler({ ctx, db: tx, input: { memberId } });
     });
 
     return { success: true };

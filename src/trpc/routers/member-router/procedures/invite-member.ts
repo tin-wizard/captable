@@ -28,7 +28,7 @@ export const inviteMemberProcedure = withAccessControl
     const { token: passwordResetToken } =
       await generatePasswordResetToken(email);
 
-    const { company, verificationToken } = await ctx.db.$transaction(
+    const { company, verificationToken } = await ctx.tenant.db.$transaction(
       async (tx) => {
         const company = await tx.company.findFirstOrThrow({
           where: {

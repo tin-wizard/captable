@@ -1,11 +1,9 @@
-import { type ShareContactType } from "@/schema/contacts";
-import { createTRPCRouter, withAuth } from "@/trpc/api/trpc";
+import type { ShareContactType } from "@/schema/contacts";
+import { createTRPCRouter, withTenant } from "@/trpc/api/trpc";
 
 export const commonRouter = createTRPCRouter({
-  getContacts: withAuth.query(async ({ ctx }) => {
-    const { db, session } = ctx;
-    const user = session.user;
-    const companyId = user.companyId;
+  getContacts: withTenant.query(async ({ ctx }) => {
+    const { db, companyId } = ctx.tenant;
     const contacts = [] as ShareContactType[];
 
     const members = await db.member.findMany({
@@ -32,10 +30,10 @@ export const commonRouter = createTRPCRouter({
     (members || []).map((member) =>
       contacts.push({
         id: member.id,
-        image: member.user.image!,
-        email: member.user.email!,
-        value: member.user.email!,
-        name: member.user.name!,
+        image: member.user.image ?? undefined,
+        email: member.user.email ?? "",
+        value: member.user.email ?? "",
+        name: member.user.name ?? "",
         type: "member",
       }),
     );
@@ -45,7 +43,7 @@ export const commonRouter = createTRPCRouter({
         email: stakeholder.email,
         value: stakeholder.email,
         name: stakeholder.name,
-        institutionName: stakeholder.institutionName!,
+        institutionName: stakeholder.institutionName ?? undefined,
         type: "stakeholder",
       }),
     );

@@ -11,7 +11,8 @@ const R = "src/trpc/routers/";
 const ALLOWLIST_TENANTLESS: Record<string, string> = {
   [`${R}onboarding-router/router.ts`]: "creates the company; no tenant yet",
   [`${R}passkey-router/router.ts`]: "user-level credentials, not tenant data",
-  [`${R}common/router.ts`]: "user-level lookups across the user's companies",
+  [`${R}company-router/procedures/switch-company.ts`]:
+    "reads the caller's own membership in another company",
   [`${R}member-router/procedures/get-profile.ts`]: "user's own profile",
   [`${R}member-router/procedures/update-profile.ts`]: "user's own profile",
   [`${R}member-router/procedures/accept-member.ts`]:
@@ -35,20 +36,13 @@ const ALLOWLIST_CHILD_CREATE: Record<string, string> = {
 };
 
 // Rule (a) migration to-do list (Tasks 6-7): shrink to zero. Must stay exact.
-const CURRENT_OFFENDERS: string[] = [
-  "src/trpc/routers/billing-router/procedures/checkout.ts",
-  "src/trpc/routers/billing-router/procedures/get-subscription.ts",
-  "src/trpc/routers/billing-router/procedures/stripe-portal.ts",
-  "src/trpc/routers/company-router/router.ts",
-  "src/trpc/routers/member-router/procedures/re-invite.ts",
-  "src/trpc/routers/member-router/procedures/remove-member.ts",
-  "src/trpc/routers/member-router/procedures/revoke-invite.ts",
-  "src/trpc/routers/member-router/procedures/toggle-activation.ts",
-];
+const CURRENT_OFFENDERS: string[] = [];
 
 const RAW_SQL = /\$(queryRaw|executeRaw)(Unsafe)?\b/;
+// ctx.db, `ctx: { ..., db }` or `const { db } = ctx` (not ctx.tenant, not a
+// `db: tx` literal handed to a helper, not `ctx: { tenant: { db } }`)
 const CTX_DB =
-  /ctx\.db\b|ctx\s*:\s*\{[^}]*\bdb\b|\{[^}]*\bdb\b[^}]*\}\s*=\s*ctx\b/;
+  /ctx\.db\b|ctx\s*:\s*\{(?:(?!tenant)[^}])*\bdb\b(?!\s*:)|\{[^}]*\bdb\b[^}]*\}\s*=\s*ctx\b(?!\.)/;
 const CHILD_MODELS = Object.keys(PARENT_SCOPED).map(
   (m) => m[0]?.toLowerCase() + m.slice(1),
 );
@@ -63,7 +57,9 @@ const stripComments = (s: string) =>
 
 const violatesA = (src: string) => {
   const s = stripComments(src);
-  return /\bwithAuth\b/.test(s) && CTX_DB.test(s);
+  return (
+    /\b(withAuth|withTenant|withAccessControl)\b/.test(s) && CTX_DB.test(s)
+  );
 };
 const violatesB = (src: string) => RAW_SQL.test(stripComments(src));
 const violatesC = (src: string) => CHILD_CREATE.test(stripComments(src));
@@ -94,7 +90,7 @@ describe("tenant architecture guard", () => {
       expect(files, `allowlisted file missing: ${f}`).toContain(f);
   });
 
-  it("(a) withAuth + ctx.db only in CURRENT_OFFENDERS or tenantless allowlist", () => {
+  it("(a) withAuth/withTenant/withAccessControl + ctx.db only in CURRENT_OFFENDERS or tenantless allowlist", () => {
     const bad = hits(violatesA).filter(
       (f) => !(f in ALLOWLIST_TENANTLESS) && !CURRENT_OFFENDERS.includes(f),
     );
@@ -148,6 +144,24 @@ describe("tenant architecture guard", () => {
       false,
     );
     expect(violatesA("// withAuth ctx.db")).toBe(false);
+    expect(
+      violatesA("withTenant.query(({ ctx }) => ctx.db.member.findMany())"),
+    ).toBe(true);
+    expect(
+      violatesA("withAccessControl.mutation(async ({ ctx: { db } }) => 1)"),
+    ).toBe(true);
+    expect(
+      violatesA("withAccessControl.query(({ ctx }) => ctx.tenant.db.x)"),
+    ).toBe(false);
+    expect(
+      violatesA("withTenant.query(({ ctx: { tenant: { db } } }) => 1)"),
+    ).toBe(false);
+    expect(
+      violatesA("withTenant.query(({ ctx }) => h({ ctx: { db: tx } }))"),
+    ).toBe(false);
+    expect(
+      violatesA("withTenant.query(({ ctx }) => { const { db } = ctx.tenant })"),
+    ).toBe(false);
     expect(violatesB("await db.$queryRaw`select 1`")).toBe(true);
     expect(violatesB("db.$executeRawUnsafe('x')")).toBe(true);
     expect(violatesB("db.user.findMany()")).toBe(false);

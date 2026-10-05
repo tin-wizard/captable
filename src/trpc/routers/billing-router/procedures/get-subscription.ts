@@ -1,11 +1,10 @@
-import { checkMembership } from "@/server/auth";
-import { withAuth } from "@/trpc/api/trpc";
+import { withTenant } from "@/trpc/api/trpc";
 
-export const getSubscriptionProcedure = withAuth.query(async ({ ctx }) => {
-  const { db, session } = ctx;
+export const getSubscriptionProcedure = withTenant.query(async ({ ctx }) => {
+  const { tenant } = ctx;
 
-  const { subscription } = await db.$transaction(async (tx) => {
-    const { companyId } = await checkMembership({ session, tx });
+  const { subscription } = await tenant.db.$transaction(async (tx) => {
+    const { companyId } = tenant;
 
     const customer = await tx.billingCustomer.findFirst({
       where: {

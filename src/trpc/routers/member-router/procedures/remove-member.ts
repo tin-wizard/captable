@@ -1,42 +1,39 @@
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
-import { type TPrismaOrTransaction } from "@/server/db";
-import { withAuth, type withAuthTrpcContextType } from "@/trpc/api/trpc";
+import { withTenant, type withTenantTrpcContextType } from "@/trpc/api/trpc";
 import {
   type TypeZodRemoveMemberMutationSchema,
   ZodRemoveMemberMutationSchema,
 } from "../schema";
 
-export const removeMemberProcedure = withAuth
+type TenantDb = withTenantTrpcContextType["tenant"]["db"];
+type TenantTx = Parameters<Parameters<TenantDb["$transaction"]>[0]>[0];
+
+export const removeMemberProcedure = withTenant
   .input(ZodRemoveMemberMutationSchema)
-  .mutation(async (args) => {
-    const data = await args.ctx.db.$transaction(async (db) => {
-      const data = await removeMemberHandler({
-        ...args,
-        ctx: { ...args.ctx, db },
-      });
-
-      return data;
-    });
-
-    return data;
-  });
+  .mutation(async ({ ctx, input }) =>
+    ctx.tenant.db.$transaction((tx) =>
+      removeMemberHandler({ ctx, db: tx, input }),
+    ),
+  );
 
 interface removeMemberHandlerOptions {
   input: TypeZodRemoveMemberMutationSchema;
-  ctx: Omit<withAuthTrpcContextType, "db"> & {
-    db: TPrismaOrTransaction;
-  };
+  // tenant-scoped client (or transaction) the delete and audit run on
+  db: TenantDb | TenantTx;
+  ctx: Pick<
+    withTenantTrpcContextType,
+    "session" | "requestIp" | "userAgent" | "tenant"
+  >;
 }
 
 export async function removeMemberHandler({
-  ctx: { db, session, requestIp, userAgent },
+  ctx: { session, requestIp, userAgent, tenant },
+  db,
   input,
 }: removeMemberHandlerOptions) {
   const user = session.user;
   const { memberId } = input;
-
-  const { companyId } = await checkMembership({ session, tx: db });
+  const { companyId } = tenant;
 
   const member = await db.member.delete({
     where: {

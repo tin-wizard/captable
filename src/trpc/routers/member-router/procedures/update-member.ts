@@ -11,15 +11,12 @@ export const updateMemberProcedure = withAccessControl
     },
   })
   .mutation(
-    async ({
-      ctx: { session, db, requestIp, userAgent, membership },
-      input,
-    }) => {
+    async ({ ctx: { session, tenant, requestIp, userAgent }, input }) => {
       const { memberId, name, roleId, ...rest } = input;
-      const { companyId } = membership;
+      const { companyId } = tenant;
       const user = session.user;
 
-      await db.$transaction(async (tx) => {
+      await tenant.db.$transaction(async (tx) => {
         const role = await getRoleById({ tx, id: roleId, companyId });
 
         const member = await tx.member.update({

@@ -907,6 +907,71 @@ describe("cross-tenant isolation", () => {
       expect(res.success).toBe(true);
     });
 
+    it("member.revokeInvite refuses B's invite as not found, before touching B's tokens or data", async () => {
+      const tokensBefore = await db.verificationToken.count({
+        where: { identifier: { contains: ids.b.pendingMemberId } },
+      });
+      expect(tokensBefore).toBeGreaterThan(0);
+
+      const err = await callerA.member
+        .revokeInvite({
+          email: ids.b.pendingEmail,
+          memberId: ids.b.pendingMemberId,
+        })
+        .then(() => undefined)
+        .catch((e: unknown) => e);
+
+      expect(err).toMatchObject({ code: "NOT_FOUND" });
+      expect(stringify((err as Error).message)).not.toContain(B_SECRET);
+      expect(
+        await db.verificationToken.count({
+          where: { identifier: { contains: ids.b.pendingMemberId } },
+        }),
+      ).toBe(tokensBefore);
+    });
+
+    it("member.inviteMember, updateMember and toggleActivation succeed inside A's own tenant", async () => {
+      const invited = await callerA.member.inviteMember({
+        email: inviteEmail,
+        name: "invitee",
+        title: "invitee",
+      });
+      expect(invited.success).toBe(true);
+      const pending = await db.member.findFirstOrThrow({
+        where: { companyId: ids.a.companyId, user: { email: inviteEmail } },
+      });
+
+      await callerA.member.updateMember({
+        memberId: ids.a.member2Id,
+        title: "renamed",
+      });
+      expect(
+        (await db.member.findUniqueOrThrow({ where: { id: ids.a.member2Id } }))
+          .title,
+      ).toBe("renamed");
+
+      await callerA.member.toggleActivation({
+        memberId: ids.a.member2Id,
+        status: "INACTIVE",
+      });
+      expect(
+        (await db.member.findUniqueOrThrow({ where: { id: ids.a.member2Id } }))
+          .status,
+      ).toBe("INACTIVE");
+
+      // revoking A's own pending invite removes the member and its token
+      await callerA.member.revokeInvite({
+        email: inviteEmail,
+        memberId: pending.id,
+      });
+      expect(await db.member.count({ where: { id: pending.id } })).toBe(0);
+      expect(
+        await db.verificationToken.count({
+          where: { identifier: { contains: pending.id } },
+        }),
+      ).toBe(0);
+    });
+
     it("update.getRecipients returns B's recipients to B's own caller", async () => {
       const res = await callerFor(tenants.b).update.getRecipients({
         updateId: ids.b.updateId,

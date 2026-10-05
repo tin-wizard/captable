@@ -27,9 +27,10 @@ interface CreateTemplateHandlerProps {
 }
 
 export async function createTemplateHandler({
-  ctx: { db, user, userAgent, requestIp },
+  ctx: handlerCtx,
   input: { recipients, ...rest },
 }: CreateTemplateHandlerProps) {
+  const { db, user, userAgent, requestIp } = handlerCtx;
   await assertBucketUsable(db, rest.companyId, rest.bucketId);
   const publicId = generatePublicId();
   const template = await db.template.create({
