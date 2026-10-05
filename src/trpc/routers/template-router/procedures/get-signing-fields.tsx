@@ -69,6 +69,20 @@ export const getSigningFieldsProcedure = withoutAuth
       return { bucket, fields, status };
     });
 
+    // a cancelled envelope stays "Cancelled" for the signer, but must not keep
+    // handing out its fields or a signed URL for the document
+    if (status === "CANCELLED") {
+      return {
+        fields: [],
+        key: "",
+        url: "",
+        recipientId,
+        templateId,
+        status,
+        signableFields: [],
+      };
+    }
+
     const { key, url } = await getPresignedGetUrl(bucket.key);
 
     return {

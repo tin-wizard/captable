@@ -3,7 +3,10 @@ import { decode } from "@/lib/jwt";
 import { queue } from "@/lib/queue";
 import { db } from "@/server/db";
 import { appRouter } from "@/trpc/api/root";
-import { DecodeEmailToken } from "@/trpc/routers/template-field-router/procedures/add-fields";
+import {
+  DecodeEmailToken,
+  EncodeEmailToken,
+} from "@/trpc/routers/template-field-router/procedures/add-fields";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { type Tenant, callerFor, seedTwoTenants } from "../helpers/seed";
 import {
@@ -229,5 +232,20 @@ describe("template.resendLink", () => {
     ).toBe("NOT_FOUND");
     expect(send).not.toHaveBeenCalled();
     expect(await snapshotB(b)).toEqual(before);
+  });
+});
+
+describe("an old link to a cancelled envelope", () => {
+  it("returns the status only: no fields and no document URL", async () => {
+    const { templateId, recipientIds } = await envelope("CANCELLED", ["SENT"]);
+    const token = await EncodeEmailToken({
+      templateId,
+      recipientId: recipientIds[0] as string,
+    });
+    const res = await anon.template.getSigningFields({ token });
+    expect(res.status).toBe("CANCELLED");
+    expect(res.fields).toEqual([]);
+    expect(res.signableFields).toEqual([]);
+    expect(res.url).toBe("");
   });
 });
