@@ -15,7 +15,11 @@ describe("seed helpers", () => {
     const url = (
       await db.$queryRaw<{ db: string }[]>`select current_database() as db`
     )[0];
-    expect(url?.db).toBe("captable_test");
+    // whatever database the harness was pointed at (CI names it differently)
+    const expected = new URL(
+      process.env.TEST_DATABASE_URL as string,
+    ).pathname.slice(1);
+    expect(url?.db).toBe(expected);
   });
 
   it("builds a working tRPC caller for a tenant", async () => {
