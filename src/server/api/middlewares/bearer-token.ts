@@ -99,7 +99,7 @@ async function checkMembership(userId: string, c: Context) {
   }
 
   const membership = await db.member.findFirst({
-    where: { companyId, userId },
+    where: { companyId, userId, status: "ACTIVE", isOnboarded: true },
     select: {
       id: true,
       companyId: true,
@@ -133,6 +133,7 @@ function findAccessToken(clientId: string, c: Context) {
       clientId,
       typeEnum: "api",
       active: true,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
     },
     select: {
       clientId: true,

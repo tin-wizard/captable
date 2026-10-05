@@ -1,5 +1,6 @@
 import { Audit } from "@/server/audit";
 import { checkMembership } from "@/server/auth";
+import { assertTenantOwns } from "@/server/tenant-guard";
 import { createTRPCRouter, withAuth } from "@/trpc/api/trpc";
 import { EquityPlanMutationSchema } from "./schema";
 
@@ -34,6 +35,7 @@ export const equityPlanRouter = createTRPCRouter({
       try {
         await ctx.db.$transaction(async (tx) => {
           const { companyId } = await checkMembership({ session, tx });
+          await assertTenantOwns(tx, companyId, input);
 
           const data = {
             companyId,
@@ -83,6 +85,7 @@ export const equityPlanRouter = createTRPCRouter({
 
         await ctx.db.$transaction(async (tx) => {
           const { companyId } = await checkMembership({ tx, session });
+          await assertTenantOwns(tx, companyId, input);
 
           const data = {
             name: input.name,
@@ -97,7 +100,7 @@ export const equityPlanRouter = createTRPCRouter({
           };
 
           await tx.equityPlan.update({
-            where: { id: input.id },
+            where: { id: input.id, companyId },
             data,
           });
 

@@ -1,3 +1,4 @@
+import { assertTenantOwns } from "@/server/tenant-guard";
 import { createTRPCRouter, withAuth } from "@/trpc/api/trpc";
 import { ShareClassMutationSchema } from "./schema";
 
@@ -25,6 +26,10 @@ export const shareClassRouter = createTRPCRouter({
             where: {
               companyId,
             },
+          });
+
+          await assertTenantOwns(tx, companyId, {
+            shareClassId: input.convertsToShareClassId,
           });
 
           const idx = maxIdx + 1;
@@ -91,6 +96,10 @@ export const shareClassRouter = createTRPCRouter({
             session: ctx.session,
           });
 
+          await assertTenantOwns(tx, companyId, {
+            shareClassId: input.convertsToShareClassId,
+          });
+
           const data = {
             prefix,
             name: input.name,
@@ -109,7 +118,7 @@ export const shareClassRouter = createTRPCRouter({
           };
 
           await tx.shareClass.update({
-            where: { id: input.id },
+            where: { id: input.id, companyId },
             data,
           });
 

@@ -45,10 +45,15 @@ export const getOne = withAuthApiV1
     const { membership } = c.get("session");
     const { id: companyId } = c.req.valid("param");
 
-    const member = await db.member.findFirst({
-      where: { companyId, id: membership.memberId },
-      select: { companyId: true },
-    });
+    // bearer tokens carry only a userId; an undefined filter would match any member
+    const { memberId, userId } = membership;
+    const who = memberId ? { id: memberId } : userId ? { userId } : null;
+    const member = who
+      ? await db.member.findFirst({
+          where: { companyId, ...who, status: "ACTIVE", isOnboarded: true },
+          select: { companyId: true },
+        })
+      : null;
 
     if (!member) {
       throw new ApiError({

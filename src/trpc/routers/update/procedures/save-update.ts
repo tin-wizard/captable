@@ -1,5 +1,6 @@
 import { generatePublicId } from "@/common/id";
 import { Audit } from "@/server/audit";
+import { checkMembership } from "@/server/auth";
 import { withAuth } from "@/trpc/api/trpc";
 import { UpdateMutationSchema } from "../schema";
 
@@ -22,9 +23,10 @@ export const saveUpdateProcedure = withAuth
         };
       }
       await ctx.db.$transaction(async (tx) => {
+        await checkMembership({ session: ctx.session, tx });
         if (input.publicId) {
           const update = await tx.update.update({
-            where: { publicId },
+            where: { publicId, companyId },
             data: {
               html,
               title,

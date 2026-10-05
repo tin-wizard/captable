@@ -1,5 +1,7 @@
 import { Audit } from "@/server/audit";
+import { checkVerificationToken } from "@/server/member";
 import { withAuth } from "@/trpc/api/trpc";
+import { TRPCError } from "@trpc/server";
 import { ZodAcceptMemberMutationSchema } from "../schema";
 
 export const acceptMemberProcedure = withAuth
@@ -7,6 +9,13 @@ export const acceptMemberProcedure = withAuth
   .mutation(async ({ ctx, input }) => {
     const user = ctx.session.user;
     const { userAgent, requestIp } = ctx;
+
+    // the token must be valid, unexpired, issued to this user's email, and
+    // for exactly the member being accepted
+    const invite = await checkVerificationToken(input.token, user.email);
+    if (invite.memberId !== input.memberId) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "invalid invite" });
+    }
 
     const { publicId } = await ctx.db.$transaction(async (trx) => {
       await trx.verificationToken.delete({
