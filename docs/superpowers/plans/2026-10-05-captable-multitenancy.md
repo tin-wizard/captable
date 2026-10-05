@@ -339,6 +339,16 @@ Also found (not tenancy, fix opportunistically): `add-stakeholders.ts:27` fires 
 - [ ] **Step 1–3:** same as Task 6. REST: in `src/server/api/middlewares/*` set `c.set("tenantDb", tenantDb(db, membership.companyId))` and read it in handlers.
 - [ ] **Step 4:** architecture allowlist reaches only the genuinely tenantless files (`onboarding`, `passkey`, `common`, profile/password, billing products). **Commit and open PR 1.**
 
+#### Phase 1 final-review follow-ups (not yet done)
+
+From the independent review of Phase 1 (B1 and S1/S2 are fixed; these remain):
+
+- **S3 (cross-tenant files, do with Task 12):** `src/server/file-uploads.ts` is a `"use server"` module, so `getPresignedGetUrl(key)`, `getPresignedPutUrl(...)` and `deleteBucketFile(key)` are callable as unauthenticated server actions. Anyone holding a key can sign a read URL or delete the object. Fix: drop `"use server"`, expose only actions that check session, membership and `Bucket.companyId`, never export `deleteBucketFile` to the client.
+- **S4:** four dashboard pages read tenant data with the JWT `session.user.companyId` and the global `db` (documents/[bucketId], data-rooms, equity-plans, share-classes pages). The layout re-checks membership, but pages render concurrently. Fix: a cached `getServerTenant()` returning `{ companyId, db: tenantDb(...) }` from `getPermissions`.
+- **N8 (Phase 2 scope):** `remove-member`, `toggle-activation`, `revoke-invite`, `re-invite` and the securities/SAFE procedures have no role check; `getCompanyList` and REST `company/getMany` do not filter on member status; the update visibility toggle copies a token-less public link.
+- **Latent:** relation writes inside update `data` (`company: { connect }`) are not forced by `tenantDb`; keep zod schemas strict. Public-flow tokens (e-sign, data room, updates) never expire.
+- **REST notes:** cookie auth fails for requests with a body (the session fetch forwards the body into a GET); the route header schema demands an `Authorization` header even for cookie callers; the pagination `limit` default does not take effect.
+
 ### Phase 2 — Roles on every mutation
 
 #### Task 8: Subjects and the role matrix (needs decision D2)
