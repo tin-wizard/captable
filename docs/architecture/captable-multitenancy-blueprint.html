@@ -67,7 +67,7 @@ svg { width: 100%; height: auto; display: block; }
   <text x="10" y="248" font-weight="700" fill="#566170">AUTHORIZATION</text>
   <rect x="10" y="254" width="540" height="46" rx="6" fill="#eaf6ef" stroke="#1f7a4d"/>
   <text x="22" y="272" font-weight="700" fill="#1f7a4d">RBAC (withAccessControl): role + custom permissions per subject/action</text>
-  <text x="22" y="288" fill="#17202a">applied to 19 router files today; <tspan fill="#a85d00" font-weight="700">target: every mutation, uploads, member management</tspan></text>
+  <text x="22" y="288" fill="#17202a">every tRPC mutation and REST write; <tspan fill="#a85d00" font-weight="700">open reads remain (follow-up)</tspan></text>
   <!-- data access -->
   <text x="10" y="324" font-weight="700" fill="#566170">DATA ACCESS</text>
   <rect x="10" y="330" width="260" height="70" rx="6" fill="#eaf6ef" stroke="#1f7a4d"/>
@@ -167,7 +167,7 @@ svg { width: 100%; height: auto; display: block; }
   <g fill="#17202a">
   <text x="6" y="136">2: no session, or next-auth's empty <tspan font-family="monospace">{}</tspan> for an undecodable cookie → 401. Expired or inactive access token → 401.</text>
   <text x="6" y="152">3: any of user id / member id / company id missing, member not ACTIVE or not onboarded, or token's company ≠ URL company → 401.</text>
-  <text x="6" y="168">4: no matching permission → UNAUTHORIZED. <tspan fill="#a85d00">(Target: applied to every mutation.)</tspan></text>
+  <text x="6" y="168">4: no matching permission → UNAUTHORIZED. (every mutation; REST writes return 403.)</text>
   <text x="6" y="184">5: an id supplied by the client that is not this company's (stakeholder, class, plan, member, role, document, bucket) → rejected.</text>
   <text x="6" y="200">6: a caller-supplied <tspan font-family="monospace">companyId</tspan> is overwritten with the member's company; raw SQL on the scoped client throws.</text>
   </g>
@@ -186,8 +186,8 @@ svg { width: 100%; height: auto; display: block; }
 <tr><td>I3</td><td>Files belong to one company</td><td><code>Bucket.companyId</code>; server-issued key <code>${companyPublicId}/…</code>; exact key-shape check on register; owner check on download</td><td><span class="badge b">BUILT</span></td></tr>
 <tr><td>I4</td><td>Every entry point proves identity</td><td>Empty or partial sessions rejected in <code>checkMembership</code> and the cookie middleware; no unauthenticated server actions</td><td><span class="badge b">BUILT</span></td></tr>
 <tr><td>I5</td><td>Public links reach only their own resource</td><td>Signed token binds template, recipient, data room or update; one-time signing state</td><td><span class="badge b">BUILT</span> · expiry <span class="badge t">TARGET</span></td></tr>
-<tr><td>I6</td><td>Inside a company, actions follow the member's role</td><td>RBAC subjects and actions on every mutation; last-ADMIN protection; least-privilege default role</td><td><span class="badge t">TARGET</span> (RBAC on 19 router files today)</td></tr>
-<tr><td>I7</td><td>Tenant data is never read by unscoped code outside the by-design exceptions</td><td>Architecture scan of routers and REST routes; dashboard pages through one scoped helper</td><td>routers <span class="badge b">BUILT</span> · pages <span class="badge t">TARGET</span></td></tr>
+<tr><td>I6</td><td>Inside a company, actions follow the member's role</td><td>RBAC subjects and actions on every mutation (tRPC and REST); role definition and assignment are ADMIN-only; last-ADMIN protection; least-privilege default role</td><td><span class="badge b">BUILT</span> (every tRPC mutation and every REST write; open reads remain, see below)</td></tr>
+<tr><td>I7</td><td>Tenant data is never read by unscoped code outside the by-design exceptions</td><td>Architecture scan of routers and REST routes; dashboard pages through one scoped helper</td><td>routers, REST and pages <span class="badge b">BUILT</span></td></tr>
 <tr><td>I8</td><td>These guarantees cannot silently regress</td><td>Two-tenant isolation matrix (tRPC and REST), upload tests, architecture test; run in CI</td><td>tests <span class="badge b">BUILT</span> · CI <span class="badge t">TARGET</span></td></tr>
 </table>
 <h3>Known limits of the scoped client (design constraints, not defects)</h3>
@@ -209,20 +209,21 @@ svg { width: 100%; height: auto; display: block; }
 <h3>Tenant switching</h3>
 <p>The session points at the member with the most recent <code>lastAccessed</code>. <code>switchCompany</code> accepts only the caller's own ACTIVE, onboarded membership, updates <code>lastAccessed</code> and refreshes the session. It deliberately uses the global client because it reads a membership in a different company.</p>
 
-<h2>6. Authorization architecture <span class="badge t">TARGET</span></h2>
+<h2>6. Authorization architecture <span class="badge b">BUILT</span></h2>
 <div class="two">
 <div>
 <p>A permission is <code>subject:action</code>. <code>ADMIN</code> holds <code>*</code>; <code>CUSTOM</code> holds the list in its <code>CustomRole</code>; a member with no role holds nothing. Enforcement is a tRPC middleware (<code>withAccessControl</code>) driven by <code>.meta({policies})</code>, so a procedure's required permission is visible beside its definition.</p>
-<p>Subjects today: billing, members, stakeholder, roles, audits, documents, company, developer, bank-accounts. Target adds <code>securities</code>, <code>cap-table-settings</code>, <code>updates</code>, <code>data-rooms</code>, <code>templates</code>.</p>
+<p>Subjects: billing, members, stakeholder, roles, audits, documents, company, developer, bank-accounts, <code>securities</code>, <code>cap-table-settings</code>, <code>updates</code>, <code>data-rooms</code>, <code>templates</code>. The REST API enforces the same check (fail-closed) on stakeholder and share writes, so an API token carries only its owner's role in the company named in the URL.</p>
 </div>
 <div>
 <table>
 <tr><th>Rule</th><th>Default</th></tr>
-<tr><td>Read cap-table data</td><td>any active member</td></tr>
+<tr><td>Read cap-table data</td><td>any active member (exceptions: stakeholders, documents, and anything that mints a public link need their read permission)</td></tr>
 <tr><td>Create, edit, delete securities and settings</td><td>ADMIN or granted</td></tr>
-<tr><td>Manage members and roles</td><td>ADMIN or granted <code>members:update</code></td></tr>
+<tr><td>Define or assign roles; invite with a role; act on an ADMIN</td><td><strong>ADMIN only</strong> (an unchanged role resent by the UI is not a change)</td></tr>
+<tr><td>Other member management (titles, non-admin members)</td><td>ADMIN or granted <code>members</code> permission</td></tr>
 <tr><td>Last ADMIN</td><td>cannot be removed, deactivated or demoted</td></tr>
-<tr><td>New member without a role</td><td>no permissions (schema default <code>ADMIN</code> to be removed)</td></tr>
+<tr><td>New member without a role</td><td>no permissions (the schema default is removed)</td></tr>
 </table>
 </div>
 </div>
@@ -295,9 +296,9 @@ svg { width: 100%; height: auto; display: block; }
 <h2>10. Threat model summary</h2>
 <table>
 <tr><th>Threat</th><th>Where it appears</th><th>Control</th><th>Residual</th></tr>
-<tr><td>Spoofing a member</td><td>Cookie and bearer paths</td><td>Per-request member lookup; empty-session rejection; hashed token secret with expiry</td><td>Public-link tokens do not expire <span class="badge t">TARGET</span></td></tr>
-<tr><td>Cross-tenant read or write</td><td>Any query; ids in request bodies</td><td>Scoped client; reference guards; two-tenant matrix</td><td>Nested writes and includes (documented limits); pages not yet scoped <span class="badge t">TARGET</span></td></tr>
-<tr><td>Elevation inside a tenant</td><td>Mutations without role checks; default admin role</td><td>RBAC; least-privilege default; last-admin rule</td><td>Open until I6 is built <span class="badge t">TARGET</span></td></tr>
+<tr><td>Spoofing a member</td><td>Cookie and bearer paths</td><td>Per-request member lookup; empty-session rejection; hashed token secret with expiry</td><td>Public links expire after 30 days; links sent before expiry existed keep working until the operator enables the strict switch</td></tr>
+<tr><td>Cross-tenant read or write</td><td>Any query; ids in request bodies</td><td>Scoped client; reference guards; two-tenant matrix</td><td>Nested writes and includes (documented limits); dashboard pages use the scoped helper</td></tr>
+<tr><td>Elevation inside a tenant</td><td>Mutations without role checks; self-granting roles; default admin role</td><td>RBAC on tRPC and REST; ADMIN-only role management; least-privilege default; last-admin rule</td><td>Many reads still open to any active member; last-admin check is count-then-write (two admins demoting each other at once could both pass)</td></tr>
 <tr><td>File access</td><td>Presigned URLs, storage keys</td><td>Server-built keys, owner check, exact key shape, image-only public uploads</td><td>No upload size limit; legacy unowned buckets unusable until assigned</td></tr>
 <tr><td>Information disclosure</td><td>Errors, global unique emails</td><td>Not-found instead of forbidden for foreign ids</td><td>Stakeholder email is globally unique <span class="badge t">TARGET</span></td></tr>
 <tr><td>Regression</td><td>New procedure bypassing the structure</td><td>Architecture test; coverage guard in the matrix</td><td>Not enforced in CI <span class="badge t">TARGET</span></td></tr>

@@ -1,6 +1,6 @@
 # Captable Multitenancy: Status and Plan (v2)
 
-**Date:** 2026-10-05 · **Branch:** `feat/multitenancy-phase0` (22 commits ahead of `main`, not pushed) · **Tests:** 255 passing · **Production build:** passes
+**Date:** 2026-10-05 · **Branch:** `feat/multitenancy-phase0` (29 commits ahead of `main`, not pushed) · **Tests:** 297 passing · **Production build:** passes
 
 **Replaces:** the v1 plan (same path, see git history). v1 mixed a plan with a log and its code samples went stale; this version is status plus remaining work only.
 
@@ -86,22 +86,28 @@ Router coverage: 37 files on `withTenant`, 19 on `withAccessControl`, 9 `withAut
 | `19548a4` | **empty session authenticated as an arbitrary member** (REST cookie path) |
 | `556c42e` | update editor page cross-tenant read; three missed routers |
 | `6889d6c` | unauthenticated file upload/download/delete; bucket owner and backfill |
+| `6197ab6`, `07724f3`, `b1a1cbb` | Phase 2: no default admin role; roles on every tRPC mutation; last-admin rule; only an admin grants ADMIN |
+| `3c62586`, `de4031b` | dashboard pages on the scoped helper; active-only company lists; public links expire in 30 days with previous-secret verification |
+| `855d303` | review fixes: role management ADMIN-only (no self-granting); REST role checks; link-minting reads need a permission |
 
-Test count by step: 13, 88, 115, 127, 131, 155, 159, 178, 193.
+Test count by step: 13, 88, 115, 127, 131, 155, 159, 178, 193, 255, 273, 297.
 
 ## 5. Open findings (ranked)
 
 | # | Finding | Severity | Phase |
 |---|---|---|---|
-| F1 | Role checks: **mutations done** (`07724f3`, `b1a1cbb`). Remaining: REST write routes still allow any active member holding an API token; buttons are not hidden in the UI; existing CUSTOM roles lack the five new subjects (operator remedy needed) | Medium | 2 |
-| F2 | 4 dashboard pages read tenant data from the JWT company with the global client (stale after deactivation; layout and page render concurrently) | Medium | 2 |
-| F3 | Public-flow tokens (e-sign, data room, update links) never expire | Medium | 2 |
+| F1 | Role checks: tRPC mutations, REST writes, role management and role assignment are enforced (`07724f3`, `855d303`). Remaining: many reads are open to any active member (F11), existing CUSTOM roles lack the five new subjects (operator remedy needed), UI buttons are not hidden | Low | 2 |
+| F2 | Dashboard pages on the scoped helper. **Done** (`3c62586`) | Done | 2 |
+| F3 | Public links expire after 30 days; previous-secret verification. **Done** (`de4031b`); operator turns on `PUBLIC_LINK_REQUIRE_EXPIRY` 30 days after deploy | Done | 2 |
 | F4 | `Member.role` default removed; onboarding and seeds set the role explicitly (`6197ab6`). **Done** | Done | 2 |
-| F5 | `getCompanyList` and REST `company/getMany` list memberships of any status | Low | 2 |
+| F5 | Company lists count only ACTIVE onboarded members. **Done** (`3c62586`) | Done | 2 |
 | F6 | Presigned PUTs have no size limit; `Bucket` has no DB-level relation to `Company` | Low | 3 |
 | F7 | `Stakeholder.email` is globally unique (one person cannot be a stakeholder of two companies; leaks existence) | Medium | 3 |
 | F8 | REST: cookie auth fails for requests with a body; header schema demands `Authorization` for cookie callers; pagination `limit` default ignored | Low | 3 |
 | F9 | `"use server"` left on 5 page files (not a hole; hygiene) | Low | 3 |
+| F11 | Open reads: `common.getContacts` (member and stakeholder emails), securities and share-class lists, templates, updates list, billing subscription, the document preview page presigns without `documents:read` | Medium | 3 |
+| F12 | No way to resend an e-sign link after it expires (cancel and recreate the envelope); data-room recipient `expiresAt` is stored but never enforced | Medium | 3 |
+| F13 | Last-admin check is count-then-write: two admins demoting each other at the same instant could both pass (needs a row lock or serializable transaction) | Low | 3 |
 | F10 | Keeping Captable's own tenancy is a fork of a Hub capability with no recorded decision (register D7) | Medium | 2 |
 
 ## 6. Remaining plan
@@ -112,9 +118,9 @@ Scope rule (ponytail): each task is the smallest change with a test that fails f
 
 - [x] **T1 (F4, check first), done `6197ab6`.** Confirm every `member.create/upsert` passes a role explicitly; then remove the `@default(ADMIN)` (migration, onboarding passes `ADMIN` for the first member). Test: a member created without a role has no permissions.
 - [x] **T2 (F1, D2), done `07724f3`; ADMIN-grant guard `b1a1cbb`.** (Original scope:) Add RBAC subjects `securities`, `cap-table-settings`, `updates`, `data-rooms`, `templates`; put `.meta({policies})` on every mutation and on `bucket.getUrl/presignUpload/create` (`documents`). Refuse removing, deactivating or demoting the last ADMIN. Test: a CUSTOM role with no grants is denied each mutation (extend the matrix with a "same tenant, insufficient role" column); ADMIN allowed; last-admin refused.
-- [ ] **T3 (F2).** `getServerTenant()` (cached; `{companyId, db: tenantDb}` from `getPermissions`); use it in the 4 dashboard pages. Add a rule to the architecture test: pages under `src/app/(authenticated)` must not import the global `db`.
+- [x] **T3 (F2), done `3c62586`.** `getServerTenant()` (cached; `{companyId, db: tenantDb}` from `getPermissions`); use it in the 4 dashboard pages. Add a rule to the architecture test: pages under `src/app/(authenticated)` must not import the global `db`.
 - [x] **T4 (F3, D), done `de4031b`.** Add `exp` to public-flow tokens (e-sign, data room, update link); expired token returns 401. Needs a decision on lifetimes (suggest 30 days, renewable by resend). **Also verify tokens against the current and the previous secret** (as the Hub does for its scope secret), so `NEXTAUTH_SECRET` can be rotated without invalidating live e-sign, data-room and update links; document the rotation steps.
-- [ ] **T5 (F5).** Filter `getCompanyList` and REST `getMany` by ACTIVE, onboarded members.
+- [x] **T5 (F5), done `3c62586`.** Filter `getCompanyList` and REST `getMany` by ACTIVE, onboarded members.
 - [ ] **T6a (F10).** Review and approve `docs/adr/0001-captable-keeps-its-own-tenancy.md`: name the owner, decide the audit question; then (optionally) publish it to the knowledge base. Decision record only, no code.
 
 ### Phase 3: hygiene
