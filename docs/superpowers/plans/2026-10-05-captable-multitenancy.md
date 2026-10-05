@@ -1,443 +1,163 @@
-# Captable Multitenancy Hardening + Hub Linkage — Implementation Plan
+# Captable Multitenancy: Status and Plan (v2)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+**Date:** 2026-10-05 · **Branch:** `feat/multitenancy-phase0` (17 commits ahead of `main`, not pushed) · **Tests:** 193 passing · **Production build:** passes
 
-**Goal:** Make Captable's tenant isolation structural (not per-procedure convention), enforce roles on every cap-table mutation, and link each company/user to the TIN Hub's tenant/user identity without duplicating tenant logic.
+**Replaces:** the v1 plan (same path, see git history). v1 mixed a plan with a log and its code samples went stale; this version is status plus remaining work only.
 
-**Architecture:** Keep Captable's own tenancy (`Company` + `Member`, NextAuth, Prisma, Neon). Add (1) one Prisma client extension that scopes every query to the caller's company, handed out by a single `withTenant` tRPC base procedure; (2) RBAC policies on every mutation; (3) explicit tenant-switching and tenant-owned files/emails; (4) Hub identity columns now, Hub sync later behind a gate. Hubs own *who/which customer*; Captable owns *what a member may do inside a company*.
+**Goal:** make tenant isolation structural, enforce roles inside a tenant, and link each company to the TIN Hub's tenant identity without duplicating tenant logic.
 
-**Tech Stack:** Next.js 14, tRPC 10 (`createCaller`), Prisma 5 client extensions, NextAuth 4 (JWT), Hono REST, Postgres (Neon), Vitest 1, Biome.
-
-**Spec:** Section 1 of this document (design + decisions). Evidence: read-only audits of Captable, `shared-identity-hub`, `tin-boss-api`, `shared-client-care-hub`, and a graphify graph of `src/` (2,166 nodes, 7,356 edges, 90 communities).
-
-## Global Constraints
-
-- Never run tests or migrations against Neon. Tests use `TEST_DATABASE_URL` and refuse any non-local host (Task 1).
-- Prisma stays at `^5.13` (extended `where` on unique operations is relied on). tRPC stays v10 (`router.createCaller(ctx)`).
-- `relationMode = "prisma"` stays (no DB foreign keys); integrity is enforced in app code and the tenant extension.
-- No new runtime dependency. Everything below uses Prisma, tRPC, Zod and Vitest, already installed.
-- Commit after every task. Pre-commit runs `biome check --apply`; do not use `--no-verify`.
-- One PR per phase, each opened against `main` (not stacked on an unmerged branch).
-- Hub repos are read-only inputs. Fixes in them are listed as dependencies (section 5), not tasks here.
+**Stack:** Next.js 14, tRPC 10, Prisma 5.14, NextAuth 4 (JWT), Hono REST, Postgres (Neon), Vitest 1, Biome.
 
 ---
 
-## 1. Design and decisions
+## 1. Principles (learned the hard way)
 
-### 1.1 What the code looks like today (from the graph)
-
-- `checkMembership()` is the #3 hub node (degree 69, 36 files): the single tenant checkpoint, called by hand in 37 files.
-- 44 files use `withAuth`, 20 use `withAccessControl` (role check), 9 are `withoutAuth`.
-- 13 `withAuth` files never call `checkMembership`; the tenant-relevant ones are `create-bucket`, `get-document`, `create-document`, `get-updates`, `clone-update`. 41 places read `session.user.companyId` straight from the JWT.
-- 37 Prisma models: 18 carry `companyId`; 6 are tenant-scoped only through a parent; the rest are global (`User`, `Account`, `Session`, `Passkey`, tokens, `Bucket`, `AccessToken`, billing).
-- RBAC subjects exist for 9 areas; cap-table mutations (shares, options, SAFEs, share classes, equity plans, updates, data rooms, templates, member toggles) have **no** role check.
-
-### 1.2 Decision gates (answer before the phase that needs them)
-
-| # | Decision | Default used in this plan | Needed by |
-|---|----------|---------------------------|-----------|
-| D1 | Stay on NextAuth+Prisma, link to Hub by tenant id (not move to Supabase) | **Stay** | Phase 4 |
-| D2 | Role matrix for CUSTOM roles on cap-table subjects (table in Task 8) | Read-only default; admins grant writes | Phase 2 |
-| D3 | Which IdP the Hub fronts for login (Supabase Auth vs WorkOS) | Unknown — blocks Phase 4b only | Phase 4b |
-| D4 | Add Postgres RLS as defense in depth | **Defer** (trigger in section 6) | Phase 5 |
-
-### 1.3 Approaches considered
-
-1. **Per-procedure filters (status quo).** Failed three times already in the audit. Rejected.
-2. **Prisma client extension + one base procedure (chosen).** Lowest rung that gives a structural guarantee in the app layer: forgetting a filter becomes impossible for covered models. Limits: raw SQL and nested writes are not covered (guarded by a test, Task 5).
-3. **Postgres RLS via per-transaction `SET LOCAL`.** Strongest, but needs a transaction around every request and does not help the connection pooler on Neon without care. Kept as Phase 5, gated.
-4. **Adopt the Hub packages directly.** Rejected: `domain-identity` needs Supabase `auth.uid()` for isolation, gives Prisma nothing, and its tenant switching/sync/Next adapter are unbuilt.
-
-### 1.4 Ownership split (this prevents duplicated logic)
+1. **Inventory the perimeter, not just the routers.** The scoped client protects code that uses it. Most real holes were elsewhere: ids supplied as data, unauthenticated server actions, an empty-session login bypass, pages that query directly. Every entry point is listed in section 3.
+2. **A guard that is not run is not a guard.** No CI workflow currently runs tests or lint (`.github/workflows/*` only builds an image). Section 6 fixes that.
+3. **Tests first, reviewed by a second reader.** Each batch was written test-first and then independently reviewed; the reviews found the three most serious issues.
+4. **Ownership split (prevents duplicated tenant logic):**
 
 | Concern | Owner |
-|---------|-------|
-| Identity of a person, SSO, platform operators | Hub |
-| Which tenant a customer is (`tenant_id`) | Hub; Captable stores `hubTenantId` |
-| Membership in a company, role, status | Captable (`Member`) |
-| What a role may do (`cap-table` subjects) | Captable (`CustomRole`) |
-| Tenant-scoped data access | Captable (tenant extension) |
+|---|---|
+| Who a person is, SSO, platform operators | Hub |
+| Which tenant a customer is | Hub (Captable stores `hubTenantId` later) |
+| Membership, role, status in a company | Captable (`Member`) |
+| What a role may do on cap-table data | Captable (`CustomRole`, RBAC) |
+| Tenant-scoped data access | Captable (`tenantDb`) |
 
----
+## 2. Architecture today
 
-## 2. File structure
+Graph of `src/` (graphify, rebuilt today): 534 files · 2,196 nodes · 7,358 edges · 90 communities. `withTenant` is now a hub node; `checkMembership` no longer is.
 
-| File | Responsibility |
-|------|----------------|
-| `src/server/tenant-db.ts` (new) | `tenantDb(db, companyId)`: Prisma extension scoping all tenant models |
-| `src/trpc/api/trpc.ts` (modify) | add `withTenant`: session → active membership → `ctx.tenant` (scoped db, companyId, member) |
-| `src/lib/rbac/subjects.ts` (modify) | new subjects for cap-table areas |
-| `tests/tenant/*.test.ts` (new) | cross-tenant matrix + architecture guard |
-| `vitest.config.ts` (new) + `tests/setup.ts` (new) | test DB guard + seeding |
-| `prisma/schema.prisma` (modify) | `Stakeholder` composite unique, `Bucket.companyId`, `Company.hubTenantId`, `User.hubUserId` |
-
----
-
-## 3. Model routing
-
-| Task | `model` | `subagent_type` | Justification |
-|------|---------|-----------------|---------------|
-| 1. Test harness + DB guard | `sonnet` | `general-purpose` | Multi-file setup with edge cases (guard must be right) |
-| 2. Cross-tenant matrix test (fails first) | `opus` | `general-purpose` | Security test design; decides what "isolated" means |
-| 3. `tenantDb` extension | `opus` | `general-purpose` | Tenant isolation core; security rule 3 |
-| 4. `withTenant` base procedure | `opus` | `general-purpose` | Auth path; security rule 3 |
-| 5b. Reference-integrity guard | `opus` | `general-purpose` | Tenant isolation; security rule 3 |
-| 5. Architecture guard test | `sonnet` | `general-purpose` | Test over file contents, clear spec |
-| 6–7. Migrate routers (batches) | `sonnet` | `general-purpose` | Mechanical across files; **opus review** each batch |
-| 8–9. RBAC subjects + policies | `opus` | `general-purpose` | Permissions design; rule 3 |
-| 10. Explicit tenant switching | `opus` | `general-purpose` | Session/JWT/tenant; rule 3 |
-| 11–12. Stakeholder email + Bucket owner migrations | `opus` | `general-purpose` | Schema + backfill touching isolation |
-| 13. Hub identity columns | `haiku` | `general-purpose` | Two nullable columns, exact spec |
-| Reviews | `opus` | `general-purpose` | Every phase touches tenant isolation |
-| Deploys / prod migrations | orchestrator | — | Needs credentials; never delegated |
-
-Before each later phase the orchestrator writes a **Previous Phase Context Review** (diff, test results, deviations, open items) and passes the findings into the next brief.
-
----
-
-## 4. Phases and tasks
-
-### Phase 0 — Safety net (no behaviour change)
-
-#### Task 1: Test harness with a hard database guard
-
-**Files:**
-- Create: `vitest.config.ts`, `tests/setup.ts`, `tests/helpers/seed.ts`
-- Modify: `package.json` (`"test": "vitest run"`)
-
-**Interfaces:**
-- Produces: `seedTwoTenants(): Promise<{ a: Tenant; b: Tenant }>` where `Tenant = { companyId: string; memberId: string; userId: string; session: Session }`; `callerFor(t: Tenant)` returning `appRouter.createCaller(ctx)`.
-
-- [ ] **Step 1: Write the guard test first**
-
-```ts
-// tests/setup.test.ts
-import { describe, expect, it } from "vitest";
-import { assertLocalTestDb } from "./setup";
-
-describe("assertLocalTestDb", () => {
-  it("accepts localhost", () => {
-    expect(() => assertLocalTestDb("postgres://u:p@localhost:54331/captable_test")).not.toThrow();
-  });
-  it("rejects Neon and any remote host", () => {
-    expect(() => assertLocalTestDb("postgres://u:p@ep-x.neon.tech/neondb")).toThrow();
-    expect(() => assertLocalTestDb(undefined)).toThrow();
-  });
-});
-```
-
-- [ ] **Step 2: Run, expect FAIL** — `pnpm vitest run tests/setup.test.ts` → "assertLocalTestDb is not a function".
-
-- [ ] **Step 3: Implement**
-
-```ts
-// tests/setup.ts
-export function assertLocalTestDb(url: string | undefined) {
-  const host = url ? new URL(url).hostname : "";
-  if (!["localhost", "127.0.0.1"].includes(host)) {
-    throw new Error("TEST_DATABASE_URL must point at a local database (never Neon)");
-  }
-}
-assertLocalTestDb(process.env.TEST_DATABASE_URL);
-process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
-```
-
-```ts
-// vitest.config.ts
-import path from "node:path";
-import { defineConfig } from "vitest/config";
-export default defineConfig({
-  resolve: { alias: { "@": path.resolve(__dirname, "src") } },
-  test: { setupFiles: ["tests/setup.ts"], include: ["tests/**/*.test.ts", "src/**/*.test.ts"] },
-});
-```
-
-`setup.ts` runs for every test file, so it must not throw for the guard unit test: run that one file with `TEST_DATABASE_URL=postgres://u:p@localhost:54331/captable_test`.
-
-- [ ] **Step 4: Create the test DB once** — `docker exec captable-database createdb -U captable captable_test`, then `TEST_DATABASE_URL=postgres://captable:password@localhost:54331/captable_test pnpm prisma migrate deploy`.
-- [ ] **Step 5: Seed helper.** `seedTwoTenants` creates two `User`, two `Company`, two `Member` (ADMIN, ACTIVE, onboarded) via Prisma, returns sessions shaped like `Session.user` (`id, memberId, companyId, companyPublicId, email, name`). Delete rows by id in `afterAll`.
-- [ ] **Step 6: Run and commit** — `pnpm test` PASS; `git commit -m "test: add vitest harness with local-db guard"`.
-
-#### Task 2: Cross-tenant matrix test (written to FAIL where gaps remain)
-
-**Files:** Create `tests/tenant/cross-tenant.test.ts`
-
-**Interfaces:** Consumes `seedTwoTenants`, `callerFor` (Task 1).
-
-- [ ] **Step 1: Write the matrix.** For tenant B create one of each: share class, equity plan, stakeholder, document, update, data room, template, safe. Then, as tenant A's caller, attempt `read`, `update`, `delete`, and `link-as-reference` on B's ids. Expected for every case: throws or returns not-found; B's row is unchanged afterwards.
-
-```ts
-const cases: [string, (a: Caller, ids: Ids) => Promise<unknown>][] = [
-  ["shareClass.update", (a, i) => a.shareClass.update({ ...validShareClass, id: i.shareClassId })],
-  ["equityPlan.update", (a, i) => a.equityPlan.update({ ...validPlan, id: i.equityPlanId })],
-  ["update.save",       (a, i) => a.update.save({ ...validUpdate, publicId: i.updatePublicId })],
-  ["dataRoom.save",     (a, i) => a.dataRoom.save({ name: "x", publicId: i.dataRoomPublicId })],
-  // ...one row per procedure that takes an id; list generated from appRouter keys (Step 2)
-];
-it.each(cases)("%s cannot touch another tenant", async (_n, run) => {
-  await expect(run(callerA, idsB)).rejects.toThrow();
-  expect(await b.snapshot()).toEqual(before);
-});
-```
-
-- [ ] **Step 2: Generate the case list** from `Object.keys(appRouter._def.procedures)` and fail the suite if any id-taking procedure has no case (forces coverage as routers grow).
-- [ ] **Step 3: Run.** Expect the six already-fixed holes to PASS and any unfixed ones to FAIL — record failures in the PR; they are the Phase 1 acceptance list.
-- [ ] **Step 4: Commit** — `git commit -m "test: cross-tenant isolation matrix"`.
-
-### Phase 1 — Structural tenant isolation
-
-#### Task 3: `tenantDb` Prisma extension
-
-**Files:** Create `src/server/tenant-db.ts`; Test `tests/tenant/tenant-db.test.ts`
-
-**Interfaces:**
-- Produces: `tenantDb(db: TPrisma, companyId: string)` — a Prisma client whose queries on tenant models are filtered/stamped with `companyId`.
-- Produces: `TENANT_MODELS: ReadonlySet<string>`, `PARENT_SCOPED: Record<string, string>`.
-
-- [ ] **Step 1: Failing tests** (real DB, two tenants): `findMany` returns only own rows; `findFirst({where:{id: otherTenantId}})` returns null; `update({where:{id: other}})` throws; `create` without `companyId` stamps it; `create` with a *different* `companyId` is overridden; `createMany` stamps all rows; a child model (`dataRoomDocument.findMany`) returns only rows whose parent belongs to the tenant; a non-tenant model (`user`) is untouched.
-- [ ] **Step 2: Run, expect FAIL** (module missing).
-- [ ] **Step 3: Implement**
-
-```ts
-// src/server/tenant-db.ts
-import type { TPrisma } from "./db";
-
-// models with a direct companyId column
-export const TENANT_MODELS = new Set([
-  "BankAccount", "Member", "CustomRole", "Stakeholder", "Audit", "ShareClass",
-  "EquityPlan", "Document", "DataRoom", "Template", "Share", "Option",
-  "Investment", "Safe", "ConvertibleNote", "Update", "EsignAudit",
-]);
-
-// child models scoped only through a parent relation
-export const PARENT_SCOPED: Record<string, string> = {
-  TemplateField: "template",
-  EsignRecipient: "template",
-  DataRoomDocument: "dataRoom",
-  DataRoomRecipient: "dataRoom",
-  DocumentShare: "document",
-  UpdateRecipient: "update",
-};
-
-const WHERE_OPS = new Set([
-  "findFirst", "findFirstOrThrow", "findUnique", "findUniqueOrThrow", "findMany",
-  "count", "aggregate", "groupBy", "update", "updateMany", "delete", "deleteMany",
-]);
-
-export function tenantDb(db: TPrisma, companyId: string) {
-  return db.$extends({
-    name: "tenant-scope",
-    query: {
-      $allModels: {
-        // biome-ignore lint/suspicious/noExplicitAny: args shape varies per operation
-        async $allOperations({ model, operation, args, query }: any) {
-          const a = { ...args };
-          if (TENANT_MODELS.has(model)) {
-            if (WHERE_OPS.has(operation)) a.where = { ...a.where, companyId };
-            else if (operation === "create") a.data = { ...a.data, companyId };
-            else if (operation === "createMany")
-              a.data = [a.data].flat().map((d: object) => ({ ...d, companyId }));
-            else if (operation === "upsert") {
-              a.where = { ...a.where, companyId };
-              a.create = { ...a.create, companyId };
-            } else throw new Error(`tenantDb: unsupported ${model}.${operation}`);
-          } else if (model in PARENT_SCOPED) {
-            const rel = PARENT_SCOPED[model] as string;
-            if (WHERE_OPS.has(operation))
-              a.where = { ...a.where, [rel]: { ...a.where?.[rel], companyId } };
-            // creates on child models must go through the parent (checked in Task 5)
-          }
-          return query(a);
-        },
-      },
-    },
-  });
-}
-```
-
-- [ ] **Step 4: Run tests, expect PASS.** If `findUnique` rejects the extra `where` key, switch those two ops to `findFirst`/`findFirstOrThrow` inside the extension (ponytail: only if the test shows the failure).
-- [ ] **Step 5: Commit** — `git commit -m "feat: tenant-scoped prisma client extension"`.
-
-**Known limits (written into the file header):** raw SQL (`$queryRaw`), nested writes inside `data`, and `include`d children are not scoped; Task 5 guards the first two; includes of parent-scoped children inherit the parent's scope.
-
-#### Task 4: `withTenant` base procedure
-
-**Files:** Modify `src/trpc/api/trpc.ts`; Test `tests/tenant/with-tenant.test.ts`
-
-**Interfaces:**
-- Consumes: `tenantDb`, existing `checkMembership` (`src/server/auth.ts`, already requires ACTIVE + onboarded + matching user).
-- Produces: `withTenant` — like `withAuth`, plus `ctx.tenant = { db: ReturnType<typeof tenantDb>, companyId: string, memberId: string, role: Role, customRoleId: string | null }`.
-
-- [ ] **Step 1: Failing tests:** an inactive member is rejected; a member of company A whose JWT claims company B is rejected; a valid member gets `ctx.tenant.companyId` equal to their membership and a `db` that cannot read the other tenant.
-- [ ] **Step 2: Implement**
-
-```ts
-export const withTenant = t.procedure.use(authMiddleware).use(async ({ ctx, next }) => {
-  const m = await checkMembership({ session: ctx.session, tx: ctx.db });
-  return next({
-    ctx: {
-      ...ctx,
-      tenant: { db: tenantDb(ctx.db, m.companyId), companyId: m.companyId,
-                memberId: m.memberId, role: m.role, customRoleId: m.customRoleId },
-    },
-  });
-});
-```
-
-- [ ] **Step 3: Make `withAccessControl` build on it** (reuse `ctx.tenant`, drop its own membership lookup) so there is one membership resolution per request. Re-run the existing RBAC tests.
-- [ ] **Step 4: Commit** — `git commit -m "feat: withTenant base procedure"`.
-
-#### Task 5: Architecture guard (keeps it from regressing)
-
-**Files:** Create `tests/tenant/architecture.test.ts`
-
-- [ ] **Step 1: Write the test.** Scan `src/trpc/routers/**` and `src/server/api/routes/**`. Fail if a file (a) uses `withAuth` and references `ctx.db` outside an allowlist (`onboarding`, `passkey`, `common`, `get-profile`, `update-profile`, `update-password`, `accept-member`, `get-products`), (b) calls `$queryRaw`/`$executeRaw`, or (c) calls `.create` on a `PARENT_SCOPED` model without a parent id taken from a scoped lookup.
-- [ ] **Step 2: Run, expect FAIL listing every unmigrated file** — this list is the migration to-do for Tasks 6–7. Commit the test with the allowlist set to current offenders so CI is green, then shrink the allowlist to zero as tasks complete.
-
-#### Task 5b: Reference-integrity guard (added after the Task 2 matrix run)
-
-`tenantDb` scopes which rows a query touches; it does not validate **ids a client supplies as data** (a `bucketId` or `memberId` pointing at another tenant). The matrix found 14 such cases (marked `it.fails` / `// GAP:` in `tests/tenant/cross-tenant.test.ts`). Fix with one shared guard, extending `assertTenantOwns` (`src/server/tenant-guard.ts`):
-
-**Files:** Modify `src/server/tenant-guard.ts` (+ its test); modify the call sites below.
-
-**Interfaces:** `assertTenantOwns(tx, companyId, refs)` gains `memberId`, `customRoleId`, `documentId`, `templateRecipientId`, `bucketId` (bucket check depends on Task 12's `Bucket.companyId`; until then it checks the id is referenced only by this company's rows).
-
-| Gap (from the matrix) | Call site | Check |
+| Layer | What it does | Where |
 |---|---|---|
-| B's bucket attached to A's records | `add-share.ts:49`, `add-option.ts:45`, `create-safe.ts:79`, `add-existing-safe.ts:31`, `create-document.ts:33`, `create-template.ts:34` | `bucketId` |
-| Field points at B's recipient | `template-field-router/procedures/add-fields.ts:114` | recipient belongs to A's template |
-| Update/data-room recipient is B's member/stakeholder | `update/procedures/share-update.ts:53`, `data-room-router/router.ts:277` | `memberId`, `stakeholderId` |
-| A's member given B's custom role | `rbac/access-control.ts:148` (`getRoleById`), `update-member.ts:23`, `invite-member.ts:76` | role `companyId` |
-| `switchCompany` writes B's member row | `company-router/router.ts:48` | also `userId` (Task 10) |
+| `tenantDb(db, companyId)` | Prisma client extension: forces `where.companyId`, stamps creates, scopes child models through their parent, rejects raw SQL | `src/server/tenant-db.ts` |
+| `withTenant` | tRPC base procedure: session, then one ACTIVE-membership lookup, then `ctx.tenant {db, companyId, memberId, role, customRoleId}` | `src/trpc/api/trpc.ts` |
+| `withAccessControl` | role check on top of `withTenant` (one membership lookup per request) | same |
+| Guards | `assertTenantOwns` (ids supplied as data), `assertBucketUsable` (ownership) | `src/server/tenant-guard.ts` |
+| REST | each auth middleware sets `tenantDb` from the verified member row | `src/server/api/middlewares/*` |
+| Uploads | authenticated presign and download procedures; `Bucket.companyId` | `src/trpc/routers/bucket-router` |
+| Tests | harness (local DB only), 75 tRPC isolation cases, 26 REST cases, upload tests, architecture guard | `tests/tenant/*` |
 
-- [ ] **Step 1:** for each row, add the guard call, run the matrix; the matching `it.fails` case now fails (the gap closed) — flip it to a normal `it`.
-- [ ] **Step 2:** commit per row group. The 14 `it.fails` cases reach zero by the end of Phase 3.
+Router coverage: 37 files on `withTenant`, 19 on `withAccessControl`, 9 `withAuth` and 8 `withoutAuth` (tenantless or token flows by design).
 
-Also found (not tenancy, fix opportunistically): `add-stakeholders.ts:27` fires an `Audit.create` without awaiting it inside a transaction; `audit.allEsignAudits` is an existence oracle for template ids.
+## 3. Entry-point inventory
 
-#### Task 6: Migrate cap-table routers (batch 1: securities)
+| Entry point | Protected by | Status |
+|---|---|---|
+| tRPC routers | `withTenant` / `withAccessControl`; architecture rules (a), (b), (c), (e) | done |
+| REST `/v1/{companyId}/...` | scoped client in middleware; rule (d); REST tests | done |
+| REST cookie auth | rejects `{}` and partial sessions | done |
+| Server actions / `"use server"` | file-uploads no longer a server module | done; page-level directives remain (hygiene) |
+| Server components (4 dashboard pages) | JWT company + global `db`; layout re-checks membership | **open (S4)** |
+| Public token flows (e-sign, data room, updates) | signed token binds the resource | safe by design; **tokens never expire** |
+| Queue jobs / `esign` services | trusted server payloads, global `db` | safe by design |
+| S3 objects | `Bucket.companyId`, authenticated presign and `getUrl` | done; legacy NULL-owner buckets unusable |
 
-**Files (modify):** `share-class/router.ts`, `equity-plan/router.ts`, `securities-router/procedures/{add-share,add-option,delete-*,get-*}.ts`, `safe/procedures/*`, `stakeholder-router/**`
+## 4. Shipped
 
-- [ ] **Step 1:** switch `withAuth` → `withTenant`; replace `checkMembership` calls and `ctx.db` with `ctx.tenant.db` / `ctx.tenant.companyId`. Remove now-redundant `companyId` in `where` only after the matrix test passes (keep them one release as belt-and-braces; remove in Task 7).
-- [ ] **Step 2:** run `pnpm tsc --noEmit`, `pnpm test`; the matrix and architecture allowlist must shrink.
-- [ ] **Step 3: Opus review** of the diff (brief includes the Phase 0 failures list). Commit per router.
+| Commit | What |
+|---|---|
+| `c421cf8` (on `main`, PR #1) | accept-invite takeover, cross-tenant writes, REST company leak, ACTIVE-member checks |
+| `6a07a81`, `adc0f0a` (**PR #4, open**) | e-sign requires the signed token; Google linking, onboarding email overwrite, `NEXTAUTH_SECRET` fallback |
+| `d3fb476`, `d2c9c49` | test harness with a local-DB guard; cross-tenant matrix |
+| `004ef28`, `21b49f1` | `tenantDb`, `withTenant`; architecture guard |
+| `25ee605` | 14 client-supplied-id holes (buckets, recipients, roles, `switchCompany`) |
+| `3790663`, `19bfa41`, `aa7b726` | all routers moved to the tenant client; `revoke-invite` fixed |
+| `dcf9e3a` | REST scoped; three REST holes; route collision (`/shares/{id}`) |
+| `19548a4` | **empty session authenticated as an arbitrary member** (REST cookie path) |
+| `556c42e` | update editor page cross-tenant read; three missed routers |
+| `6889d6c` | unauthenticated file upload/download/delete; bucket owner and backfill |
 
-#### Lessons from Task 6 that Task 7 must apply
+Test count by step: 13, 88, 115, 127, 131, 155, 159, 178, 193.
 
-- **A scoped client silently rewrites `where.companyId` to equality.** Any query that deliberately reads another company's rows (or `companyId: { not/in }`) is neutered, not rejected. `assertBucketUsable` was caught this way; it now uses a relation filter. `assertTenantOwns` (equality) is safe.
-- **`company-router` `switchCompany` must stay on `withAuth` + `ctx.db`** (it reads the caller's membership in a *different* company). Move it into its own procedure file and add that file to `ALLOWLIST_TENANTLESS` with that reason; migrate `getCompany`/`updateCompany` normally.
-- **Keep global-by-design:** `src/server/company.ts` (`getCompanyList`), the JWT callback in `src/server/auth.ts`, `accept-member.ts`, and all token-based public flows (`get-signing-fields`, `sign-template`, `esign-service`, data-room and update public pages).
-- **Fix while migrating:** `member-router/procedures/revoke-invite.ts` (member lookup and token delete have no company check: a member of A can revoke B's invite tokens); `common/router.ts` is mislabelled tenantless in the allowlist (it reads the session company without `checkMembership`; move it to `withTenant`).
-- **Extend the architecture test's rule (a)** to also flag `withTenant`/`withAccessControl` files that use `ctx.db`.
-- Non-members now get `UNAUTHORIZED` from the middleware instead of `{ success: false }` in mutation bodies; check client code that relies on the old shape.
+## 5. Open findings (ranked)
 
-#### Task 7: Migrate remaining routers (batch 2)
+| # | Finding | Severity | Phase |
+|---|---|---|---|
+| F1 | No role checks on most cap-table mutations, members toggle/remove/re-invite/revoke, and the new bucket procedures | High | 2 |
+| F2 | 4 dashboard pages read tenant data from the JWT company with the global client (stale after deactivation; layout and page render concurrently) | Medium | 2 |
+| F3 | Public-flow tokens (e-sign, data room, update links) never expire | Medium | 2 |
+| F4 | `Member.role` schema default is `ADMIN`. Invites set the role explicitly (`getRoleById`), so it is not exploitable today, but any new create path that omits it creates an admin | Medium | 2 |
+| F5 | `getCompanyList` and REST `company/getMany` list memberships of any status | Low | 2 |
+| F6 | Presigned PUTs have no size limit; `Bucket` has no DB-level relation to `Company` | Low | 3 |
+| F7 | `Stakeholder.email` is globally unique (one person cannot be a stakeholder of two companies; leaks existence) | Medium | 3 |
+| F8 | REST: cookie auth fails for requests with a body; header schema demands `Authorization` for cookie callers; pagination `limit` default ignored | Low | 3 |
+| F9 | `"use server"` left on 5 page files (not a hole; hygiene) | Low | 3 |
 
-**Files (modify):** `document-router`, `document-share-router`, `update`, `data-room-router`, `template-router`, `template-field-router`, `member-router`, `company-router`, `bucket-router`, `bank-accounts`, `audit-router`, REST `src/server/api/routes/**` (use the same `tenantDb` via the bearer/cookie membership already resolved in the middleware).
+## 6. Remaining plan
 
-- [ ] **Step 1–3:** same as Task 6. REST: in `src/server/api/middlewares/*` set `c.set("tenantDb", tenantDb(db, membership.companyId))` and read it in handlers.
-- [ ] **Step 4:** architecture allowlist reaches only the genuinely tenantless files (`onboarding`, `passkey`, `common`, profile/password, billing products). **Commit and open PR 1.**
+Scope rule (ponytail): each task is the smallest change with a test that fails first. Tasks marked **D** need a decision from you (section 7).
 
-#### Phase 1 final-review follow-ups (not yet done)
+### Phase 2: roles and perimeter (next)
 
-From the independent review of Phase 1 (B1 and S1/S2 are fixed; these remain):
+- [ ] **T1 (F4, check first).** Confirm every `member.create/upsert` passes a role explicitly; then remove the `@default(ADMIN)` (migration, onboarding passes `ADMIN` for the first member). Test: a member created without a role has no permissions.
+- [ ] **T2 (F1, D2).** Add RBAC subjects `securities`, `cap-table-settings`, `updates`, `data-rooms`, `templates`; put `.meta({policies})` on every mutation and on `bucket.getUrl/presignUpload/create` (`documents`). Refuse removing, deactivating or demoting the last ADMIN. Test: a CUSTOM role with no grants is denied each mutation (extend the matrix with a "same tenant, insufficient role" column); ADMIN allowed; last-admin refused.
+- [ ] **T3 (F2).** `getServerTenant()` (cached; `{companyId, db: tenantDb}` from `getPermissions`); use it in the 4 dashboard pages. Add a rule to the architecture test: pages under `src/app/(authenticated)` must not import the global `db`.
+- [ ] **T4 (F3, D).** Add `exp` to public-flow tokens (e-sign, data room, update link); expired token returns 401. Needs a decision on lifetimes (suggest 30 days, renewable by resend).
+- [ ] **T5 (F5).** Filter `getCompanyList` and REST `getMany` by ACTIVE, onboarded members.
 
-- **S3 (cross-tenant files, do with Task 12):** `src/server/file-uploads.ts` is a `"use server"` module, so `getPresignedGetUrl(key)`, `getPresignedPutUrl(...)` and `deleteBucketFile(key)` are callable as unauthenticated server actions. Anyone holding a key can sign a read URL or delete the object. Fix: drop `"use server"`, expose only actions that check session, membership and `Bucket.companyId`, never export `deleteBucketFile` to the client.
-- **S4:** four dashboard pages read tenant data with the JWT `session.user.companyId` and the global `db` (documents/[bucketId], data-rooms, equity-plans, share-classes pages). The layout re-checks membership, but pages render concurrently. Fix: a cached `getServerTenant()` returning `{ companyId, db: tenantDb(...) }` from `getPermissions`.
-- **N8 (Phase 2 scope):** `remove-member`, `toggle-activation`, `revoke-invite`, `re-invite` and the securities/SAFE procedures have no role check; `getCompanyList` and REST `company/getMany` do not filter on member status; the update visibility toggle copies a token-less public link.
-- **Latent:** relation writes inside update `data` (`company: { connect }`) are not forced by `tenantDb`; keep zod schemas strict. Public-flow tokens (e-sign, data room, updates) never expire.
-- **REST notes:** cookie auth fails for requests with a body (the session fetch forwards the body into a GET); the route header schema demands an `Authorization` header even for cookie callers; the pagination `limit` default does not take effect.
+### Phase 3: hygiene
 
-### Phase 2 — Roles on every mutation
+- [ ] **T6 (F7).** `Stakeholder` unique on `(companyId, email)`; update callers using the old unique key.
+- [ ] **T7 (F6).** Add `Bucket -> Company` relation; presign size limit (`Content-Length` condition).
+- [ ] **T8 (F8, F9).** Fix REST cookie auth with a body, header schema, pagination default; drop the page-level `"use server"` directives.
 
-#### Task 8: Subjects and the role matrix (needs decision D2)
+### Phase 4: Hub linkage (gated, not scheduled)
 
-**Files:** Modify `src/lib/rbac/subjects.ts`; Test `src/lib/rbac/rbac.test.ts`
+Opens only when the Hubs provide: a published signing key (JWKS), a claims contract with `tenant_id`, and a membership read endpoint or webhook (none exist today), plus decision D3. Then: an OIDC or WorkOS provider mapping IdP organisation to `Company.hubTenantId`; a signed membership webhook; operator access through a Hub claim only. **Decision:** the `hubTenantId` / `hubUserId` columns (old Task 13) are dropped from this plan until then; unused columns are speculative.
 
-- [ ] **Step 1: Add subjects** `"securities"`, `"updates"`, `"data-rooms"`, `"templates"`, `"cap-table-settings"` (share classes, equity plans). Existing: `stakeholder`, `members`, `documents`, `roles`, `audits`, `billing`, `company`, `developer`, `bank-accounts`.
-- [ ] **Step 2: Matrix (defaults; confirm with the business):**
+### Phase 5: row-level security (deferred)
 
-| Subject | read | create/update | delete |
-|---------|------|---------------|--------|
-| securities (shares, options, SAFEs) | members | CUSTOM with `securities:create/update` | CUSTOM with `securities:delete` |
-| cap-table-settings (classes, plans) | members | ADMIN or granted | ADMIN or granted |
-| updates, data-rooms, templates | members | granted | granted |
-| members (toggle, remove, re-invite, revoke) | members | **ADMIN or granted `members:update`**; cannot target self-demote or the last ADMIN | same |
+Trigger: a second isolation bug found despite `tenantDb`, or a compliance need. Approach is a documented Prisma pattern: a client extension that runs `set_config('app.current_company_id', ...)` in a transaction with each query, plus `CREATE POLICY ... USING (companyId = current_setting(...))` on the 18 tenant tables.
 
-- [ ] **Step 3: Test** that a CUSTOM role with no permissions is denied each mutation, an ADMIN is allowed, and removing/deactivating the last ADMIN is refused.
-- [ ] **Step 4: Commit.**
+### Rollout and operations (before and after merge)
 
-#### Task 9: Apply policies to every mutation
+1. **Merge PR #4**, then rebase this branch onto `main` and open one PR (about 80 files; split by phase if reviewers prefer). **Every PR targets `main`** (the stacked PRs landed in the wrong branch once).
+2. **Database:** the `Bucket.companyId` migration is applied only to the local test DB. Before any database that holds files: run `docs/bucket-owner-backfill-report.sql` (read-only) and review the buckets that would stay unowned. Neon is empty, so applying there is trivial. Production migration is run by a person with credentials, never delegated.
+3. **Config:** `NEXTAUTH_SECRET` must be 32+ characters; the app now refuses to start otherwise.
+4. **Behaviour changes to announce:** non-members get UNAUTHORIZED instead of `{success:false}`; REST share update is now `PATCH /v1/{companyId}/shares/{id}`; Google sign-in no longer merges into an existing password account.
+5. **CI (new):** add a workflow job that starts a Postgres service, runs `prisma migrate deploy` against it, then `pnpm test`, `tsc --noEmit` and `biome check`. Without it the isolation tests protect nobody.
+6. **Smoke test (manual, once per release):** upload and open a document; sign a document through an emailed link; invite and accept a member; switch company; open a data room link. These flows are covered by tests and the build, never by a browser run.
 
-**Files (modify):** each mutation procedure: swap `withTenant` → `withAccessControl` with `.meta({ policies: { <subject>: { allow: ["<action>"] } } })` per the matrix; add the last-admin guard to `toggle-activation`, `remove-member`, `re-invite`, `revoke-invite`.
+## 7. Decisions needed
 
-- [ ] **Step 1:** extend `tests/tenant/cross-tenant.test.ts` with a "same-tenant, insufficient role" column (CUSTOM role, no grants) for every mutation. Expect FAIL, then implement, then PASS.
-- [ ] **Step 2: Opus review. Commit. Open PR 2.**
+| # | Decision | Default in this plan | Blocks |
+|---|---|---|---|
+| D1 | Stay on NextAuth and Prisma; link to the Hub by tenant id | Stay | Phase 4 |
+| D2 | Role matrix for CUSTOM roles on cap-table subjects | Read for all members; writes need a grant; member management admin-only | T2 |
+| D3 | Which login provider the Hub fronts (Supabase Auth or WorkOS) | Unknown | Phase 4 |
+| D4 | Public-link token lifetime | 30 days | T4 |
+| D5 | One large PR or one per phase | One per phase | Rollout |
 
-### Phase 3 — Session, switching, tenant-owned data
+## 8. Verified against current documentation (Context7)
 
-#### Task 10: Explicit tenant switching
+| Claim the plan relies on | Source says | Effect on plan |
+|---|---|---|
+| Prisma treats `undefined` in a filter as "do nothing" (key omitted) | Prisma docs, null vs undefined | Root cause of the empty-session bypass; explains why `checkMembership` now rejects falsy ids |
+| Query extensions via `$allModels.$allOperations` can rewrite `args`; raw queries reach `$allOperations` with `model` undefined | Prisma client extensions docs | `tenantDb` design; raw SQL is rejected explicitly |
+| RLS with Prisma: `set_config(...)` per query inside a transaction, plus policies, is a documented pattern | Prisma client extensions blog | Phase 5 approach |
+| `"use server"` exports are public endpoints; authenticate and authorize inside each action | Next.js 14 Server Actions and authentication docs | The upload fix (no unauthenticated server actions) |
+| `/api/auth/session` returns an empty object when there is no session; `getServerSession` returns `null` | NextAuth.js (v4) docs | The cookie path must treat `{}` as unauthenticated |
+| tRPC middleware extends context with `next({ ctx })`; `createCaller` is for server-side calls and tests, not for calling procedures from other procedures | tRPC server docs | `withTenant` and the test harness |
 
-**Files:** Modify `src/server/auth.ts` (`jwt` callback), `src/trpc/routers/company-router/router.ts` (`switchCompany`); Test `tests/tenant/switch.test.ts`
+The Context7 results include Prisma v7 pages while this repo is on 5.14; behaviours above were also confirmed by the test suite on the installed versions.
 
-- [ ] **Step 1: Failing tests:** `switchCompany` to a company where the caller is not an ACTIVE onboarded member throws and changes nothing (today it bumps `lastAccessed` on any member id); after a valid switch, the next request resolves the chosen company; deactivating a member invalidates it on the next request (already true via `checkMembership`).
-- [ ] **Step 2: Implement.** `switchCompany` verifies `{ id: memberId, userId: session.user.id, status: "ACTIVE", isOnboarded: true }`, then bumps `lastAccessed`; the `jwt` callback keeps choosing the most recent *valid* member.
-- [ ] **Step 3: Commit.**
+## 9. Model routing (remaining work)
 
-#### Task 11: Stakeholder email unique per company
+| Task | Model | Why |
+|---|---|---|
+| T1, T2, T3, T4 | `opus` | Auth, roles, tokens: security paths |
+| T5, T6, T7, T8 | `sonnet` | Mechanical with a failing test; `opus` review per phase |
+| CI job, smoke-test checklist | `sonnet` | Config |
+| Migrations on shared databases, deploys | orchestrator | Credentials; never delegated |
 
-**Files:** Modify `prisma/schema.prisma:280` (`email String @unique` → drop; add `@@unique([companyId, email])`); new migration.
+Each phase ends with an independent `opus` review of the diff (the reviews found the empty-session bypass, the open editor page and the weak backfill) and a written summary of the previous phase before the next starts.
 
-- [ ] **Step 1:** `pnpm prisma migrate dev --name stakeholder_email_per_company` against the **local** DB; confirm it drops the global unique and adds the composite one.
-- [ ] **Step 2:** grep for `stakeholder.findUnique({ where: { email` and fix callers to use `companyId_email`. Test: the same email can be a stakeholder in two companies.
-- [ ] **Step 3:** Commit. Production migration is run by the orchestrator, not delegated.
+## 10. Hub dependencies (not Captable work)
 
-#### Task 12: Buckets get an owner
-
-**Files:** Modify `prisma/schema.prisma` (`Bucket.companyId String?`, index), `src/trpc/routers/bucket-router/{schema,procedures/create-bucket}.ts`, `src/server/file-uploads.ts`; migration with backfill.
-
-- [ ] **Step 1: Migration** adds nullable `companyId`; backfill SQL sets it from `Document.bucketId` and `Template.bucketId` (orphan buckets stay null and are flagged).
-- [ ] **Step 2: `createBucket` stops accepting a client `key`.** The server generates `${companyPublicId}/${nanoid()}`; presigned GET/PUT only for keys with the caller's company prefix or a `Bucket.companyId` match.
-- [ ] **Step 3: Tests:** tenant A cannot register or fetch tenant B's key. Commit. **Open PR 3** (Phases 3 tasks 10–12).
-
-### Phase 4 — Hub linkage
-
-#### Task 13: Hub identity columns (can ship now)
-
-**Files:** Modify `prisma/schema.prisma`; migration.
-
-- [ ] **Step 1:** add `Company.hubTenantId String? @unique` and `User.hubUserId String? @unique`. Nothing reads them yet.
-- [ ] **Step 2:** a one-off admin script `scripts/link-hub-tenant.ts <companyPublicId> <hubTenantId>` (validates UUID, refuses to overwrite). Commit.
-
-#### Phase 4b — Hub sync (BLOCKED; not tasks until the gate opens)
-
-Gate opens when **all** of these exist in the Hubs (section 5): published signing key (JWKS), a stable claims contract containing `tenant_id` and a user id, a membership read endpoint or webhook in `tin-boss-api`, and decision D3. When open, Phase 4b becomes: (a) a NextAuth OIDC/WorkOS provider that maps the IdP organization → `Company.hubTenantId` and only provisions a `Member` for pre-linked companies; (b) an inbound signed webhook `POST /api/hub/memberships` that upserts `Member` status for linked companies; (c) platform-operator read access via a Hub claim, never via a DB role name. Written as its own spec + plan at that time.
-
-### Phase 5 — RLS defense in depth (deferred)
-
-Trigger: a second isolation bug found *despite* `tenantDb`, or a compliance requirement. Approach: `SET LOCAL app.company_id` inside an interactive transaction per request and `CREATE POLICY ... USING (company_id = current_setting('app.company_id'))` on the 18 tenant tables. Not planned now (YAGNI).
-
----
-
-## 5. Dependencies in the Hub repos (not Captable tasks)
-
-| Repo | Needed before Phase 4b |
-|------|------------------------|
-| `shared-identity-hub` | Close the `x-tenant-id` header bypass in `get_current_tenant_id()` (unaudited tenant pick by tenantless platform admins); one canonical "operator" definition (4 exist); tenant switching + `identity-next` (specified, unbuilt) |
-| `tin-boss-api` | Tenant/membership read endpoint or webhook (none exist); JWKS endpoint; claims revocation story |
-| `shared-client-care-hub` | Composite `(tenant_id, id)` foreign keys on CRM tables; unify `get_user_tenant_id` vs `get_current_tenant_id`. Not needed by Captable |
-
-## 6. Risks and what would change the plan
-
-- **Prisma won't accept the extra `where` on `findUnique`** → Task 3 Step 4 fallback (use `findFirst`).
-- **A router relies on cross-tenant reads** (e.g. platform admin) → none found in the audit; the architecture test will surface any.
-- **Raw SQL appears** → architecture test fails; use `tenantDb` or add a dedicated scoped helper.
-- **Neon pooling** → `tenantDb` is app-level and unaffected; Phase 5 would need direct connections.
-- **Bucket backfill leaves orphans** → report them; do not delete automatically.
-
-## 7. Self-review
-
-- **Spec coverage:** isolation (T2–T7), roles (T8–T9), switching/lifecycle (T10), tenant-owned data (T11–T12), Hub linkage (T13, 4b gate), regression guard (T5). Not covered by design: RLS (gated), Hub-side fixes (section 5).
-- **Placeholders:** none; tasks 6–7 list exact files and the mechanical change; Task 8's matrix is a default pending decision D2.
-- **Type consistency:** `tenantDb`, `TENANT_MODELS`, `PARENT_SCOPED`, `ctx.tenant`, `withTenant`, `seedTwoTenants`, `callerFor` are used with the same names throughout.
+| Repo | Needed before Phase 4 |
+|---|---|
+| `shared-identity-hub` | Close the `x-tenant-id` header bypass in `get_current_tenant_id()`; one definition of "operator" (four exist); tenant switching and the Next adapter (specified, not built) |
+| `tin-boss-api` | Tenant and membership read endpoint or webhook; JWKS endpoint; claims revocation |
+| `shared-client-care-hub` | Composite `(tenant_id, id)` keys on CRM tables; one tenant-resolution function (not needed by Captable) |
