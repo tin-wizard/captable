@@ -323,6 +323,15 @@ Also found (not tenancy, fix opportunistically): `add-stakeholders.ts:27` fires 
 - [ ] **Step 2:** run `pnpm tsc --noEmit`, `pnpm test`; the matrix and architecture allowlist must shrink.
 - [ ] **Step 3: Opus review** of the diff (brief includes the Phase 0 failures list). Commit per router.
 
+#### Lessons from Task 6 that Task 7 must apply
+
+- **A scoped client silently rewrites `where.companyId` to equality.** Any query that deliberately reads another company's rows (or `companyId: { not/in }`) is neutered, not rejected. `assertBucketUsable` was caught this way; it now uses a relation filter. `assertTenantOwns` (equality) is safe.
+- **`company-router` `switchCompany` must stay on `withAuth` + `ctx.db`** (it reads the caller's membership in a *different* company). Move it into its own procedure file and add that file to `ALLOWLIST_TENANTLESS` with that reason; migrate `getCompany`/`updateCompany` normally.
+- **Keep global-by-design:** `src/server/company.ts` (`getCompanyList`), the JWT callback in `src/server/auth.ts`, `accept-member.ts`, and all token-based public flows (`get-signing-fields`, `sign-template`, `esign-service`, data-room and update public pages).
+- **Fix while migrating:** `member-router/procedures/revoke-invite.ts` (member lookup and token delete have no company check: a member of A can revoke B's invite tokens); `common/router.ts` is mislabelled tenantless in the allowlist (it reads the session company without `checkMembership`; move it to `withTenant`).
+- **Extend the architecture test's rule (a)** to also flag `withTenant`/`withAccessControl` files that use `ctx.db`.
+- Non-members now get `UNAUTHORIZED` from the middleware instead of `{ success: false }` in mutation bodies; check client code that relies on the old shape.
+
 #### Task 7: Migrate remaining routers (batch 2)
 
 **Files (modify):** `document-router`, `document-share-router`, `update`, `data-room-router`, `template-router`, `template-field-router`, `member-router`, `company-router`, `bucket-router`, `bank-accounts`, `audit-router`, REST `src/server/api/routes/**` (use the same `tenantDb` via the bearer/cookie membership already resolved in the middleware).
