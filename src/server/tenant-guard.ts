@@ -41,12 +41,15 @@ export async function assertBucketUsable(
   companyId: string,
   bucketId: string,
 ) {
-  const foreign = { bucketId, companyId: { not: companyId } };
-  // sequential: an interactive transaction runs one query at a time anyway
-  if (
-    !(await tx.bucket.count({ where: { id: bucketId } })) ||
-    (await tx.document.count({ where: foreign })) ||
-    (await tx.template.count({ where: foreign }))
-  )
-    throw new Error("Invalid reference");
+  // Filter through Bucket's relations rather than querying Document/Template
+  // directly: those are tenant-scoped, so a tenantDb tx would only ever see the
+  // caller's own rows and could never find another company's reference.
+  const foreign = { some: { companyId: { not: companyId } } };
+  const usable = await tx.bucket.count({
+    where: {
+      id: bucketId,
+      NOT: [{ documents: foreign }, { templates: foreign }],
+    },
+  });
+  if (!usable) throw new Error("Invalid reference");
 }

@@ -1,11 +1,10 @@
 import { generatePublicId } from "@/common/id";
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
 import { assertBucketUsable, assertTenantOwns } from "@/server/tenant-guard";
-import { withAuth } from "@/trpc/api/trpc";
+import { withTenant } from "@/trpc/api/trpc";
 import { ZodAddOptionMutationSchema } from "../schema";
 
-export const addOptionProcedure = withAuth
+export const addOptionProcedure = withTenant
   .input(ZodAddOptionMutationSchema)
   .mutation(async ({ ctx, input }) => {
     const { userAgent, requestIp } = ctx;
@@ -13,11 +12,8 @@ export const addOptionProcedure = withAuth
       const user = ctx.session.user;
       const documents = input.documents;
 
-      await ctx.db.$transaction(async (tx) => {
-        const { companyId } = await checkMembership({
-          tx,
-          session: ctx.session,
-        });
+      await ctx.tenant.db.$transaction(async (tx) => {
+        const { companyId } = ctx.tenant;
 
         await assertTenantOwns(tx, companyId, input);
 

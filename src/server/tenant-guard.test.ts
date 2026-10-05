@@ -44,22 +44,30 @@ describe("assertTenantOwns", () => {
 });
 
 describe("assertBucketUsable", () => {
-  // bucket id -> companies whose documents/templates reference it
-  const refs: Record<string, string[]> = { fresh: [], own: ["A"], b: ["B"] };
-  const foreign = ({
-    where,
-  }: { where: { bucketId: string; companyId: { not: string } } }) =>
-    Promise.resolve(
-      (refs[where.bucketId] ?? []).filter((c) => c !== where.companyId.not)
-        .length,
-    );
+  // bucket id -> companies whose documents / templates reference it
+  const docs: Record<string, string[]> = { own: ["A"], bDoc: ["B"] };
+  const templates: Record<string, string[]> = { own: ["A"], bTpl: ["B"] };
+  const known = ["fresh", "own", "bDoc", "bTpl"];
+  type Clause = { some: { companyId: { not: string } } };
+  type Where = {
+    id: string;
+    NOT: { documents?: Clause; templates?: Clause }[];
+  };
+  // mirrors the relation-filter query: bucket exists and NEITHER relation
+  // has a row from another company (evaluates every NOT entry)
   const db = {
     bucket: {
-      count: ({ where }: { where: { id: string } }) =>
-        Promise.resolve(where.id in refs ? 1 : 0),
+      count: ({ where }: { where: Where }) => {
+        const foreign = (refs: Record<string, string[]>, c?: Clause) =>
+          c
+            ? (refs[where.id] ?? []).some((x) => x !== c.some.companyId.not)
+            : false;
+        const blocked = where.NOT.some(
+          (n) => foreign(docs, n.documents) || foreign(templates, n.templates),
+        );
+        return Promise.resolve(known.includes(where.id) && !blocked ? 1 : 0);
+      },
     },
-    document: { count: foreign },
-    template: { count: foreign },
   } as never;
 
   it("allows a fresh bucket or one only this company references", async () => {
@@ -67,8 +75,14 @@ describe("assertBucketUsable", () => {
     await expect(assertBucketUsable(db, "A", "own")).resolves.toBeUndefined();
   });
 
-  it("rejects a missing bucket or one another company references", async () => {
+  it("rejects a missing bucket", async () => {
     await expect(assertBucketUsable(db, "A", "nope")).rejects.toThrow();
-    await expect(assertBucketUsable(db, "A", "b")).rejects.toThrow();
   });
+
+  it.each(["bDoc", "bTpl"])(
+    "rejects a bucket only another company's %s references",
+    async (id) => {
+      await expect(assertBucketUsable(db, "A", id)).rejects.toThrow();
+    },
+  );
 });

@@ -1,26 +1,20 @@
 import { generatePublicId } from "@/common/id";
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
 import { assertBucketUsable, assertTenantOwns } from "@/server/tenant-guard";
-import { withAuth } from "@/trpc/api/trpc";
+import { withTenant } from "@/trpc/api/trpc";
 import { ZodAddShareMutationSchema } from "../schema";
 
-export const addShareProcedure = withAuth
+export const addShareProcedure = withTenant
   .input(ZodAddShareMutationSchema)
   .mutation(async ({ ctx, input }) => {
-    console.log({ input }, "#############");
-
     const { userAgent, requestIp } = ctx;
 
     try {
       const user = ctx.session.user;
       const documents = input.documents;
 
-      await ctx.db.$transaction(async (tx) => {
-        const { companyId } = await checkMembership({
-          session: ctx.session,
-          tx,
-        });
+      await ctx.tenant.db.$transaction(async (tx) => {
+        const { companyId } = ctx.tenant;
 
         await assertTenantOwns(tx, companyId, input);
 

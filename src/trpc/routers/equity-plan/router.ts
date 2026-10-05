@@ -1,15 +1,14 @@
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
 import { assertTenantOwns } from "@/server/tenant-guard";
-import { createTRPCRouter, withAuth } from "@/trpc/api/trpc";
+import { createTRPCRouter, withTenant } from "@/trpc/api/trpc";
 import { EquityPlanMutationSchema } from "./schema";
 
 export const equityPlanRouter = createTRPCRouter({
-  getPlans: withAuth.query(async ({ ctx }) => {
-    const { db, session } = ctx;
+  getPlans: withTenant.query(async ({ ctx }) => {
+    const { tenant } = ctx;
 
-    const data = await db.$transaction(async (tx) => {
-      const { companyId } = await checkMembership({ session, tx });
+    const data = await tenant.db.$transaction(async (tx) => {
+      const { companyId } = ctx.tenant;
 
       const data = await tx.equityPlan.findMany({
         where: {
@@ -27,14 +26,14 @@ export const equityPlanRouter = createTRPCRouter({
     return { data };
   }),
 
-  create: withAuth
+  create: withTenant
     .input(EquityPlanMutationSchema)
     .mutation(async ({ ctx, input }) => {
-      const { userAgent, requestIp, session } = ctx;
+      const { userAgent, requestIp } = ctx;
 
       try {
-        await ctx.db.$transaction(async (tx) => {
-          const { companyId } = await checkMembership({ session, tx });
+        await ctx.tenant.db.$transaction(async (tx) => {
+          const { companyId } = ctx.tenant;
           await assertTenantOwns(tx, companyId, input);
 
           const data = {
@@ -77,14 +76,14 @@ export const equityPlanRouter = createTRPCRouter({
       }
     }),
 
-  update: withAuth
+  update: withTenant
     .input(EquityPlanMutationSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        const { userAgent, requestIp, session } = ctx;
+        const { userAgent, requestIp } = ctx;
 
-        await ctx.db.$transaction(async (tx) => {
-          const { companyId } = await checkMembership({ tx, session });
+        await ctx.tenant.db.$transaction(async (tx) => {
+          const { companyId } = ctx.tenant;
           await assertTenantOwns(tx, companyId, input);
 
           const data = {

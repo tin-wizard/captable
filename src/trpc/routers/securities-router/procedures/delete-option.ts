@@ -1,12 +1,11 @@
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
-import { withAuth, type withAuthTrpcContextType } from "@/trpc/api/trpc";
+import { withTenant, type withTenantTrpcContextType } from "@/trpc/api/trpc";
 import {
   type TypeZodDeleteOptionMutationSchema,
   ZodDeleteOptionMutationSchema,
 } from "../schema";
 
-export const deleteOptionProcedure = withAuth
+export const deleteOptionProcedure = withTenant
   .input(ZodDeleteOptionMutationSchema)
   .mutation(async (args) => {
     return await deleteOptionHandler(args);
@@ -14,18 +13,18 @@ export const deleteOptionProcedure = withAuth
 
 interface deleteOptionHandlerOptions {
   input: TypeZodDeleteOptionMutationSchema;
-  ctx: withAuthTrpcContextType;
+  ctx: withTenantTrpcContextType;
 }
 
 export async function deleteOptionHandler({
-  ctx: { db, session, requestIp, userAgent },
+  ctx: { tenant, session, requestIp, userAgent },
   input,
 }: deleteOptionHandlerOptions) {
   const user = session.user;
   const { optionId } = input;
   try {
-    await db.$transaction(async (tx) => {
-      const { companyId } = await checkMembership({ session, tx });
+    await tenant.db.$transaction(async (tx) => {
+      const { companyId } = tenant;
 
       const option = await tx.option.delete({
         where: {
