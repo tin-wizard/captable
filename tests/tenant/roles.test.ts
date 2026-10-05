@@ -75,6 +75,8 @@ type Fx = Record<
   | "dataRoomPublicId"
   | "templateId"
   | "templatePublicId"
+  | "resendTemplateId"
+  | "resendRecipientId"
   | "shareToDelete"
   | "optionToDelete"
   | "safeToDelete"
@@ -403,6 +405,15 @@ const cases: Case[] = [
         status: "DRAFT",
         templatePublicId: f.templatePublicId,
         data: [],
+      }),
+  },
+  {
+    proc: "template.resendLink",
+    perm: ["templates", "update"],
+    run: (c, f) =>
+      c.template.resendLink({
+        templateId: f.resendTemplateId,
+        recipientId: f.resendRecipientId,
       }),
   },
   {
@@ -766,6 +777,24 @@ beforeAll(async () => {
   const update = await db.update.findUniqueOrThrow({
     where: { id: aIds.updateId },
   });
+  // an envelope out for signature, its signer's turn (resendLink)
+  const resendTemplate = await db.template.create({
+    data: {
+      companyId,
+      uploaderId: a.memberId,
+      bucketId: aIds.bucketId,
+      publicId: generatePublicId(),
+      name: "roles resend",
+      status: "PENDING",
+    },
+  });
+  const resendRecipient = await db.esignRecipient.create({
+    data: {
+      templateId: resendTemplate.id,
+      email: "resend@example.com",
+      status: "SENT",
+    },
+  });
   // a key presignUpload would issue to A (computed with the global helper so
   // the fixture does not depend on the procedure under test)
   const { getPresignedPutUrl } = await import("@/server/file-uploads");
@@ -781,6 +810,8 @@ beforeAll(async () => {
   fx = {
     ...aIds,
     updatePublicId: update.publicId,
+    resendTemplateId: resendTemplate.id,
+    resendRecipientId: resendRecipient.id,
     shareToDelete: share.id,
     optionToDelete: option.id,
     safeToDelete: safe.id,
@@ -880,6 +911,14 @@ describe("roles inside a tenant", () => {
           orderedDelivery: false,
         }),
     ],
+    [
+      "template.resendLink",
+      (c, f) =>
+        c.template.resendLink({
+          templateId: f.resendTemplateId,
+          recipientId: f.resendRecipientId,
+        }),
+    ],
   ];
 
   it.each(spotChecks)(
@@ -916,6 +955,34 @@ describe("roles inside a tenant", () => {
     const input = { updateId: fx.updateId };
     expect(await code(noRole.update.getRecipients(input))).toBe("UNAUTHORIZED");
     expect(await code(admin.update.getRecipients(input))).toBe("resolved");
+  });
+
+  it("billing.getSubscription needs billing:read", async () => {
+    expect(await code(noRole.billing.getSubscription())).toBe("UNAUTHORIZED");
+    expect(await code(admin.billing.getSubscription())).toBe("resolved");
+    await db.customRole.update({
+      where: { id: grantedRoleId },
+      data: { permissions: [{ subject: "billing", actions: ["read"] }] },
+    });
+    expect(await code(granted.billing.getSubscription())).toBe("resolved");
+  });
+
+  // share dialogs call it for any member; each half needs its own read grant
+  it("common.getContacts returns members only with members:read and stakeholders only with stakeholder:read", async () => {
+    const types = async (c: Caller) =>
+      new Set((await c.common.getContacts()).map((x) => x.type));
+    const grant = (subject: TSubjects) =>
+      db.customRole.update({
+        where: { id: grantedRoleId },
+        data: { permissions: [{ subject, actions: ["read"] }] },
+      });
+
+    expect(await noRole.common.getContacts()).toEqual([]);
+    await grant("stakeholder");
+    expect(await types(granted)).toEqual(new Set(["stakeholder"]));
+    await grant("members");
+    expect(await types(granted)).toEqual(new Set(["member"]));
+    expect(await types(admin)).toEqual(new Set(["member", "stakeholder"]));
   });
 });
 
@@ -1039,5 +1106,53 @@ describe("last active admin", () => {
     await addAdmin();
     await self.member.updateMember({ memberId: t.a.memberId, roleId: "" });
     expect((await member(t.a.memberId))?.role).toBeNull();
+  });
+
+  // F13: the guard is count-then-write, so it must run serializably. Two
+  // admins acting on each other at the same instant: exactly one may win.
+  it("two admins removing, deactivating or demoting each other at once leave an active admin", async () => {
+    const ops = {
+      demote: (c: Caller, id: string) =>
+        c.member.updateMember({ memberId: id, roleId: "" }),
+      remove: (c: Caller, id: string) =>
+        c.member.removeMember({ memberId: id }),
+      deactivate: (c: Caller, id: string) =>
+        c.member.toggleActivation({ memberId: id, status: "INACTIVE" }),
+    };
+    for (let i = 0; i < 5; i++) {
+      for (const [name, op] of Object.entries(ops)) {
+        const pair = await seedTwoTenants();
+        const y = await seedMemberOf(pair.a, "roles race", { role: "ADMIN" });
+        users.push(y.user.id);
+        try {
+          const results = await Promise.allSettled([
+            op(callerFor(pair.a), y.member.id),
+            op(callerFor(y.tenant), pair.a.memberId),
+          ]);
+          const admins = await db.member.count({
+            where: {
+              companyId: pair.a.companyId,
+              role: "ADMIN",
+              status: "ACTIVE",
+            },
+          });
+          const outcome = results.map((r) =>
+            r.status === "fulfilled"
+              ? "ok"
+              : (r.reason as { code?: string }).code,
+          );
+          expect({ name, admins, outcome: outcome.sort() }).toMatchObject({
+            admins: 1,
+            outcome: [
+              // UNAUTHORIZED: the winner committed before the loser's access check
+              expect.stringMatching(/^(FORBIDDEN|CONFLICT|UNAUTHORIZED)$/),
+              "ok",
+            ],
+          });
+        } finally {
+          await cleanupTenants(pair.a, pair.b);
+        }
+      }
+    }
   });
 });

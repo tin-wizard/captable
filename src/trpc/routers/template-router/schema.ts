@@ -39,3 +39,8 @@ export const ZodCancelTemplateMutationSchema = z.object({
   templateId: z.string(),
   publicId: z.string(),
 });
+
+export const ZodResendLinkMutationSchema = z.object({
+  templateId: z.string(),
+  recipientId: z.string(),
+});

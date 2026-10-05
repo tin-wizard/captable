@@ -145,6 +145,13 @@ export class RBAC {
   }
 }
 
+// The check withAccessControl runs for a single `{ subject: { allow: [action] } }` policy.
+export const hasPermission = (
+  permissions: TPermission[],
+  subject: TSubjects,
+  action: TActions,
+) => new RBAC().allow(subject, action).enforce(permissions).val?.valid === true;
+
 // Example usage:
 // const rbac = new RBAC();
 

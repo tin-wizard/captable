@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import type { TPrismaOrTransaction } from "./db";
 
@@ -77,8 +78,8 @@ export async function assertMayManageMember(
 // A company must always keep at least one ACTIVE ADMIN. Call before removing,
 // deactivating, revoking or demoting `memberId`; a no-op unless that member is
 // currently an ACTIVE ADMIN of the company.
-// ponytail: count-then-write, so two concurrent demotions of the last two
-// admins could both pass; serialize (row lock / SERIALIZABLE) if that matters.
+// Count-then-write: callers must run it inside runSerializable, or two admins
+// demoting each other at the same instant could both pass.
 export async function assertNotLastActiveAdmin(
   tx: TPrismaOrTransaction,
   companyId: string,
@@ -97,5 +98,36 @@ export async function assertNotLastActiveAdmin(
       code: "FORBIDDEN",
       message: "A company must keep at least one active admin.",
     });
+  }
+}
+
+// Runs `transaction` (which must pass the given options to $transaction) at
+// SERIALIZABLE, so assertNotLastActiveAdmin's count cannot go stale before the
+// write. A serialization failure (P2034) is retried once, then reported as
+// CONFLICT.
+export async function runSerializable<T>(
+  transaction: (options: {
+    isolationLevel: Prisma.TransactionIsolationLevel;
+  }) => Promise<T>,
+): Promise<T> {
+  const options = {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+  };
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await transaction(options);
+    } catch (error) {
+      const conflict =
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2034";
+      if (!conflict) throw error;
+      if (attempt >= 2) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message:
+            "Another change to this company's members happened at the same time. Please try again.",
+        });
+      }
+    }
   }
 }

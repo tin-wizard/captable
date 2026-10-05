@@ -2,6 +2,7 @@ import { Audit } from "@/server/audit";
 import {
   assertMayManageMember,
   assertNotLastActiveAdmin,
+  runSerializable,
 } from "@/server/tenant-guard";
 import {
   withAccessControl,
@@ -19,8 +20,11 @@ export const removeMemberProcedure = withAccessControl
   .input(ZodRemoveMemberMutationSchema)
   .meta({ policies: { members: { allow: ["delete"] } } })
   .mutation(async ({ ctx, input }) =>
-    ctx.tenant.db.$transaction((tx) =>
-      removeMemberHandler({ ctx, db: tx, input }),
+    runSerializable((options) =>
+      ctx.tenant.db.$transaction(
+        (tx) => removeMemberHandler({ ctx, db: tx, input }),
+        options,
+      ),
     ),
   );
 
@@ -34,6 +38,7 @@ interface removeMemberHandlerOptions {
   >;
 }
 
+// Callers run it in a runSerializable transaction (last-admin guard).
 export async function removeMemberHandler({
   ctx: { session, requestIp, userAgent, tenant },
   db,

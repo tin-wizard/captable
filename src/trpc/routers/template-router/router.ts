@@ -4,6 +4,7 @@ import { createTemplateProcedure } from "./procedures/create-template";
 import { getAllTemplateProcedure } from "./procedures/get-all-template";
 import { getSigningFieldsProcedure } from "./procedures/get-signing-fields";
 import { getTemplateProcedure } from "./procedures/get-template";
+import { resendLinkProcedure } from "./procedures/resend-link";
 import { signTemplateProcedure } from "./procedures/sign-template";
 
 export const templateRouter = createTRPCRouter({
@@ -13,4 +14,5 @@ export const templateRouter = createTRPCRouter({
   getSigningFields: getSigningFieldsProcedure,
   all: getAllTemplateProcedure,
   cancel: cancelTemplateProcedure,
+  resendLink: resendLinkProcedure,
 });

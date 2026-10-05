@@ -1,32 +1,42 @@
+import { hasPermission } from "@/lib/rbac";
 import type { ShareContactType } from "@/schema/contacts";
-import { createTRPCRouter, withTenant } from "@/trpc/api/trpc";
+import { createTRPCRouter, withAccessControl } from "@/trpc/api/trpc";
 
 export const commonRouter = createTRPCRouter({
-  getContacts: withTenant.query(async ({ ctx }) => {
+  // Open to any member (share dialogs), but each half needs the read grant
+  // that member.getMembers / stakeholder.getStakeholders need. No policy:
+  // withAccessControl only resolves `permissions` here.
+  getContacts: withAccessControl.query(async ({ ctx }) => {
     const { db, companyId } = ctx.tenant;
     const contacts = [] as ShareContactType[];
+    const can = (subject: "members" | "stakeholder") =>
+      hasPermission(ctx.permissions, subject, "read");
 
-    const members = await db.member.findMany({
-      where: {
-        companyId,
-      },
-
-      include: {
-        user: {
-          select: {
-            email: true,
-            name: true,
-            image: true,
+    const members = !can("members")
+      ? []
+      : await db.member.findMany({
+          where: {
+            companyId,
           },
-        },
-      },
-    });
 
-    const stakeholders = await db.stakeholder.findMany({
-      where: {
-        companyId,
-      },
-    });
+          include: {
+            user: {
+              select: {
+                email: true,
+                name: true,
+                image: true,
+              },
+            },
+          },
+        });
+
+    const stakeholders = !can("stakeholder")
+      ? []
+      : await db.stakeholder.findMany({
+          where: {
+            companyId,
+          },
+        });
     (members || []).map((member) =>
       contacts.push({
         id: member.id,

@@ -2,6 +2,9 @@ import FileIcon from "@/components/common/file-icon";
 import FilePreview from "@/components/file/preview";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { UnAuthorizedState } from "@/components/ui/un-authorized-state";
+import { hasPermission } from "@/lib/rbac";
+import { getServerPermissions } from "@/lib/rbac/access-control";
 import { getPresignedGetUrl } from "@/server/file-uploads";
 import { getServerTenant } from "@/server/tenant";
 import { RiArrowLeftSLine } from "@remixicon/react";
@@ -14,6 +17,12 @@ const DocumentPreview = async ({
 }: {
   params: { publicId: string; bucketId: string };
 }) => {
+  // same grant as bucket.getUrl: no documents:read, no presigned URL
+  const { permissions } = await getServerPermissions();
+  if (!hasPermission(permissions, "documents", "read")) {
+    return <UnAuthorizedState />;
+  }
+
   const { db, companyId } = await getServerTenant();
   const document = await db.document.findFirst({
     where: {

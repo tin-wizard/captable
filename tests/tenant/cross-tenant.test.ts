@@ -419,6 +419,15 @@ const cases: Case[] = [
       }),
   },
   {
+    name: "template.resendLink to B's recipient",
+    kind: "update",
+    run: (a, { b }) =>
+      a.template.resendLink({
+        templateId: b.templateId,
+        recipientId: b.recipientId,
+      }),
+  },
+  {
     name: "templateField.add on B's template",
     kind: "update",
     run: (a, { b }) =>

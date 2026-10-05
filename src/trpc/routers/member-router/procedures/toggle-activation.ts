@@ -2,6 +2,7 @@ import { Audit } from "@/server/audit";
 import {
   assertMayManageMember,
   assertNotLastActiveAdmin,
+  runSerializable,
 } from "@/server/tenant-guard";
 import { withAccessControl } from "@/trpc/api/trpc";
 import { ZodToggleActivationMutationSchema } from "../schema";
@@ -15,52 +16,54 @@ export const toggleActivation = withAccessControl
       const user = session.user;
       const { memberId, status } = input;
 
-      await tenant.db.$transaction(async (tx) => {
-        await assertMayManageMember(tx, companyId, tenant.role, memberId);
-        if (status !== "ACTIVE") {
-          await assertNotLastActiveAdmin(tx, companyId, memberId);
-        }
+      await runSerializable((options) =>
+        tenant.db.$transaction(async (tx) => {
+          await assertMayManageMember(tx, companyId, tenant.role, memberId);
+          if (status !== "ACTIVE") {
+            await assertNotLastActiveAdmin(tx, companyId, memberId);
+          }
 
-        const member = await tx.member.update({
-          where: {
-            id: memberId,
-            companyId,
-          },
-          data: {
-            status,
-          },
-          select: {
-            userId: true,
-            user: {
-              select: {
-                name: true,
+          const member = await tx.member.update({
+            where: {
+              id: memberId,
+              companyId,
+            },
+            data: {
+              status,
+            },
+            select: {
+              userId: true,
+              user: {
+                select: {
+                  name: true,
+                },
+              },
+              company: {
+                select: {
+                  name: true,
+                },
               },
             },
-            company: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        });
+          });
 
-        await Audit.create(
-          {
-            action: status ? "member.activated" : "member.deactivated",
-            companyId,
-            actor: { type: "user", id: user.id },
-            context: {
-              requestIp,
-              userAgent,
+          await Audit.create(
+            {
+              action: status ? "member.activated" : "member.deactivated",
+              companyId,
+              actor: { type: "user", id: user.id },
+              context: {
+                requestIp,
+                userAgent,
+              },
+              target: [{ type: "user", id: member.userId }],
+              summary: `${user.name} ${status ? "activated" : "deactivated"} ${
+                member.user?.name
+              } from ${member?.company.name}`,
             },
-            target: [{ type: "user", id: member.userId }],
-            summary: `${user.name} ${status ? "activated" : "deactivated"} ${
-              member.user?.name
-            } from ${member?.company.name}`,
-          },
-          tx,
-        );
-      });
+            tx,
+          );
+        }, options),
+      );
 
       return { success: true };
     },
