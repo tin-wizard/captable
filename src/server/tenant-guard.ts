@@ -47,6 +47,20 @@ export async function assertBucketUsable(
 // A company must always keep at least one ACTIVE ADMIN. Call before removing,
 // deactivating, revoking or demoting `memberId`; a no-op unless that member is
 // currently an ACTIVE ADMIN of the company.
+// Managing members (members:create / members:update) must not be a way to mint
+// admins: only an ADMIN may grant the ADMIN role.
+export function assertMayGrantRole(
+  callerRole: "ADMIN" | "CUSTOM" | null,
+  grantedRole: "ADMIN" | "CUSTOM" | null | undefined,
+) {
+  if (grantedRole === "ADMIN" && callerRole !== "ADMIN") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only an admin can grant the admin role.",
+    });
+  }
+}
+
 // ponytail: count-then-write, so two concurrent demotions of the last two
 // admins could both pass; serialize (row lock / SERIALIZABLE) if that matters.
 export async function assertNotLastActiveAdmin(

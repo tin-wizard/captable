@@ -1,6 +1,9 @@
 import { getRoleById } from "@/lib/rbac/access-control";
 import { Audit } from "@/server/audit";
-import { assertNotLastActiveAdmin } from "@/server/tenant-guard";
+import {
+  assertMayGrantRole,
+  assertNotLastActiveAdmin,
+} from "@/server/tenant-guard";
 import { withAccessControl } from "@/trpc/api/trpc";
 import { ZodUpdateMemberMutationSchema } from "../schema";
 
@@ -24,6 +27,7 @@ export const updateMemberProcedure = withAccessControl
             ? undefined
             : await getRoleById({ tx, id: roleId, companyId });
 
+        assertMayGrantRole(tenant.role, role?.role);
         if (role && role.role !== "ADMIN") {
           await assertNotLastActiveAdmin(tx, companyId, memberId);
         }

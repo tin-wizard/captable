@@ -3,6 +3,7 @@ import { getRoleById } from "@/lib/rbac/access-control";
 import { generatePasswordResetToken } from "@/lib/token";
 import { Audit } from "@/server/audit";
 import { generateInviteToken, generateMemberIdentifier } from "@/server/member";
+import { assertMayGrantRole } from "@/server/tenant-guard";
 import { withAccessControl } from "@/trpc/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { ZodInviteMemberMutationSchema } from "../schema";
@@ -74,6 +75,7 @@ export const inviteMemberProcedure = withAccessControl
         }
 
         const role = await getRoleById({ id: roleId, companyId, tx });
+        assertMayGrantRole(ctx.tenant.role, role.role);
 
         //  create member
         const member = await tx.member.upsert({
