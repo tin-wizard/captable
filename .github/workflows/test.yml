@@ -53,10 +53,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      # the version comes from "packageManager" in package.json
       - name: 📦 Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9.1.2
 
       - name: 🟢 Set up Node
         uses: actions/setup-node@v4
