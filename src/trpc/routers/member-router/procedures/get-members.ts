@@ -1,11 +1,10 @@
-import { checkMembership } from "@/server/auth";
 import { withAccessControl } from "@/trpc/api/trpc";
 
 export const getMembersProcedure = withAccessControl
   .meta({ policies: { members: { allow: ["read"] } } })
   .query(async ({ ctx }) => {
     const {
-      db,
+      tenant: { db },
       membership: { companyId },
     } = ctx;
 

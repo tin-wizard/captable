@@ -51,8 +51,32 @@ const CURRENT_OFFENDERS: string[] = [];
 const RAW_SQL = /\$(queryRaw|executeRaw)(Unsafe)?\b/;
 // ctx.db, `ctx: { ..., db }` or `const { db } = ctx` (not ctx.tenant, not a
 // `db: tx` literal handed to a helper, not `ctx: { tenant: { db } }`)
-const CTX_DB =
-  /ctx\.db\b|ctx\s*:\s*\{(?:(?!tenant)[^}])*\bdb\b(?!\s*:)|\{[^}]*\bdb\b[^}]*\}\s*=\s*ctx\b(?!\.)/;
+const CTX_DB_SIMPLE = /ctx\.db\b|ctx\s*:\s*\{(?:(?!tenant)[^}])*\bdb\b(?!\s*:)/;
+
+// `const { db, membership: { companyId } } = ctx`: a regex stops at the first
+// nested `}`, so walk back to the matching `{` and look at the top level only
+// (`tenant: { db }` is nested and therefore fine).
+function destructuresCtxDb(s: string) {
+  for (const m of s.matchAll(/\}\s*=\s*ctx\b(?!\.)/g)) {
+    let depth = 0;
+    let i = m.index ?? 0;
+    for (; i >= 0; i--) {
+      if (s[i] === "}") depth++;
+      else if (s[i] === "{" && --depth === 0) break;
+    }
+    let body = s.slice(i + 1, m.index);
+    let prev: string;
+    do {
+      prev = body;
+      body = body.replace(/\{[^{}]*\}/g, "");
+    } while (body !== prev);
+    if (/\bdb\b(?!\s*:)/.test(body)) return true;
+  }
+  return false;
+}
+const CTX_DB = {
+  test: (s: string) => CTX_DB_SIMPLE.test(s) || destructuresCtxDb(s),
+};
 const CHILD_MODELS = Object.keys(PARENT_SCOPED).map(
   (m) => m[0]?.toLowerCase() + m.slice(1),
 );
@@ -61,6 +85,10 @@ const CHILD_CREATE = new RegExp(
     "|",
   )})\\.create(?:Many)?\\(`,
 );
+
+// a router that imports the global client by value can bypass ctx.tenant.db
+const IMPORTS_GLOBAL_DB =
+  /^import\s+(?!type\b)[^;]*from\s+["']@\/server\/db["']/m;
 
 const stripComments = (s: string) =>
   s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1");
@@ -117,6 +145,18 @@ describe("tenant architecture guard", () => {
     ).toEqual([]);
   });
 
+  it("(e) routers never import the global db client by value", () => {
+    const bad = hits((s) => IMPORTS_GLOBAL_DB.test(stripComments(s))).filter(
+      (f) => !(f in ALLOWLIST_TENANTLESS),
+    );
+    expect(
+      bad,
+      `import type only; use ctx.tenant.db (or allowlist as tenantless):\n${bad.join(
+        "\n",
+      )}`,
+    ).toEqual([]);
+  });
+
   it("(a) CURRENT_OFFENDERS only lists files that still violate", () => {
     const now = new Set(hits(violatesA));
     const fixed = CURRENT_OFFENDERS.filter((f) => !now.has(f));
@@ -167,6 +207,22 @@ describe("tenant architecture guard", () => {
       violatesA("withAuth.query(async ({ ctx: { db, session } }) => 1)"),
     ).toBe(true);
     expect(violatesA("const { db } = ctx; withAuth")).toBe(true);
+    expect(
+      violatesA(
+        "withAccessControl; const { db, membership: { companyId } } = ctx",
+      ),
+    ).toBe(true);
+    expect(
+      violatesA(
+        "withAccessControl; const { tenant: { db }, membership: { companyId } } = ctx",
+      ),
+    ).toBe(false);
+    expect(IMPORTS_GLOBAL_DB.test('import { db } from "@/server/db";')).toBe(
+      true,
+    );
+    expect(
+      IMPORTS_GLOBAL_DB.test('import type { TPrisma } from "@/server/db";'),
+    ).toBe(false);
     expect(violatesA("withTenant.query(({ ctx }) => ctx.tenant.db.x)")).toBe(
       false,
     );
