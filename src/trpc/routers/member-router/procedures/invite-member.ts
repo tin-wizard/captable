@@ -73,7 +73,7 @@ export const inviteMemberProcedure = withAccessControl
           });
         }
 
-        const role = await getRoleById({ id: roleId, tx });
+        const role = await getRoleById({ id: roleId, companyId, tx });
 
         //  create member
         const member = await tx.member.upsert({

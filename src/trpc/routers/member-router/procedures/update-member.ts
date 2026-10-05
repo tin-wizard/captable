@@ -20,7 +20,7 @@ export const updateMemberProcedure = withAccessControl
       const user = session.user;
 
       await db.$transaction(async (tx) => {
-        const role = await getRoleById({ tx, id: roleId });
+        const role = await getRoleById({ tx, id: roleId, companyId });
 
         const member = await tx.member.update({
           where: {

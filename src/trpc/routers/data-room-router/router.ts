@@ -5,6 +5,7 @@ import { encode } from "@/lib/jwt";
 import { ShareRecipientSchema } from "@/schema/contacts";
 import { Audit } from "@/server/audit";
 import { checkMembership } from "@/server/auth";
+import { assertTenantOwns } from "@/server/tenant-guard";
 import { createTRPCRouter, withAuth } from "@/trpc/api/trpc";
 import type { DataRoom } from "@prisma/client";
 import { z } from "zod";
@@ -280,6 +281,7 @@ export const dataRoomRouter = createTRPCRouter({
               : recipient.type === "stakeholder"
                 ? { stakeholderId: recipient.id }
                 : {};
+          await assertTenantOwns(db, companyId, memberOrStakeholderId);
 
           const { recipientRecord } = await db.$transaction(async (tx) => {
             const recipientRecord = await tx.dataRoomRecipient.upsert({

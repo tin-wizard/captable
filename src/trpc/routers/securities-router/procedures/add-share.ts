@@ -1,7 +1,7 @@
 import { generatePublicId } from "@/common/id";
 import { Audit } from "@/server/audit";
 import { checkMembership } from "@/server/auth";
-import { assertTenantOwns } from "@/server/tenant-guard";
+import { assertBucketUsable, assertTenantOwns } from "@/server/tenant-guard";
 import { withAuth } from "@/trpc/api/trpc";
 import { ZodAddShareMutationSchema } from "../schema";
 
@@ -45,6 +45,10 @@ export const addShareProcedure = withAuth
           boardApprovalDate: new Date(input.boardApprovalDate),
         };
         const share = await tx.share.create({ data });
+
+        for (const doc of documents) {
+          await assertBucketUsable(tx, companyId, doc.bucketId);
+        }
 
         const bulkDocuments = documents.map((doc) => ({
           companyId,

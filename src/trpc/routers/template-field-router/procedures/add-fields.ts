@@ -109,6 +109,14 @@ export const addFieldProcedure = withAuth
           },
         });
 
+        // every field's recipient must belong to this (company-scoped) template
+        if (recipientList.length !== new Set(recipientIdList).size) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Invalid recipient",
+          });
+        }
+
         const fieldsList = [];
 
         for (const field of input.data) {

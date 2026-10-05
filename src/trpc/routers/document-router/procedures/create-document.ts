@@ -1,6 +1,7 @@
 import { generatePublicId } from "@/common/id";
 import { Audit } from "@/server/audit";
 import type { TPrismaOrTransaction } from "@/server/db";
+import { assertBucketUsable } from "@/server/tenant-guard";
 import {
   withAccessControl,
   type withAuthTrpcContextType,
@@ -28,6 +29,7 @@ export const createDocumentHandler = async ({
   uploaderName,
   uploaderId,
 }: createDocumentHandlerOptions) => {
+  await assertBucketUsable(db, companyId, input.bucketId);
   const publicId = generatePublicId();
 
   const document = await db.document.create({

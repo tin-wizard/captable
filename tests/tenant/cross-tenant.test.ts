@@ -26,10 +26,6 @@ import {
  *   (a) every row B owns is unchanged (nothing updated, deleted or inserted),
  *   (b) no row outside B now points at one of B's ids,
  *   (c) the return value carries none of B's data.
- *
- * Cases marked `gap` are real holes on this branch. They run as `it.fails`
- * so the suite stays green while the gap list stays explicit; Phase 1 flips
- * them to normal cases.
  */
 
 // @/env snapshots process.env at import; passkey options need a valid base URL
@@ -44,8 +40,6 @@ type Case = {
   name: string;
   kind: "read" | "update" | "delete" | "reference";
   run: (a: Caller, ids: Ids) => Promise<unknown>;
-  // GAP: one-line cause and file:line. Present = expected to fail today.
-  gap?: string;
 };
 
 const DAY = "2024-01-01";
@@ -167,9 +161,6 @@ const fieldInput = (id: string, recipientId: string) => ({
   recipientId,
 });
 
-const BUCKET_GAP =
-  "Bucket has no companyId and bucketId is never checked against the caller's company";
-
 const cases: Case[] = [
   // --- share classes / equity plans --------------------------------------
   {
@@ -269,7 +260,6 @@ const cases: Case[] = [
           bucketId: b.bucketId,
         }),
       ),
-    gap: `${BUCKET_GAP} (src/trpc/routers/securities-router/procedures/add-share.ts:49)`,
   },
   {
     name: "securities.deleteShare B's share",
@@ -309,7 +299,6 @@ const cases: Case[] = [
           bucketId: b.bucketId,
         }),
       ),
-    gap: `${BUCKET_GAP} (src/trpc/routers/securities-router/procedures/add-option.ts:45)`,
   },
   {
     name: "securities.deleteOption B's option",
@@ -329,7 +318,6 @@ const cases: Case[] = [
     kind: "reference",
     run: (a, { a: own, b }) =>
       a.safe.create(customSafe(own.stakeholderId, b.bucketId)),
-    gap: `${BUCKET_GAP} (src/trpc/routers/safe/procedures/create-safe.ts:79 -> template-router/procedures/create-template.ts:34)`,
   },
   {
     name: "safe.addExisting for B's stakeholder",
@@ -345,7 +333,6 @@ const cases: Case[] = [
         documents: [{ bucketId: b.bucketId, name: "doc" }],
         ...safeTerms(own.stakeholderId),
       }),
-    gap: `${BUCKET_GAP} (src/trpc/routers/safe/procedures/add-existing-safe.ts:31)`,
   },
   {
     name: "safe.deleteSafe B's SAFE",
@@ -363,7 +350,6 @@ const cases: Case[] = [
     name: "document.create on B's bucket",
     kind: "reference",
     run: (a, { b }) => a.document.create({ name: "doc", bucketId: b.bucketId }),
-    gap: `${BUCKET_GAP} (src/trpc/routers/document-router/procedures/create-document.ts:33)`,
   },
   {
     name: "documentShare.create for B's document",
@@ -406,7 +392,6 @@ const cases: Case[] = [
         recipients: [{ email: "signer@example.com" }],
         orderedDelivery: false,
       }),
-    gap: `${BUCKET_GAP} (src/trpc/routers/template-router/procedures/create-template.ts:34)`,
   },
   {
     name: "template.cancel B's template",
@@ -436,7 +421,6 @@ const cases: Case[] = [
         templatePublicId: own.templatePublicId,
         data: [fieldInput(nanoid(), b.recipientId)],
       }),
-    gap: "field.recipientId is written unchecked; only the email list is filtered by template (src/trpc/routers/template-field-router/procedures/add-fields.ts:114)",
   },
   {
     name: "templateField.add reusing B's field id",
@@ -503,7 +487,6 @@ const cases: Case[] = [
         others: [],
         selectedContacts: [contact(b.memberId, "member")],
       }),
-    gap: "recipient memberId/stakeholderId are taken from the client unchecked (src/trpc/routers/update/procedures/share-update.ts:53)",
   },
   {
     name: "update.share A's update with B's stakeholder",
@@ -514,7 +497,6 @@ const cases: Case[] = [
         others: [],
         selectedContacts: [contact(b.stakeholderId, "stakeholder")],
       }),
-    gap: "recipient memberId/stakeholderId are taken from the client unchecked (src/trpc/routers/update/procedures/share-update.ts:53)",
   },
   {
     name: "update.unShare B's recipient on B's update",
@@ -607,7 +589,6 @@ const cases: Case[] = [
         others: [],
         selectedContacts: [contact(b.memberId, "member")],
       }),
-    gap: "recipient memberId/stakeholderId are taken from the client unchecked (src/trpc/routers/data-room-router/router.ts:277)",
   },
   {
     name: "dataRoom.share A's room with B's stakeholder",
@@ -618,7 +599,6 @@ const cases: Case[] = [
         others: [],
         selectedContacts: [contact(b.stakeholderId, "stakeholder")],
       }),
-    gap: "recipient memberId/stakeholderId are taken from the client unchecked (src/trpc/routers/data-room-router/router.ts:277)",
   },
   {
     name: "dataRoom.unShare B's recipient on B's room",
@@ -644,7 +624,6 @@ const cases: Case[] = [
     name: "company.switchCompany into B's member",
     kind: "update",
     run: (a, { b }) => a.company.switchCompany({ id: b.memberId }),
-    gap: "member is looked up by id only, not by the caller's userId, then its lastAccessed is written (src/trpc/routers/company-router/router.ts:48)",
   },
   {
     name: "member.acceptMember B's member with A's own invite token",
@@ -699,7 +678,6 @@ const cases: Case[] = [
         memberId: own.member2Id,
         roleId: b.customRoleId,
       }),
-    gap: "getRoleById looks the custom role up by id only (src/lib/rbac/access-control.ts:148, called from member-router/procedures/update-member.ts:23)",
   },
   {
     name: "member.reInvite B's pending member",
@@ -716,7 +694,6 @@ const cases: Case[] = [
         title: "invitee",
         roleId: b.customRoleId,
       }),
-    gap: "getRoleById looks the custom role up by id only (src/lib/rbac/access-control.ts:148, called from member-router/procedures/invite-member.ts:76)",
   },
   {
     name: "rbac.updateRole B's role",
@@ -860,15 +837,9 @@ describe("cross-tenant isolation", () => {
     expect(stringify(result)).not.toContain(B_SECRET);
   }
 
-  const rows = (gap: boolean) =>
-    cases
-      .filter((c) => !!c.gap === gap)
-      .map((c) => [`${c.name} [${c.kind}]`, c] as const);
+  const rows = cases.map((c) => [`${c.name} [${c.kind}]`, c] as const);
 
-  it.each(rows(false))("%s", (_name, c) => expectIsolated(c));
-
-  // GAP cases: expected to fail until Phase 1 closes them
-  it.fails.each(rows(true))("GAP %s", (_name, c) => expectIsolated(c));
+  it.each(rows)("%s", (_name, c) => expectIsolated(c));
 
   describe("own-tenant controls (the matrix cannot pass vacuously)", () => {
     it("shareClass.update succeeds on A's own share class", async () => {

@@ -48,6 +48,8 @@ export const companyRouter = createTRPCRouter({
         const member = await tx.member.findFirst({
           where: {
             id: input.id,
+            userId: ctx.session.user.id,
+            status: "ACTIVE",
             isOnboarded: true,
           },
         });

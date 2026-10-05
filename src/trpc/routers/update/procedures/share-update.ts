@@ -5,6 +5,7 @@ import { UpdateStatusEnum } from "@/prisma/enums";
 import { ShareRecipientSchema } from "@/schema/contacts";
 import { Audit } from "@/server/audit";
 import { checkMembership } from "@/server/auth";
+import { assertTenantOwns } from "@/server/tenant-guard";
 import { withAuth } from "@/trpc/api/trpc";
 import { z } from "zod";
 
@@ -56,6 +57,7 @@ export const shareUpdateProcedure = withAuth
             : recipient.type === "stakeholder"
               ? { stakeholderId: recipient.id }
               : {};
+        await assertTenantOwns(db, companyId, memberOrStakeholderId);
 
         const recipientRecord = await db.updateRecipient.upsert({
           where: {

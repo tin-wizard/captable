@@ -2,6 +2,7 @@ import { generatePublicId } from "@/common/id";
 import { Audit } from "@/server/audit";
 import { checkMembership } from "@/server/auth";
 import type { PrismaTransactionalClient } from "@/server/db";
+import { assertBucketUsable } from "@/server/tenant-guard";
 import { withAuth } from "@/trpc/api/trpc";
 import {
   type TypeZodCreateTemplateMutationSchema,
@@ -30,6 +31,7 @@ export async function createTemplateHandler({
   ctx: { db, user, userAgent, requestIp },
   input: { recipients, ...rest },
 }: CreateTemplateHandlerProps) {
+  await assertBucketUsable(db, rest.companyId, rest.bucketId);
   const publicId = generatePublicId();
   const template = await db.template.create({
     data: {
