@@ -326,6 +326,18 @@ export interface checkMembershipOptions {
 }
 
 export async function checkMembership({ session, tx }: checkMembershipOptions) {
+  const {
+    memberId: claimedMember,
+    companyId: claimedCompany,
+    id: claimedUser,
+  } = session.user ?? {};
+  // Prisma treats `undefined` as "no filter": an empty or partial session
+  // (e.g. next-auth's `{}` for an undecodable cookie) would otherwise match
+  // the first active member of any company.
+  if (!claimedMember || !claimedCompany || !claimedUser) {
+    throw new Error("membership not found");
+  }
+
   const data = await tx.member.findFirst({
     where: {
       id: session.user.memberId,

@@ -42,6 +42,10 @@ function determineCookieName(authUrl: string): string {
 
 async function validateSessionCookie(authUrl: string, c: Context) {
   const session = await fetchSessionFromAuthUrl(authUrl, c);
+  // next-auth answers 200 with {} for a missing or undecodable cookie
+  if (!session?.user?.id || !session.user.memberId) {
+    throw new Error("Not authenticated");
+  }
   const companyIdParam = c.req.param("companyId");
   const { db } = c.get("services");
 

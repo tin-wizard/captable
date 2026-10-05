@@ -299,11 +299,11 @@ describe("REST bearer: token and membership state", () => {
 
 describe("REST session cookie", () => {
   // session-token.ts fetches the session from NEXTAUTH_URL; stub that fetch
-  const withSession = async (path: string) => {
+  const withSession = async (path: string, body: object = a.session) => {
     process.env.NEXTAUTH_URL ||= "http://localhost:3000";
     const spy = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValue(new Response(JSON.stringify(a.session)));
+      .mockResolvedValue(new Response(JSON.stringify(body)));
     try {
       return await api.request(`/api/v1${path}`, {
         // the route's header schema demands an Authorization header even on
@@ -331,5 +331,25 @@ describe("REST session cookie", () => {
       withSession(`/${b.companyId}/stakeholders`),
     );
     expect(status).toBe(401);
+  });
+
+  // next-auth answers 200 with {} for an undecodable cookie; that must never
+  // authenticate anybody (an undefined Prisma filter would match any member)
+  it.each([
+    ["no companyId in the path", "/companies"],
+    ["a company path", "/${A}/stakeholders?limit=50"],
+  ])("an empty session ({}) is rejected: %s", async (_n, path) => {
+    const res = await withSession(path.replace("${A}", a.companyId), {});
+    expect(res.status).toBe(401);
+    expect(await res.text()).not.toContain(aIds.stakeholderId);
+  });
+
+  it("a session missing the member id is rejected", async () => {
+    const { memberId: _m, ...user } = a.session.user;
+    const res = await withSession(`/${a.companyId}/stakeholders?limit=50`, {
+      ...a.session,
+      user,
+    });
+    expect(res.status).toBe(401);
   });
 });
