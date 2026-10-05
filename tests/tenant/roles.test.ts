@@ -2,7 +2,6 @@ import { generatePublicId } from "@/common/id";
 import { queue } from "@/lib/queue";
 import type { TActions } from "@/lib/rbac/actions";
 import { SUBJECTS, type TSubjects } from "@/lib/rbac/subjects";
-import { Audit } from "@/server/audit";
 import { db } from "@/server/db";
 import { appRouter } from "@/trpc/api/root";
 import { nanoid } from "nanoid";
@@ -101,7 +100,6 @@ type Case = {
   // the handler calls a third party (Stripe) that is not reachable in tests:
   // ADMIN is only required to get past the access check
   adminPastAclOnly?: true;
-  beforeAdmin?: () => void;
 };
 
 const DAY = "2024-01-01";
@@ -288,11 +286,6 @@ const cases: Case[] = [
   {
     proc: "stakeholder.addStakeholders",
     perm: ["stakeholder", "create"],
-    // add-stakeholders fires Audit.create un-awaited inside its transaction
-    // (see cross-tenant.test.ts); stub it for the call that reaches it
-    beforeAdmin: () => {
-      vi.spyOn(Audit, "create").mockResolvedValueOnce(undefined as never);
-    },
     run: (c) =>
       c.stakeholder.addStakeholders([
         {
@@ -674,7 +667,8 @@ async function snapshotA() {
 }
 
 beforeAll(async () => {
-  vi.spyOn(queue, "send").mockResolvedValue(null);
+  // a queued job's id; null would mean pg-boss dropped a throttled send
+  vi.spyOn(queue, "send").mockResolvedValue("job-id");
   vi.spyOn(queue, "insert").mockResolvedValue(undefined as never);
   vi.spyOn(console, "error").mockImplementation(() => undefined);
   vi.spyOn(console, "log").mockImplementation(() => undefined);
@@ -877,7 +871,6 @@ describe("roles inside a tenant", () => {
         expect(await snapshotA()).toEqual(before);
       }
 
-      c.beforeAdmin?.();
       if (c.adminPastAclOnly) {
         expect(["UNAUTHORIZED", "FORBIDDEN"]).not.toContain(
           await code(c.run(admin, fx)),
@@ -1153,6 +1146,37 @@ describe("last active admin", () => {
           await cleanupTenants(pair.a, pair.b);
         }
       }
+    }
+  });
+
+  // its own tenant pair: toggling an extra admin would change the counts above
+  it("toggleActivation audits deactivation and activation as such", async () => {
+    const pair = await seedTwoTenants();
+    const x = await seedMemberOf(pair.a, "roles toggled", { role: "ADMIN" });
+    users.push(x.user.id);
+    try {
+      const c = callerFor(pair.a);
+      await c.member.toggleActivation({
+        memberId: x.member.id,
+        status: "INACTIVE",
+      });
+      await c.member.toggleActivation({
+        memberId: x.member.id,
+        status: "ACTIVE",
+      });
+      const rows = await db.audit.findMany({
+        where: {
+          companyId: pair.a.companyId,
+          action: { in: ["member.activated", "member.deactivated"] },
+        },
+        orderBy: { occurredAt: "asc" },
+      });
+      expect(rows.map((r) => r.action)).toEqual([
+        "member.deactivated",
+        "member.activated",
+      ]);
+    } finally {
+      await cleanupTenants(pair.a, pair.b);
     }
   });
 });

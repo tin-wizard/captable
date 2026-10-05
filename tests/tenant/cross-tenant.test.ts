@@ -1,6 +1,5 @@
 import { generatePublicId } from "@/common/id";
 import { queue } from "@/lib/queue";
-import { Audit } from "@/server/audit";
 import { db } from "@/server/db";
 import { appRouter } from "@/trpc/api/root";
 import { nanoid } from "nanoid";
@@ -209,12 +208,8 @@ const cases: Case[] = [
   {
     name: "stakeholder.addStakeholders reusing B's stakeholder id",
     kind: "update",
-    run: (a, { b }) => {
-      // add-stakeholders.ts:27 fires Audit.create un-awaited inside the
-      // transaction; it rejects after commit as an unhandled error. Unrelated
-      // to tenancy, so stub it for this call only.
-      vi.spyOn(Audit, "create").mockResolvedValueOnce(undefined as never);
-      return a.stakeholder.addStakeholders([
+    run: (a, { b }) =>
+      a.stakeholder.addStakeholders([
         {
           id: b.stakeholderId,
           name: "pwned",
@@ -222,8 +217,7 @@ const cases: Case[] = [
           stakeholderType: "INDIVIDUAL",
           currentRelationship: "EMPLOYEE",
         },
-      ]);
-    },
+      ]),
   },
 
   // --- securities ---------------------------------------------------------

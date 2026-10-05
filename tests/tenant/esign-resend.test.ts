@@ -88,7 +88,8 @@ async function envelope(status: Status, recipients: RStatus[]) {
 const send = vi.spyOn(queue, "send");
 
 beforeAll(async () => {
-  send.mockResolvedValue(null);
+  // pg-boss send resolves the job id when queued, null when a singleton drops it
+  send.mockResolvedValue("job-id");
   vi.spyOn(queue, "insert").mockResolvedValue(undefined as never);
   tenants = await seedTwoTenants();
   a = await seedTenantA(tenants.a);
@@ -143,6 +144,33 @@ describe("template.resendLink", () => {
       where: { id: recipientId },
     });
     expect(r?.status).toBe("SENT");
+  });
+
+  it("throttles per recipient: a send dropped by pg-boss is TOO_MANY_REQUESTS and not audited", async () => {
+    const { templateId, recipientIds } = await envelope("PENDING", ["SENT"]);
+    const recipientId = recipientIds[0] as string;
+    send.mockClear();
+    const audits = () => db.audit.count({ where: { companyId: a.companyId } });
+
+    await callerFor(tenants.a).template.resendLink({ templateId, recipientId });
+    expect(send.mock.calls[0]?.[2]).toMatchObject({
+      singletonKey: `esign-resend-${recipientId}`,
+      singletonSeconds: 60,
+    });
+
+    const before = await audits();
+    send.mockResolvedValueOnce(null);
+    const err = await callerFor(tenants.a)
+      .template.resendLink({ templateId, recipientId })
+      .then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+    expect(err).toMatchObject({
+      code: "TOO_MANY_REQUESTS",
+      message: expect.stringMatching(/wait a minute/i),
+    });
+    expect(await audits()).toBe(before);
   });
 
   it.each(["DRAFT", "CANCELLED", "COMPLETE"] as const)(

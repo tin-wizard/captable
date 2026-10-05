@@ -1,4 +1,3 @@
-import { invariant } from "@/lib/error";
 import { getPermissions } from "@/lib/rbac/access-control";
 import { tenantDb } from "@/server/tenant-db";
 import type { Context } from "hono";
@@ -14,22 +13,46 @@ export const sessionCookieAuthMiddleware = () =>
   });
 
 export async function authenticateWithSessionCookie(c: Context) {
+  const authUrl = process.env.NEXTAUTH_URL;
+  if (!authUrl || !getCookie(c, determineCookieName(authUrl))) {
+    throw unauthorized();
+  }
+
+  // outside the try: a cross-site write is 403, not a failed login
+  assertSameOriginWrite(c, authUrl);
+
   try {
-    const authUrl = process.env.NEXTAUTH_URL;
-    invariant(authUrl);
-
-    const nextAuthcookieName = determineCookieName(authUrl);
-    const nextAuthCookie = getCookie(c, nextAuthcookieName);
-
-    if (!nextAuthCookie) {
-      throw new Error("Session cookie not found");
-    }
-
     await validateSessionCookie(authUrl, c);
   } catch (_error) {
+    throw unauthorized();
+  }
+}
+
+const unauthorized = () =>
+  new ApiError({
+    code: "UNAUTHORIZED",
+    message: "Failed to authenticate with session cookie",
+  });
+
+const SAFE_METHODS = ["GET", "HEAD", "OPTIONS"];
+
+// CSRF: the session cookie is an ambient credential, so a write it authorizes
+// must come from the app itself. Browsers send Origin on every cross-origin
+// POST (and Sec-Fetch-Site on all requests); a request with neither is a
+// non-browser client, which cannot hold the victim's cookie, and is allowed.
+// The request's own origin is accepted too: a cross-site page can set neither
+// Host nor Origin on the victim's request, so they match only same-origin.
+function assertSameOriginWrite(c: Context, authUrl: string) {
+  if (SAFE_METHODS.includes(c.req.method)) return;
+  const origin = c.req.header("origin");
+  const allowed = [new URL(authUrl).origin, new URL(c.req.url).origin];
+  if (
+    c.req.header("sec-fetch-site") === "cross-site" ||
+    (origin !== undefined && !allowed.includes(origin))
+  ) {
     throw new ApiError({
-      code: "UNAUTHORIZED",
-      message: "Failed to authenticate with session cookie",
+      code: "FORBIDDEN",
+      message: "Cross-origin requests cannot use the session cookie",
     });
   }
 }

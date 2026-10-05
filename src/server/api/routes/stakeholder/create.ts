@@ -1,4 +1,6 @@
 import { z } from "@hono/zod-openapi";
+import { Prisma } from "@prisma/client";
+import { ApiError } from "../../error";
 import { requirePermission } from "../../middlewares/permission";
 import {
   CreateStakeholderSchema,
@@ -64,40 +66,55 @@ export const create = withAuthApiV1
 
     const body = c.req.valid("json");
 
-    const stakeholders = await db.$transaction(async (tx) => {
-      const inputDataWithCompanyId = body.map((stakeholder) => ({
-        ...stakeholder,
-        companyId: membership.companyId,
-      }));
+    const stakeholders = await db
+      .$transaction(async (tx) => {
+        const inputDataWithCompanyId = body.map((stakeholder) => ({
+          ...stakeholder,
+          companyId: membership.companyId,
+        }));
 
-      const addedStakeholders = await tx.stakeholder.createManyAndReturn({
-        data: inputDataWithCompanyId,
-        select: {
-          id: true,
-          name: true,
-        },
-      });
-
-      const auditPromises = addedStakeholders.map((stakeholder) =>
-        audit.create(
-          {
-            action: "stakeholder.added",
-            companyId: membership.companyId,
-            actor: { type: "user", id: membership.userId },
-            context: {
-              requestIp,
-              userAgent,
-            },
-            target: [{ type: "stakeholder", id: stakeholder.id }],
-            summary: `${membership.user.name} added the stakholder in the company : ${stakeholder.name}`,
+        const addedStakeholders = await tx.stakeholder.createManyAndReturn({
+          data: inputDataWithCompanyId,
+          select: {
+            id: true,
+            name: true,
           },
-          tx,
-        ),
-      );
-      await Promise.all(auditPromises);
+        });
 
-      return addedStakeholders;
-    });
+        const auditPromises = addedStakeholders.map((stakeholder) =>
+          audit.create(
+            {
+              action: "stakeholder.added",
+              companyId: membership.companyId,
+              actor: { type: "user", id: membership.userId },
+              context: {
+                requestIp,
+                userAgent,
+              },
+              target: [{ type: "stakeholder", id: stakeholder.id }],
+              summary: `${membership.user.name} added the stakholder in the company : ${stakeholder.name}`,
+            },
+            tx,
+          ),
+        );
+        await Promise.all(auditPromises);
+
+        return addedStakeholders;
+      })
+      // the only client-controlled unique key is (companyId, email)
+      .catch((error) => {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          throw new ApiError({
+            code: "NOT_UNIQUE",
+            message:
+              "A stakeholder with this email already exists in this company",
+          });
+        }
+        throw error;
+      });
 
     const data: z.infer<typeof ResponseSchema>["data"] = stakeholders;
 

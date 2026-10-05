@@ -24,27 +24,29 @@ export const addStakeholdersProcedure = withAccessControl
             companyId,
           }));
 
-          await tx.stakeholder.createMany({
+          // skipped duplicates are not returned, so they are not audited
+          const added = await tx.stakeholder.createManyAndReturn({
             data: inputDataWithCompanyId,
             skipDuplicates: true,
+            select: { id: true, name: true },
           });
 
-          inputDataWithCompanyId.map(async (inp) => {
+          for (const stakeholder of added) {
             await Audit.create(
               {
                 action: "stakeholder.added",
-                companyId: user.companyId,
+                companyId,
                 actor: { type: "user", id: user.id },
                 context: {
                   userAgent,
                   requestIp,
                 },
-                target: [{ type: "stakeholder", id: inp.id }],
-                summary: `${user.name} added stakeholder ${inp.name} for the company ID ${inp.companyId}`,
+                target: [{ type: "stakeholder", id: stakeholder.id }],
+                summary: `${user.name} added stakeholder ${stakeholder.name} for the company ID ${companyId}`,
               },
               tx,
             );
-          });
+          }
         });
 
         return {
