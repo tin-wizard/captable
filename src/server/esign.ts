@@ -54,6 +54,7 @@ export function getEsignTemplate({ tx, templateId }: getEsignTemplateOptions) {
       id: true,
       name: true,
       orderedDelivery: true,
+      status: true,
       uploader: {
         select: {
           user: {
