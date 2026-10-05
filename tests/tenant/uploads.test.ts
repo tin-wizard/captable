@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { generatePublicId } from "@/common/id";
 import { db } from "@/server/db";
-import { getPresignedPutUrl } from "@/server/file-uploads";
+import { getPresignedPutUrl, uploadFile } from "@/server/file-uploads";
 import { tenantDb } from "@/server/tenant-db";
 import { assertBucketUsable } from "@/server/tenant-guard";
 import {
@@ -480,6 +480,30 @@ describe("file-uploads module", () => {
         return /^["']use client["']/m.test(s) && byValue.test(s);
       });
     expect(clientImporters).toEqual([]);
+  });
+
+  // e-sign passes a File-shaped object whose .size is 0
+  it("uploadFile reports the bytes it sent, not file.size", async () => {
+    const put = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 200 }));
+    try {
+      const bytes = new Uint8Array(1234);
+      const lying = {
+        name: "signed.pdf",
+        type: "application/pdf",
+        size: 0,
+        arrayBuffer: async () => bytes.buffer,
+      } as unknown as File;
+      const res = await uploadFile(lying, {
+        identifier: a.companyId,
+        keyPrefix: "signed-esign-doc",
+      });
+      expect(res.size).toBe(1234);
+      expect(put).toHaveBeenCalledTimes(1);
+    } finally {
+      put.mockRestore();
+    }
   });
 });
 

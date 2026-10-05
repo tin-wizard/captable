@@ -93,8 +93,10 @@ const createApi = <V extends Version, L extends boolean>(
   return { createRoute };
 };
 
+// some() rethrows the LAST failure: the cookie path goes last so its 403 for a
+// cross-site write is not masked by the bearer path's 401
 export const authMiddleware = (option?: accessTokenAuthMiddlewareOptions) =>
-  some(sessionCookieAuthMiddleware(), accessTokenAuthMiddleware(option));
+  some(accessTokenAuthMiddleware(option), sessionCookieAuthMiddleware());
 
 export const ApiV1 = createApi("v1");
 

@@ -139,8 +139,14 @@ export const uploadFile = async (
       `Failed to upload file "${file.name}", failed with status code ${res.status}`,
     );
   }
-  const { name, type, size } = file;
-  return { key, name, mimeType: type, size, fileUrl: bucketUrl };
+  const { name, type } = file;
+  return {
+    key,
+    name,
+    mimeType: type,
+    size: body.byteLength,
+    fileUrl: bucketUrl,
+  };
 };
 
 export type TUploadFile = Awaited<ReturnType<typeof uploadFile>>;

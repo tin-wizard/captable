@@ -46,9 +46,11 @@ export const toggleActivation = withAccessControl
             },
           });
 
+          // INACTIVE and PENDING both take access away
+          const activated = status === "ACTIVE";
           await Audit.create(
             {
-              action: status ? "member.activated" : "member.deactivated",
+              action: activated ? "member.activated" : "member.deactivated",
               companyId,
               actor: { type: "user", id: user.id },
               context: {
@@ -56,9 +58,9 @@ export const toggleActivation = withAccessControl
                 userAgent,
               },
               target: [{ type: "user", id: member.userId }],
-              summary: `${user.name} ${status ? "activated" : "deactivated"} ${
-                member.user?.name
-              } from ${member?.company.name}`,
+              summary: `${user.name} ${
+                activated ? "activated" : "deactivated"
+              } ${member.user?.name} from ${member?.company.name}`,
             },
             tx,
           );

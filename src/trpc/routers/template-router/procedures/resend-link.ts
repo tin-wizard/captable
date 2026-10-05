@@ -58,6 +58,37 @@ export const resendLinkProcedure = withAccessControl
       templateId: template.id,
     });
 
+    // throttled per recipient: pg-boss resolves null for a send it drops
+    const jobId = await eSignNotificationEmailJob.emit(
+      {
+        token,
+        email: recipient.email,
+        recipient: {
+          id: recipient.id,
+          name: recipient.name,
+          email: recipient.email,
+        },
+        sender: { name: user.name, email: user.email },
+        message: template.message,
+        documentName: template.name,
+        company: template.company,
+        requestIp,
+        companyId,
+        userAgent,
+      },
+      {
+        singletonKey: `esign-resend-${recipient.id}`,
+        singletonSeconds: 60,
+      },
+    );
+
+    if (!jobId) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "Please wait a minute before resending",
+      });
+    }
+
     await Audit.create(
       {
         action: "template.updated",
@@ -71,23 +102,6 @@ export const resendLinkProcedure = withAccessControl
       },
       db,
     );
-
-    await eSignNotificationEmailJob.emit({
-      token,
-      email: recipient.email,
-      recipient: {
-        id: recipient.id,
-        name: recipient.name,
-        email: recipient.email,
-      },
-      sender: { name: user.name, email: user.email },
-      message: template.message,
-      documentName: template.name,
-      company: template.company,
-      requestIp,
-      companyId,
-      userAgent,
-    });
 
     return { success: true, message: "A new signing link has been sent." };
   });

@@ -1,6 +1,5 @@
 import { createSecureHash } from "@/lib/crypto";
 import api from "@/server/api";
-import { Audit } from "@/server/audit";
 import { db } from "@/server/db";
 import { tenantDb } from "@/server/tenant-db";
 import { nanoid } from "nanoid";
@@ -85,14 +84,8 @@ afterAll(async () => {
   await cleanupTenants(a, b);
 });
 
-// add-stakeholders fires Audit.create un-awaited inside its transaction (see
-// cross-tenant.test.ts); stub it so it cannot reject after commit
-const stubAudit = () =>
-  vi.spyOn(Audit, "create").mockResolvedValue(undefined as never);
-
 describe("the same email in two companies", () => {
   it("is accepted by stakeholder.addStakeholders in each company", async () => {
-    stubAudit();
     const email = freshEmail();
     expect((await trpcAdd(a, email)).success).toBe(true);
     expect((await trpcAdd(b, email)).success).toBe(true);
@@ -121,20 +114,52 @@ describe("the same email in two companies", () => {
 
 describe("a duplicate email inside one company", () => {
   it("addStakeholders skips it, as before (no second row)", async () => {
-    stubAudit();
     const email = freshEmail();
     expect((await trpcAdd(a, email)).success).toBe(true);
     expect((await trpcAdd(a, email)).success).toBe(true);
     expect(await rowsIn(a, email)).toBe(1);
   });
 
-  it("REST refuses it with the generic 500, as before", async () => {
+  it("REST refuses it with 409 NOT_UNIQUE", async () => {
     const email = freshEmail();
     expect((await restCreate(a, email)).status).toBe(200);
     const res = await restCreate(a, email);
-    expect(res.status).toBe(500);
-    expect(await res.text()).not.toContain(email);
+    expect(res.status).toBe(409);
+    const body = await res.text();
+    expect(JSON.parse(body)).toMatchObject({
+      error: {
+        code: "NOT_UNIQUE",
+        message: "A stakeholder with this email already exists in this company",
+      },
+    });
+    expect(body).not.toContain(email);
     expect(await rowsIn(a, email)).toBe(1);
+  });
+
+  it("addStakeholders audits each created stakeholder by its id, and not a skipped duplicate", async () => {
+    const dup = freshEmail();
+    expect((await trpcAdd(a, dup)).success).toBe(true);
+    const fresh = freshEmail();
+    const where = { companyId: a.companyId, action: "stakeholder.added" };
+    const seen = (await db.audit.findMany({ where })).map((r) => r.id);
+    const res = await callerFor(a).stakeholder.addStakeholders(
+      [dup, fresh].map((email) => ({
+        name: "audited holder",
+        email,
+        stakeholderType: "INDIVIDUAL" as const,
+        currentRelationship: "EMPLOYEE" as const,
+      })),
+    );
+    expect(res.success).toBe(true);
+    const created = await db.stakeholder.findFirstOrThrow({
+      where: { companyId: a.companyId, email: fresh },
+    });
+    const rows = await db.audit.findMany({
+      where: { ...where, id: { notIn: seen } },
+    });
+    expect(rows.map((r) => r.target)).toEqual([
+      [{ type: "stakeholder", id: created.id }],
+    ]);
   });
 
   it("Prisma refuses it with a unique violation on (companyId, email)", async () => {
