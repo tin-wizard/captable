@@ -1,5 +1,6 @@
 import { getRoleById } from "@/lib/rbac/access-control";
 import { Audit } from "@/server/audit";
+import { assertNotLastActiveAdmin } from "@/server/tenant-guard";
 import { withAccessControl } from "@/trpc/api/trpc";
 import { ZodUpdateMemberMutationSchema } from "../schema";
 
@@ -17,7 +18,15 @@ export const updateMemberProcedure = withAccessControl
       const user = session.user;
 
       await tenant.db.$transaction(async (tx) => {
-        const role = await getRoleById({ tx, id: roleId, companyId });
+        // no roleId: leave the role alone (it used to clear it)
+        const role =
+          roleId === undefined
+            ? undefined
+            : await getRoleById({ tx, id: roleId, companyId });
+
+        if (role && role.role !== "ADMIN") {
+          await assertNotLastActiveAdmin(tx, companyId, memberId);
+        }
 
         const member = await tx.member.update({
           where: {
@@ -27,16 +36,18 @@ export const updateMemberProcedure = withAccessControl
           },
           data: {
             ...rest,
-            ...(role && { role: role.role }),
-            customRole: {
-              ...(role.customRoleId
-                ? {
-                    connect: {
-                      id: role.customRoleId,
-                    },
-                  }
-                : { disconnect: true }),
-            },
+            ...(role && {
+              role: role.role,
+              customRole: {
+                ...(role.customRoleId
+                  ? {
+                      connect: {
+                        id: role.customRoleId,
+                      },
+                    }
+                  : { disconnect: true }),
+              },
+            }),
             user: {
               update: {
                 name,

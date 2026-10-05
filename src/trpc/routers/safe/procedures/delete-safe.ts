@@ -1,12 +1,16 @@
 import { Audit } from "@/server/audit";
-import { withTenant, type withTenantTrpcContextType } from "@/trpc/api/trpc";
+import {
+  withAccessControl,
+  type withTenantTrpcContextType,
+} from "@/trpc/api/trpc";
 import {
   type TypeZodDeleteSafesMutationSchema,
   ZodDeleteSafesMutationSchema,
 } from "../schema";
 
-export const deleteSafeProcedure = withTenant
+export const deleteSafeProcedure = withAccessControl
   .input(ZodDeleteSafesMutationSchema)
+  .meta({ policies: { securities: { allow: ["delete"] } } })
   .mutation(async (args) => {
     return await deleteSafeHandler(args);
   });

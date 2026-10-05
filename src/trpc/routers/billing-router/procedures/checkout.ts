@@ -1,12 +1,13 @@
 import { env } from "@/env";
 import { invariant } from "@/lib/error";
 import { createOrRetrieveCustomer, stripe } from "@/server/stripe";
-import { withTenant } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import type Stripe from "stripe";
 import { ZodCheckoutMutationSchema } from "../schema";
 
-export const checkoutProcedure = withTenant
+export const checkoutProcedure = withAccessControl
   .input(ZodCheckoutMutationSchema)
+  .meta({ policies: { billing: { allow: ["create"] } } })
   .mutation(async ({ ctx, input }) => {
     const { priceId, priceType } = input;
     const { tenant, session } = ctx;

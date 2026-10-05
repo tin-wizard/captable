@@ -1,12 +1,17 @@
 import { assertTenantOwns } from "@/server/tenant-guard";
-import { createTRPCRouter, withTenant } from "@/trpc/api/trpc";
+import {
+  createTRPCRouter,
+  withAccessControl,
+  withTenant,
+} from "@/trpc/api/trpc";
 import { ShareClassMutationSchema } from "./schema";
 
 import { Audit } from "@/server/audit";
 
 export const shareClassRouter = createTRPCRouter({
-  create: withTenant
+  create: withAccessControl
     .input(ShareClassMutationSchema)
+    .meta({ policies: { "cap-table-settings": { allow: ["create"] } } })
     .mutation(async ({ ctx, input }) => {
       const { userAgent, requestIp } = ctx;
 
@@ -76,8 +81,9 @@ export const shareClassRouter = createTRPCRouter({
       }
     }),
 
-  update: withTenant
+  update: withAccessControl
     .input(ShareClassMutationSchema)
+    .meta({ policies: { "cap-table-settings": { allow: ["update"] } } })
     .mutation(async ({ ctx, input }) => {
       const { userAgent, requestIp } = ctx;
 

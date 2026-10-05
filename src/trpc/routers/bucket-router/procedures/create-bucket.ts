@@ -1,6 +1,6 @@
 import { Audit } from "@/server/audit";
 import type { TPrismaOrTransaction } from "@/server/db";
-import { withTenant } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { TRPCError } from "@trpc/server";
 import {
   type TypeZodCreateBucketMutationSchema,
@@ -48,8 +48,9 @@ export const createBucketHandler = async ({
   return bucket;
 };
 
-export const createBucketProcedure = withTenant
+export const createBucketProcedure = withAccessControl
   .input(ZodCreateBucketMutationSchema)
+  .meta({ policies: { documents: { allow: ["create"] } } })
   .mutation(
     async ({
       ctx: {

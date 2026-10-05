@@ -5,10 +5,10 @@ import { UpdateStatusEnum } from "@/prisma/enums";
 import { ShareRecipientSchema } from "@/schema/contacts";
 import { Audit } from "@/server/audit";
 import { assertTenantOwns } from "@/server/tenant-guard";
-import { withTenant } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { z } from "zod";
 
-export const shareUpdateProcedure = withTenant
+export const shareUpdateProcedure = withAccessControl
   .input(
     z.object({
       updateId: z.string(),
@@ -16,6 +16,7 @@ export const shareUpdateProcedure = withTenant
       selectedContacts: z.array(ShareRecipientSchema),
     }),
   )
+  .meta({ policies: { updates: { allow: ["update"] } } })
   .mutation(async ({ ctx, input }) => {
     const { session, userAgent, requestIp } = ctx;
     const { db, companyId } = ctx.tenant;
@@ -133,13 +134,14 @@ export const shareUpdateProcedure = withTenant
     };
   });
 
-export const unshareUpdateProcedure = withTenant
+export const unshareUpdateProcedure = withAccessControl
   .input(
     z.object({
       updateId: z.string(),
       recipientId: z.string(),
     }),
   )
+  .meta({ policies: { updates: { allow: ["update"] } } })
   .mutation(async ({ ctx, input }) => {
     const { session, userAgent, requestIp } = ctx;
     const { db, companyId } = ctx.tenant;

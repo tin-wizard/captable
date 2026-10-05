@@ -1,10 +1,11 @@
 import { generatePublicId } from "@/common/id";
 import { Audit } from "@/server/audit";
-import { withTenant } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { UpdateMutationSchema } from "../schema";
 
-export const saveUpdateProcedure = withTenant
+export const saveUpdateProcedure = withAccessControl
   .input(UpdateMutationSchema)
+  .meta({ policies: { updates: { allow: ["create", "update"] } } })
   .mutation(async ({ ctx, input }) => {
     try {
       const { memberId: authorId, companyId } = ctx.tenant;

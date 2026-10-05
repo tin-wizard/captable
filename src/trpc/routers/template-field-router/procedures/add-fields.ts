@@ -4,7 +4,7 @@ import {
 } from "@/jobs/esign-email";
 import { decode, encode } from "@/lib/jwt";
 import { Audit } from "@/server/audit";
-import { withTenant } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { ZodAddFieldMutationSchema } from "../schema";
@@ -38,8 +38,9 @@ export async function DecodeEmailToken(jwt: string) {
   return emailTokenPayloadSchema.parse(payload);
 }
 
-export const addFieldProcedure = withTenant
+export const addFieldProcedure = withAccessControl
   .input(ZodAddFieldMutationSchema)
+  .meta({ policies: { templates: { allow: ["update"] } } })
   .mutation(async ({ ctx, input }) => {
     try {
       const user = ctx.session.user;

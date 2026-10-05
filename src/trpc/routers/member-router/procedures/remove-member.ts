@@ -1,5 +1,9 @@
 import { Audit } from "@/server/audit";
-import { withTenant, type withTenantTrpcContextType } from "@/trpc/api/trpc";
+import { assertNotLastActiveAdmin } from "@/server/tenant-guard";
+import {
+  withAccessControl,
+  type withTenantTrpcContextType,
+} from "@/trpc/api/trpc";
 import {
   type TypeZodRemoveMemberMutationSchema,
   ZodRemoveMemberMutationSchema,
@@ -8,8 +12,9 @@ import {
 type TenantDb = withTenantTrpcContextType["tenant"]["db"];
 type TenantTx = Parameters<Parameters<TenantDb["$transaction"]>[0]>[0];
 
-export const removeMemberProcedure = withTenant
+export const removeMemberProcedure = withAccessControl
   .input(ZodRemoveMemberMutationSchema)
+  .meta({ policies: { members: { allow: ["delete"] } } })
   .mutation(async ({ ctx, input }) =>
     ctx.tenant.db.$transaction((tx) =>
       removeMemberHandler({ ctx, db: tx, input }),
@@ -34,6 +39,8 @@ export async function removeMemberHandler({
   const user = session.user;
   const { memberId } = input;
   const { companyId } = tenant;
+
+  await assertNotLastActiveAdmin(db, companyId, memberId);
 
   const member = await db.member.delete({
     where: {

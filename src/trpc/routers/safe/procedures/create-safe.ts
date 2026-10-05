@@ -6,14 +6,15 @@ import { TAG } from "@/lib/tags";
 import { Audit } from "@/server/audit";
 import { uploadFile } from "@/server/file-uploads";
 import { assertTenantOwns } from "@/server/tenant-guard";
-import { withTenant } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import type { Prisma } from "@prisma/client";
 import { createBucketHandler } from "../../bucket-router/procedures/create-bucket";
 import { createTemplateHandler } from "../../template-router/procedures/create-template";
 import { ZodCreateSafeMutationSchema } from "../schema";
 
-export const createSafeProcedure = withTenant
+export const createSafeProcedure = withAccessControl
   .input(ZodCreateSafeMutationSchema)
+  .meta({ policies: { securities: { allow: ["create"] } } })
   .mutation(async ({ ctx, input }) => {
     const { userAgent, requestIp } = ctx;
     const user = ctx.session.user;

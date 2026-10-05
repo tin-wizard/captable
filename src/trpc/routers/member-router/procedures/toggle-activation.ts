@@ -1,9 +1,11 @@
 import { Audit } from "@/server/audit";
-import { withTenant } from "@/trpc/api/trpc";
+import { assertNotLastActiveAdmin } from "@/server/tenant-guard";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { ZodToggleActivationMutationSchema } from "../schema";
 
-export const toggleActivation = withTenant
+export const toggleActivation = withAccessControl
   .input(ZodToggleActivationMutationSchema)
+  .meta({ policies: { members: { allow: ["update"] } } })
   .mutation(
     async ({ ctx: { session, tenant, requestIp, userAgent }, input }) => {
       const { companyId } = tenant;
@@ -11,6 +13,10 @@ export const toggleActivation = withTenant
       const { memberId, status } = input;
 
       await tenant.db.$transaction(async (tx) => {
+        if (status !== "ACTIVE") {
+          await assertNotLastActiveAdmin(tx, companyId, memberId);
+        }
+
         const member = await tx.member.update({
           where: {
             id: memberId,

@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import type { TPrismaOrTransaction } from "./db";
 
 type Refs = {
@@ -41,4 +42,30 @@ export async function assertBucketUsable(
 ) {
   if (!(await tx.bucket.count({ where: { id: bucketId, companyId } })))
     throw new Error("Invalid reference");
+}
+
+// A company must always keep at least one ACTIVE ADMIN. Call before removing,
+// deactivating, revoking or demoting `memberId`; a no-op unless that member is
+// currently an ACTIVE ADMIN of the company.
+// ponytail: count-then-write, so two concurrent demotions of the last two
+// admins could both pass; serialize (row lock / SERIALIZABLE) if that matters.
+export async function assertNotLastActiveAdmin(
+  tx: TPrismaOrTransaction,
+  companyId: string,
+  memberId: string,
+) {
+  const activeAdmin = {
+    companyId,
+    role: "ADMIN" as const,
+    status: "ACTIVE" as const,
+  };
+  const isActiveAdmin = await tx.member.count({
+    where: { id: memberId, ...activeAdmin },
+  });
+  if (isActiveAdmin && (await tx.member.count({ where: activeAdmin })) <= 1) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "A company must keep at least one active admin.",
+    });
+  }
 }

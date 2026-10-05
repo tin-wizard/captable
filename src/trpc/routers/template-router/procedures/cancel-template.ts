@@ -1,8 +1,9 @@
-import { withTenant } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { ZodCancelTemplateMutationSchema } from "../schema";
 
-export const cancelTemplateProcedure = withTenant
+export const cancelTemplateProcedure = withAccessControl
   .input(ZodCancelTemplateMutationSchema)
+  .meta({ policies: { templates: { allow: ["update"] } } })
   .mutation(async ({ input, ctx }) => {
     const { templateId, publicId } = input;
     const { companyId } = ctx.tenant;

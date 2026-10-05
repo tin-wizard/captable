@@ -1,12 +1,13 @@
 import { Audit } from "@/server/audit";
 import { revokeExistingInviteTokens } from "@/server/member";
-import { withTenant } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { ZodRevokeInviteMutationSchema } from "../schema";
 import { removeMemberHandler } from "./remove-member";
 
-export const revokeInviteProcedure = withTenant
+export const revokeInviteProcedure = withAccessControl
   .input(ZodRevokeInviteMutationSchema)
+  .meta({ policies: { members: { allow: ["delete"] } } })
   .mutation(async ({ ctx, input }) => {
     const { tenant, session, requestIp, userAgent } = ctx;
     const user = session.user;

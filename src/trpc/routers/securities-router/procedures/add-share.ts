@@ -1,11 +1,12 @@
 import { generatePublicId } from "@/common/id";
 import { Audit } from "@/server/audit";
 import { assertBucketUsable, assertTenantOwns } from "@/server/tenant-guard";
-import { withTenant } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { ZodAddShareMutationSchema } from "../schema";
 
-export const addShareProcedure = withTenant
+export const addShareProcedure = withAccessControl
   .input(ZodAddShareMutationSchema)
+  .meta({ policies: { securities: { allow: ["create"] } } })
   .mutation(async ({ ctx, input }) => {
     const { userAgent, requestIp } = ctx;
 

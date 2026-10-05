@@ -43,6 +43,7 @@ export const accessTokenRouter = createTRPCRouter({
 
   create: withAccessControl
     .input(z.object({ typeEnum: z.nativeEnum(AccessTokenType) }))
+    .meta({ policies: { developer: { allow: ["create"] } } })
     .mutation(async ({ ctx, input }) => {
       const {
         tenant: { db },

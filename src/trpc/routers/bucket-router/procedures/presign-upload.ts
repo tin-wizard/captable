@@ -1,13 +1,14 @@
 import { getPresignedPutUrl } from "@/server/file-uploads";
-import { withAuth, withTenant } from "@/trpc/api/trpc";
+import { withAccessControl, withAuth } from "@/trpc/api/trpc";
 import {
   ZodPresignPublicUploadSchema,
   ZodPresignUploadSchema,
 } from "../schema";
 
 // Private company files: the key lives under the caller's company publicId.
-export const presignUploadProcedure = withTenant
+export const presignUploadProcedure = withAccessControl
   .input(ZodPresignUploadSchema)
+  .meta({ policies: { documents: { allow: ["create"] } } })
   .mutation(async ({ ctx: { tenant }, input }) => {
     const { publicId } = await tenant.db.company.findUniqueOrThrow({
       where: { id: tenant.companyId },

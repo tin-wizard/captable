@@ -5,7 +5,11 @@ import { encode } from "@/lib/jwt";
 import { ShareRecipientSchema } from "@/schema/contacts";
 import { Audit } from "@/server/audit";
 import { assertTenantOwns } from "@/server/tenant-guard";
-import { createTRPCRouter, withTenant } from "@/trpc/api/trpc";
+import {
+  createTRPCRouter,
+  withAccessControl,
+  withTenant,
+} from "@/trpc/api/trpc";
 import type { DataRoom } from "@prisma/client";
 import { z } from "zod";
 import { DataRoomSchema } from "./schema";
@@ -105,134 +109,139 @@ export const dataRoomRouter = createTRPCRouter({
       return response;
     }),
 
-  save: withTenant.input(DataRoomSchema).mutation(async ({ ctx, input }) => {
-    try {
-      let room = {} as DataRoom;
-      const { session, userAgent, requestIp } = ctx;
-      const { db, companyId } = ctx.tenant;
+  save: withAccessControl
+    .input(DataRoomSchema)
+    .meta({ policies: { "data-rooms": { allow: ["create", "update"] } } })
+    .mutation(async ({ ctx, input }) => {
+      try {
+        let room = {} as DataRoom;
+        const { session, userAgent, requestIp } = ctx;
+        const { db, companyId } = ctx.tenant;
 
-      const { publicId } = input;
+        const { publicId } = input;
 
-      await db.$transaction(async (tx) => {
-        const { user } = session;
-        if (!publicId) {
-          room = await tx.dataRoom.create({
-            data: {
-              name: input.name,
-              companyId,
-              publicId: generatePublicId(),
-            },
-          });
-
-          await Audit.create(
-            {
-              action: "dataroom.created",
-              companyId: user.companyId,
-              actor: { type: "user", id: user.id },
-              context: {
-                userAgent,
-                requestIp,
+        await db.$transaction(async (tx) => {
+          const { user } = session;
+          if (!publicId) {
+            room = await tx.dataRoom.create({
+              data: {
+                name: input.name,
+                companyId,
+                publicId: generatePublicId(),
               },
-              target: [{ type: "dataroom", id: room.id }],
-              summary: `${user.name} created the data room ${room.name}`,
-            },
-            tx,
-          );
-        } else {
-          room = await tx.dataRoom.update({
-            where: {
-              publicId,
-              companyId,
-            },
-            data: {
-              name: input.name,
-            },
-          });
+            });
 
-          await Audit.create(
-            {
-              action: "dataroom.updated",
-              companyId: user.companyId,
-              actor: { type: "user", id: user.id },
-              context: {
-                userAgent,
-                requestIp,
+            await Audit.create(
+              {
+                action: "dataroom.created",
+                companyId: user.companyId,
+                actor: { type: "user", id: user.id },
+                context: {
+                  userAgent,
+                  requestIp,
+                },
+                target: [{ type: "dataroom", id: room.id }],
+                summary: `${user.name} created the data room ${room.name}`,
               },
-              target: [{ type: "dataroom", id: room.id }],
-              summary: `${user.name} updated the data room ${room.name}`,
-            },
-            tx,
-          );
-
-          const { documents, recipients } = input;
-
-          // every referenced document/member/stakeholder must belong to this company
-          if (documents?.length) {
-            const ids = [...new Set(documents.map((d) => d.documentId))];
-            const owned = await tx.document.count({
-              where: { id: { in: ids }, companyId },
+              tx,
+            );
+          } else {
+            room = await tx.dataRoom.update({
+              where: {
+                publicId,
+                companyId,
+              },
+              data: {
+                name: input.name,
+              },
             });
-            if (owned !== ids.length) throw new Error("Invalid document");
-          }
-          const memberIds = [
-            ...new Set(recipients?.flatMap((r) => r.memberId ?? []) ?? []),
-          ];
-          if (memberIds.length) {
-            const owned = await tx.member.count({
-              where: { id: { in: memberIds }, companyId },
-            });
-            if (owned !== memberIds.length) throw new Error("Invalid member");
-          }
-          const stakeholderIds = [
-            ...new Set(recipients?.flatMap((r) => r.stakeholderId ?? []) ?? []),
-          ];
-          if (stakeholderIds.length) {
-            const owned = await tx.stakeholder.count({
-              where: { id: { in: stakeholderIds }, companyId },
-            });
-            if (owned !== stakeholderIds.length)
-              throw new Error("Invalid stakeholder");
-          }
 
-          if (documents) {
-            await tx.dataRoomDocument.createMany({
-              data: documents.map((document) => ({
-                dataRoomId: room.id,
-                documentId: document.documentId,
-              })),
-            });
+            await Audit.create(
+              {
+                action: "dataroom.updated",
+                companyId: user.companyId,
+                actor: { type: "user", id: user.id },
+                context: {
+                  userAgent,
+                  requestIp,
+                },
+                target: [{ type: "dataroom", id: room.id }],
+                summary: `${user.name} updated the data room ${room.name}`,
+              },
+              tx,
+            );
+
+            const { documents, recipients } = input;
+
+            // every referenced document/member/stakeholder must belong to this company
+            if (documents?.length) {
+              const ids = [...new Set(documents.map((d) => d.documentId))];
+              const owned = await tx.document.count({
+                where: { id: { in: ids }, companyId },
+              });
+              if (owned !== ids.length) throw new Error("Invalid document");
+            }
+            const memberIds = [
+              ...new Set(recipients?.flatMap((r) => r.memberId ?? []) ?? []),
+            ];
+            if (memberIds.length) {
+              const owned = await tx.member.count({
+                where: { id: { in: memberIds }, companyId },
+              });
+              if (owned !== memberIds.length) throw new Error("Invalid member");
+            }
+            const stakeholderIds = [
+              ...new Set(
+                recipients?.flatMap((r) => r.stakeholderId ?? []) ?? [],
+              ),
+            ];
+            if (stakeholderIds.length) {
+              const owned = await tx.stakeholder.count({
+                where: { id: { in: stakeholderIds }, companyId },
+              });
+              if (owned !== stakeholderIds.length)
+                throw new Error("Invalid stakeholder");
+            }
+
+            if (documents) {
+              await tx.dataRoomDocument.createMany({
+                data: documents.map((document) => ({
+                  dataRoomId: room.id,
+                  documentId: document.documentId,
+                })),
+              });
+            }
+
+            if (recipients) {
+              await tx.dataRoomRecipient.createMany({
+                data: recipients.map((recipient) => ({
+                  dataRoomId: room.id,
+                  email: recipient.email,
+                  memberId: recipient.memberId,
+                  stakeholderId: recipient.stakeholderId,
+                  expiresAt: recipient.expiresAt,
+                })),
+              });
+            }
           }
+        });
 
-          if (recipients) {
-            await tx.dataRoomRecipient.createMany({
-              data: recipients.map((recipient) => ({
-                dataRoomId: room.id,
-                email: recipient.email,
-                memberId: recipient.memberId,
-                stakeholderId: recipient.stakeholderId,
-                expiresAt: recipient.expiresAt,
-              })),
-            });
-          }
-        }
-      });
+        return {
+          success: true,
+          message: "Successfully updated data room",
+          data: room,
+        };
+      } catch (error) {
+        console.error(error);
+        return {
+          success: false,
+          message:
+            "Oops, something went wrong while saving data room. Please try again.",
+        };
+      }
+    }),
 
-      return {
-        success: true,
-        message: "Successfully updated data room",
-        data: room,
-      };
-    } catch (error) {
-      console.error(error);
-      return {
-        success: false,
-        message:
-          "Oops, something went wrong while saving data room. Please try again.",
-      };
-    }
-  }),
-
-  share: withTenant
+  share: withAccessControl
     .input(
       z.object({
         dataRoomId: z.string(),
@@ -240,6 +249,7 @@ export const dataRoomRouter = createTRPCRouter({
         selectedContacts: z.array(ShareRecipientSchema),
       }),
     )
+    .meta({ policies: { "data-rooms": { allow: ["update"] } } })
     .mutation(async ({ ctx, input }) => {
       const { session, requestIp, userAgent } = ctx;
       const { db, companyId } = ctx.tenant;
@@ -348,13 +358,14 @@ export const dataRoomRouter = createTRPCRouter({
       };
     }),
 
-  unShare: withTenant
+  unShare: withAccessControl
     .input(
       z.object({
         dataRoomId: z.string(),
         recipientId: z.string(),
       }),
     )
+    .meta({ policies: { "data-rooms": { allow: ["update"] } } })
     .mutation(async ({ ctx, input }) => {
       const { session, requestIp, userAgent } = ctx;
       const { db, companyId } = ctx.tenant;

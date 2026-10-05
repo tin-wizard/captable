@@ -6,11 +6,12 @@ import {
   generateMemberIdentifier,
   revokeExistingInviteTokens,
 } from "@/server/member";
-import { withTenant } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { ZodReInviteMutationSchema } from "../schema";
 
-export const reInviteProcedure = withTenant
+export const reInviteProcedure = withAccessControl
   .input(ZodReInviteMutationSchema)
+  .meta({ policies: { members: { allow: ["update"] } } })
   .mutation(
     async ({ ctx: { session, tenant, requestIp, userAgent }, input }) => {
       const { companyId } = tenant;

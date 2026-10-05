@@ -1,6 +1,10 @@
 import { Audit } from "@/server/audit";
 import { assertTenantOwns } from "@/server/tenant-guard";
-import { createTRPCRouter, withTenant } from "@/trpc/api/trpc";
+import {
+  createTRPCRouter,
+  withAccessControl,
+  withTenant,
+} from "@/trpc/api/trpc";
 import { EquityPlanMutationSchema } from "./schema";
 
 export const equityPlanRouter = createTRPCRouter({
@@ -26,8 +30,9 @@ export const equityPlanRouter = createTRPCRouter({
     return { data };
   }),
 
-  create: withTenant
+  create: withAccessControl
     .input(EquityPlanMutationSchema)
+    .meta({ policies: { "cap-table-settings": { allow: ["create"] } } })
     .mutation(async ({ ctx, input }) => {
       const { userAgent, requestIp } = ctx;
 
@@ -76,8 +81,9 @@ export const equityPlanRouter = createTRPCRouter({
       }
     }),
 
-  update: withTenant
+  update: withAccessControl
     .input(EquityPlanMutationSchema)
+    .meta({ policies: { "cap-table-settings": { allow: ["update"] } } })
     .mutation(async ({ ctx, input }) => {
       try {
         const { userAgent, requestIp } = ctx;
