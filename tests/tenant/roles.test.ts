@@ -971,14 +971,16 @@ describe("last active admin", () => {
     const id = t.a.memberId;
     const email = t.a.session.user.email as string;
     const before = await member(id);
+    // thunks, started one at a time: calls created up front but awaited later
+    // can reject before a handler is attached (an unhandled rejection)
     const attempts = [
-      self.member.removeMember({ memberId: id }),
-      self.member.toggleActivation({ memberId: id, status: "INACTIVE" }),
-      self.member.revokeInvite({ memberId: id, email }),
-      self.member.updateMember({ memberId: id, roleId: "" }),
+      () => self.member.removeMember({ memberId: id }),
+      () => self.member.toggleActivation({ memberId: id, status: "INACTIVE" }),
+      () => self.member.revokeInvite({ memberId: id, email }),
+      () => self.member.updateMember({ memberId: id, roleId: "" }),
     ];
     for (const attempt of attempts) {
-      const err = await attempt.then(
+      const err = await attempt().then(
         () => undefined,
         (e: unknown) => e,
       );
