@@ -209,6 +209,7 @@ const companyInput = {
 const pdf = {
   fileName: "roles.pdf",
   contentType: "application/pdf",
+  size: 1,
   keyPrefix: "generic-documents" as const,
 };
 

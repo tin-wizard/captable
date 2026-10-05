@@ -34,6 +34,8 @@ export const uploadFile = async (
   const input = {
     fileName: file.name,
     contentType: file.type || "application/octet-stream",
+    // signed as content-length: the PUT below must send exactly these bytes
+    size: file.size,
   };
   const isPublic =
     keyPrefix === "company-logos" || keyPrefix === "profile-avatars";

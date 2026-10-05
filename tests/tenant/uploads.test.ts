@@ -5,6 +5,10 @@ import { db } from "@/server/db";
 import { getPresignedPutUrl } from "@/server/file-uploads";
 import { tenantDb } from "@/server/tenant-db";
 import { assertBucketUsable } from "@/server/tenant-guard";
+import {
+  MAX_PRIVATE_UPLOAD_BYTES,
+  MAX_PUBLIC_UPLOAD_BYTES,
+} from "@/trpc/routers/bucket-router/schema";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { type Tenant, callerFor, seedTwoTenants } from "../helpers/seed";
 import {
@@ -68,7 +72,11 @@ const rawTemplate = (t: Tenant, bucketId: string) =>
     },
   });
 
-const file = { fileName: "Board Minutes.pdf", contentType: "application/pdf" };
+const file = {
+  fileName: "Board Minutes.pdf",
+  contentType: "application/pdf",
+  size: 1,
+};
 const bucketInput = (key: string) => ({
   name: "doc.pdf",
   key,
@@ -153,6 +161,7 @@ describe("bucket.presignPublicUpload", () => {
       const res = await callerA.bucket.presignPublicUpload({
         fileName: "me.png",
         contentType: "image/png",
+        size: 1,
         keyPrefix,
       });
       expect(res.key.startsWith(`${a.userId}/${keyPrefix}-`)).toBe(true);
@@ -164,6 +173,7 @@ describe("bucket.presignPublicUpload", () => {
       callerA.bucket.presignPublicUpload({
         fileName: "me.png",
         contentType: "image/png",
+        size: 1,
         keyPrefix: "generic-documents" as never,
       }),
     ).rejects.toThrow();
@@ -176,11 +186,106 @@ describe("bucket.presignPublicUpload", () => {
         callerA.bucket.presignPublicUpload({
           fileName: "x.png",
           contentType: contentType as never,
+          size: 1,
           keyPrefix: "profile-avatars",
         }),
       ).rejects.toThrow();
     },
   );
+});
+
+// The declared size is signed as content-length, so S3 refuses a PUT of any
+// other length; the schemas cap what may be declared.
+describe("upload size limit", () => {
+  // a zod issue on `size` itself (not .strict() refusing an unknown key)
+  const sizeIssue = /"path": \[\s*"size"\s*\]/;
+  const signedHeaders = (url: string) =>
+    new URL(url).searchParams.get("X-Amz-SignedHeaders")?.split(";") ?? [];
+  const privatePresign = (size: number) =>
+    callerA.bucket.presignUpload({
+      ...file,
+      size,
+      keyPrefix: "generic-documents",
+    });
+  const publicPresign = (size: number) =>
+    callerA.bucket.presignPublicUpload({
+      fileName: "me.png",
+      contentType: "image/png",
+      size,
+      keyPrefix: "profile-avatars",
+    });
+
+  it("private files: 25 MiB, public images: 5 MiB", () => {
+    expect(MAX_PRIVATE_UPLOAD_BYTES).toBe(25 * 1024 * 1024);
+    expect(MAX_PUBLIC_UPLOAD_BYTES).toBe(5 * 1024 * 1024);
+  });
+
+  it.each([
+    ["zero", 0],
+    ["negative", -1],
+    ["fractional", 1.5],
+    ["over the private max", MAX_PRIVATE_UPLOAD_BYTES + 1],
+  ])("presignUpload rejects size: %s", async (_label, size) => {
+    await expect(privatePresign(size)).rejects.toThrow(sizeIssue);
+  });
+
+  it.each([
+    ["zero", 0],
+    ["negative", -1],
+    ["fractional", 1.5],
+    ["over the public max", MAX_PUBLIC_UPLOAD_BYTES + 1],
+  ])("presignPublicUpload rejects size: %s", async (_label, size) => {
+    await expect(publicPresign(size)).rejects.toThrow(sizeIssue);
+  });
+
+  it("both presigns reject a missing size", async () => {
+    const { size: _size, ...noSize } = file;
+    await expect(
+      callerA.bucket.presignUpload({
+        ...noSize,
+        keyPrefix: "generic-documents",
+      } as never),
+    ).rejects.toThrow(sizeIssue);
+    await expect(
+      callerA.bucket.presignPublicUpload({
+        fileName: "me.png",
+        contentType: "image/png",
+        keyPrefix: "profile-avatars",
+      } as never),
+    ).rejects.toThrow(sizeIssue);
+  });
+
+  it("accepts each max exactly and signs content-length", async () => {
+    const priv = await privatePresign(MAX_PRIVATE_UPLOAD_BYTES);
+    const pub = await publicPresign(MAX_PUBLIC_UPLOAD_BYTES);
+    for (const { url } of [priv, pub]) {
+      expect(signedHeaders(url)).toContain("content-length");
+    }
+  });
+
+  it("getPresignedPutUrl signs content-length for server-side uploads", async () => {
+    const { url } = await getPresignedPutUrl({
+      fileName: "x.pdf",
+      contentType: "application/pdf",
+      size: 10,
+      keyPrefix: "signed-esign-doc",
+      identifier: "someone",
+      bucketMode: "privateBucket",
+    });
+    expect(signedHeaders(url)).toContain("content-length");
+  });
+
+  it("bucket.create rejects a size over the private max", async () => {
+    const { key } = await privatePresign(1);
+    createdKeys.push(key);
+    await expect(
+      callerA.bucket.create({
+        ...bucketInput(key),
+        size: MAX_PRIVATE_UPLOAD_BYTES + 1,
+      }),
+    ).rejects.toThrow(sizeIssue);
+    expect(await db.bucket.count({ where: { key } })).toBe(0);
+  });
 });
 
 describe("getPresignedPutUrl extension", () => {
@@ -192,6 +297,7 @@ describe("getPresignedPutUrl extension", () => {
     const { key, bucketUrl } = await getPresignedPutUrl({
       fileName,
       contentType: "application/pdf",
+      size: 1,
       keyPrefix: "generic-documents",
       identifier: "someone",
       bucketMode: "publicBucket",
@@ -320,6 +426,7 @@ describe("bucket.create with an issued key", () => {
         const { key } = await callerA.bucket.presignUpload({
           fileName,
           contentType: "application/pdf",
+          size: 1,
           keyPrefix,
         });
         createdKeys.push(key);

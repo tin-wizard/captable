@@ -1,11 +1,17 @@
 import { TAG } from "@/lib/tags";
 import { z } from "zod";
 
+// Upload caps in bytes. The presigned PUT signs the declared size as
+// content-length, so S3 refuses a body of any other length.
+export const MAX_PRIVATE_UPLOAD_BYTES = 25 * 1024 * 1024;
+export const MAX_PUBLIC_UPLOAD_BYTES = 5 * 1024 * 1024;
+const size = (max: number) => z.number().int().positive().max(max);
+
 export const ZodCreateBucketMutationSchema = z.object({
   name: z.string(),
   key: z.string(),
   mimeType: z.string(),
-  size: z.number(),
+  size: size(MAX_PRIVATE_UPLOAD_BYTES),
   tags: z.array(z.nativeEnum(TAG)),
 });
 
@@ -26,6 +32,7 @@ const file = {
 export const ZodPresignUploadSchema = z
   .object({
     ...file,
+    size: size(MAX_PRIVATE_UPLOAD_BYTES),
     keyPrefix: z.union([
       z.enum([
         "new-safes",
@@ -49,6 +56,7 @@ export const ZodPresignPublicUploadSchema = z
   .object({
     ...file,
     contentType: z.enum(["image/png", "image/jpeg", "image/webp", "image/gif"]),
+    size: size(MAX_PUBLIC_UPLOAD_BYTES),
     keyPrefix: z.enum(["company-logos", "profile-avatars"]),
   })
   .strict();

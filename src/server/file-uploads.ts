@@ -46,6 +46,9 @@ export type TypeKeyPrefixes =
 
 export interface getPresignedUrlOptions {
   contentType: string;
+  // exact byte length of the body; signed as content-length, so the PUT must
+  // send exactly this many bytes
+  size: number;
   expiresIn?: number;
   fileName: string;
   keyPrefix: TypeKeyPrefixes;
@@ -58,6 +61,7 @@ const TEN_MINUTES_IN_SECONDS = 10 * 60;
 
 export const getPresignedPutUrl = async ({
   contentType,
+  size,
   expiresIn,
   fileName,
   keyPrefix,
@@ -76,6 +80,7 @@ export const getPresignedPutUrl = async ({
     Bucket: bucketMode === "privateBucket" ? PrivateBucket : PublicBucket,
     Key,
     ContentType: contentType,
+    ContentLength: size,
     ACL: bucketMode === "privateBucket" ? "private" : "public-read",
   });
 
@@ -114,16 +119,20 @@ export const uploadFile = async (
   >,
   bucketMode: "publicBucket" | "privateBucket" = "privateBucket",
 ) => {
+  // callers pass File-shaped objects whose .size is not the real length
+  // (esign sets 0), so sign the length of the bytes actually sent
+  const body = await file.arrayBuffer();
   const { url, key, bucketUrl } = await getPresignedPutUrl({
     contentType: file.type,
     fileName: file.name,
+    size: body.byteLength,
     bucketMode,
     ...options,
   });
   const res = await fetch(url, {
     method: "PUT",
     headers: { "Content-Type": "application/octet-stream" },
-    body: await file.arrayBuffer(),
+    body,
   });
   if (!res.ok) {
     throw new Error(
