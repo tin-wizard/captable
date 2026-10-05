@@ -1,5 +1,6 @@
 import { invariant } from "@/lib/error";
 import { getPermissions } from "@/lib/rbac/access-control";
+import { tenantDb } from "@/server/tenant-db";
 import type { Context } from "hono";
 import { getCookie } from "hono/cookie";
 import { createMiddleware } from "hono/factory";
@@ -60,6 +61,8 @@ async function validateSessionCookie(authUrl: string, c: Context) {
   }
 
   c.set("session", { membership: val.membership });
+  // the verified member row's company (equal to the path companyId when present)
+  c.set("tenantDb", tenantDb(db, val.membership.companyId));
 }
 
 async function fetchSessionFromAuthUrl(

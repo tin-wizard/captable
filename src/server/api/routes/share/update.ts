@@ -1,3 +1,4 @@
+import { assertTenantOwns } from "@/server/tenant-guard";
 import { z } from "@hono/zod-openapi";
 import { ApiError } from "../../error";
 
@@ -41,7 +42,7 @@ export const update = withAuthApiV1
     description: "Update details of an issued share by its ID.",
     tags: ["Shares"],
     method: "patch",
-    path: "/v1/{companyId}/stakeholders/{id}",
+    path: "/v1/{companyId}/shares/{id}",
     middleware: [authMiddleware()],
     request: {
       params: ParamsSchema,
@@ -65,7 +66,8 @@ export const update = withAuthApiV1
     },
   })
   .handler(async (c) => {
-    const { db, audit, client } = c.get("services");
+    const { audit, client } = c.get("services");
+    const db = c.get("tenantDb");
     const { membership } = c.get("session");
     const { requestIp, userAgent } = client;
     const { id } = c.req.valid("param");
@@ -73,7 +75,7 @@ export const update = withAuthApiV1
     const body = c.req.valid("json");
 
     const updatedShare = await db.$transaction(async (tx) => {
-      const share = await db.share.findUnique({
+      const share = await tx.share.findUnique({
         where: {
           id,
           companyId: membership.companyId,
@@ -87,6 +89,7 @@ export const update = withAuthApiV1
         });
       }
 
+      await assertTenantOwns(tx, membership.companyId, body);
       const updatedShare = await tx.share.update({
         where: {
           id: share.id,

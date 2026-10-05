@@ -54,7 +54,7 @@ export const getOne = withAuthApiV1
     },
   })
   .handler(async (c) => {
-    const { db } = c.get("services");
+    const db = c.get("tenantDb");
     const { membership } = c.get("session");
     const { id } = c.req.valid("param");
 

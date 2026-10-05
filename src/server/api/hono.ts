@@ -1,6 +1,7 @@
 import { env } from "@/env";
 import { handleError, handleZodError } from "@/server/api/error";
 import type { TPrisma } from "@/server/db";
+import type { tenantDb } from "@/server/tenant-db";
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Audit } from "../audit";
@@ -20,6 +21,9 @@ declare module "hono" {
     session: {
       membership: Awaited<ReturnType<typeof checkMembership>>;
     };
+    // db scoped to the company of the membership the auth middleware verified;
+    // unset on the cross-company routes (withoutMembershipCheck)
+    tenantDb: ReturnType<typeof tenantDb>;
   }
 }
 

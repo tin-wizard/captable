@@ -49,7 +49,8 @@ export const _delete = withAuthApiV1
     },
   })
   .handler(async (c) => {
-    const { db, audit, client } = c.get("services");
+    const { audit, client } = c.get("services");
+    const db = c.get("tenantDb");
     const { membership } = c.get("session");
     const { requestIp, userAgent } = client;
     const { id } = c.req.valid("param");

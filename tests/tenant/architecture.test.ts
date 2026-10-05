@@ -35,6 +35,16 @@ const ALLOWLIST_CHILD_CREATE: Record<string, string> = {
     "room is created with companyId or updated by { publicId, companyId }",
 };
 
+// Rule (d) exceptions: REST routes that keep the global services db.
+const API = "src/server/api/routes/";
+const ALLOWLIST_REST_GLOBAL: Record<string, string> = {
+  [`${API}company/getMany.ts`]:
+    "lists every company the caller is a member of (cross-company)",
+  [`${API}company/getOne.ts`]:
+    "checks the caller's membership in the requested company itself",
+  [`${API}_example.ts`]: "example route, not registered",
+};
+
 // Rule (a) migration to-do list (Tasks 6-7): shrink to zero. Must stay exact.
 const CURRENT_OFFENDERS: string[] = [];
 
@@ -61,6 +71,10 @@ const violatesA = (src: string) => {
     /\b(withAuth|withTenant|withAccessControl)\b/.test(s) && CTX_DB.test(s)
   );
 };
+// `c.get("services").db` or `const { db } = c.get("services")`
+const SERVICES_DB =
+  /c\.get\(\s*["']services["']\s*\)\.db\b|\{[^}]*\bdb\b[^}]*\}\s*=\s*c\.get\(\s*["']services["']\s*\)/;
+const violatesD = (src: string) => SERVICES_DB.test(stripComments(src));
 const violatesB = (src: string) => RAW_SQL.test(stripComments(src));
 const violatesC = (src: string) => CHILD_CREATE.test(stripComments(src));
 
@@ -85,6 +99,7 @@ describe("tenant architecture guard", () => {
     for (const f of [
       ...Object.keys(ALLOWLIST_TENANTLESS),
       ...Object.keys(ALLOWLIST_CHILD_CREATE),
+      ...Object.keys(ALLOWLIST_REST_GLOBAL),
       ...CURRENT_OFFENDERS,
     ])
       expect(files, `allowlisted file missing: ${f}`).toContain(f);
@@ -132,6 +147,18 @@ describe("tenant architecture guard", () => {
     ).toEqual([]);
   });
 
+  it('(d) REST routes use the tenant-scoped c.get("tenantDb"), not the services db', () => {
+    const bad = hits(violatesD).filter(
+      (f) => f.startsWith(API) && !(f in ALLOWLIST_REST_GLOBAL),
+    );
+    expect(
+      bad,
+      `use c.get("tenantDb") instead of the global services db:\n${bad.join(
+        "\n",
+      )}`,
+    ).toEqual([]);
+  });
+
   it("scanner detects each rule on in-memory strings (not vacuous)", () => {
     expect(
       violatesA("export const p = withAuth.query(({ ctx }) => ctx.db.x)"),
@@ -171,5 +198,13 @@ describe("tenant architecture guard", () => {
     );
     expect(violatesC("await tx.template.create({})")).toBe(false);
     expect(violatesC("await tx.templateField.deleteMany({})")).toBe(false);
+    expect(violatesD('const { db, audit } = c.get("services");')).toBe(true);
+    expect(
+      violatesD("const x = await c.get('services').db.share.findMany()"),
+    ).toBe(true);
+    expect(violatesD('const { audit, client } = c.get("services");')).toBe(
+      false,
+    );
+    expect(violatesD('const db = c.get("tenantDb");')).toBe(false);
   });
 });
