@@ -1,4 +1,3 @@
-"use server";
 import { getServerTenant } from "@/server/tenant";
 import dynamic from "next/dynamic";
 

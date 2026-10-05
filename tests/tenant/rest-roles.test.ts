@@ -56,7 +56,7 @@ async function call(
   });
 }
 
-// cookie auth works only without a body (known bug): GET and DELETE
+// cookie-authenticated helper for GET and DELETE (writes with a body are covered in rest-hygiene.test.ts)
 async function withSession(path: string, method: "GET" | "DELETE") {
   process.env.NEXTAUTH_URL ||= "http://localhost:3000";
   const session = {

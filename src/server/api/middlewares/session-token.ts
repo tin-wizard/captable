@@ -73,15 +73,13 @@ async function fetchSessionFromAuthUrl(
   authUrl: string,
   c: Context,
 ): Promise<Session> {
-  const rawRequest = c.req.raw;
-  const clonedRequest = rawRequest.clone();
   const newUrl = new URL("/api/auth/session", authUrl).toString();
 
   const response = await fetch(
     new Request(newUrl, {
       method: "GET",
-      headers: clonedRequest.headers,
-      body: clonedRequest.body,
+      // only the cookie: the original body and its content headers must not reach a GET
+      headers: { cookie: c.req.header("cookie") ?? "" },
     }),
   );
 

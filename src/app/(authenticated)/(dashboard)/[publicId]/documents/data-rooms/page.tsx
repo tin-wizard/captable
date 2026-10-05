@@ -1,5 +1,3 @@
-"use server";
-
 import EmptyState from "@/components/common/empty-state";
 import { Button } from "@/components/ui/button";
 import { getServerTenant } from "@/server/tenant";
