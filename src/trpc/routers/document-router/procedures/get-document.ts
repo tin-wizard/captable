@@ -16,6 +16,8 @@ export const getDocumentProcedure = withAccessControl
         where: {
           publicId: input.publicId,
           companyId,
+          // the relation is not tenant-scoped: never sign a bucket the company doesn't own
+          bucket: { companyId },
         },
         select: {
           bucket: {

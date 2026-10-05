@@ -28,6 +28,7 @@ import {
 
 import { api } from "@/trpc/react";
 
+import { openFileOnTab } from "@/common/uploads";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { DataTableBody } from "@/components/ui/data-table/data-table-body";
@@ -35,7 +36,6 @@ import { SortButton } from "@/components/ui/data-table/data-table-buttons";
 import { DataTableContent } from "@/components/ui/data-table/data-table-content";
 import { DataTableHeader } from "@/components/ui/data-table/data-table-header";
 import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
-import { getPresignedGetUrl } from "@/server/file-uploads";
 import type { RouterOutputs } from "@/trpc/shared";
 import { RiFileDownloadLine, RiMore2Fill } from "@remixicon/react";
 import { useRouter } from "next/navigation";
@@ -189,11 +189,6 @@ export const columns: ColumnDef<Option[number]>[] = [
       );
     },
     cell: ({ row }) => {
-      const openFileOnTab = async (key: string) => {
-        const fileUrl = await getPresignedGetUrl(key);
-        window.open(fileUrl.url, "_blank");
-      };
-
       return (
         <DropdownMenu>
           <div className="items-end justify-end text-right">

@@ -25,7 +25,8 @@ import {
  *   - `include`/`select` of a relation: returns whatever row the FK points at
  *   - create/createMany on a child model: the parent id is not checked
  *   - FK ids supplied as data (stakeholderId, bucketId ...): Task 5b
- *   - Company, User and other global models: untouched by design
+ *   - Company, User and other global models: untouched by design (Bucket is
+ *     a tenant model since Task 12)
  *   - findRaw/aggregateRaw do not exist for Postgres; $queryRaw et al. throw
  */
 
@@ -121,6 +122,15 @@ describe("tenantDb reads", () => {
       tx.shareClass.findFirst({ where: { id: bIds.shareClassId } }),
     );
     expect(found).toBeNull();
+  });
+
+  it("Bucket is scoped: another tenant's bucket is invisible", async () => {
+    expect(
+      await ta.bucket.findFirst({ where: { id: bIds.bucketId } }),
+    ).toBeNull();
+    expect(
+      await ta.bucket.findFirst({ where: { id: aIds.bucketId } }),
+    ).not.toBeNull();
   });
 
   it("a non-tenant model (user) is untouched", async () => {

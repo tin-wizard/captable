@@ -1,10 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { generatePublicId } from "@/common/id";
-import { uploadFile } from "@/common/uploads";
 import { invariant } from "@/lib/error";
 import { TAG } from "@/lib/tags";
 import { Audit } from "@/server/audit";
+import { uploadFile } from "@/server/file-uploads";
 import { assertTenantOwns } from "@/server/tenant-guard";
 import { withTenant } from "@/trpc/api/trpc";
 import type { Prisma } from "@prisma/client";
@@ -61,11 +61,8 @@ export const createSafeProcedure = withTenant
             input: { ...rest, tags: [TAG.SAFE] },
             userAgent,
             requestIp,
-            user: {
-              companyId: user.companyId,
-              id: user.id,
-              name: user.name || "",
-            },
+            companyId,
+            user: { id: user.id, name: user.name || "" },
           });
 
           document = { name: bucketName, bucketId };

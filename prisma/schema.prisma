@@ -410,11 +410,16 @@ model Bucket {
   size     Int
   tags     String[]
 
+  // owner; null only for legacy buckets no single company references
+  companyId String?
+
   documents Document[]
   templates Template[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([companyId])
 }
 
 model Document {

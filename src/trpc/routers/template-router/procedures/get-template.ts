@@ -11,6 +11,8 @@ export const getTemplateProcedure = withTenant
         where: {
           publicId: input.publicId,
           companyId: companyId,
+          // the relation is not tenant-scoped: never sign a bucket the company doesn't own
+          bucket: { companyId },
           ...(input.isDraftOnly && { status: "DRAFT" }),
         },
         select: {

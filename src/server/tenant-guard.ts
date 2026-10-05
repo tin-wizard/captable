@@ -32,24 +32,13 @@ export async function assertTenantOwns(
   }
 }
 
-// Bucket has no companyId yet (Task 12 adds it). Until then a bucket is usable
-// when it exists and no other company's Document/Template references it.
-// ponytail: a fresh, unreferenced bucket id can be claimed by whoever
-// references it first; Task 12's Bucket.companyId closes that.
+// A bucket is usable only by its owner. Buckets with no owner (legacy orphans)
+// are usable by nobody.
 export async function assertBucketUsable(
   tx: TPrismaOrTransaction,
   companyId: string,
   bucketId: string,
 ) {
-  // Filter through Bucket's relations rather than querying Document/Template
-  // directly: those are tenant-scoped, so a tenantDb tx would only ever see the
-  // caller's own rows and could never find another company's reference.
-  const foreign = { some: { companyId: { not: companyId } } };
-  const usable = await tx.bucket.count({
-    where: {
-      id: bucketId,
-      NOT: [{ documents: foreign }, { templates: foreign }],
-    },
-  });
-  if (!usable) throw new Error("Invalid reference");
+  if (!(await tx.bucket.count({ where: { id: bucketId, companyId } })))
+    throw new Error("Invalid reference");
 }

@@ -14,11 +14,7 @@ type DataRoomUploaderProps = {
   dataRoom: DataRoom;
 };
 
-const DataRoomUploader = ({
-  trigger,
-  companyPublicId,
-  dataRoom,
-}: DataRoomUploaderProps) => {
+const DataRoomUploader = ({ trigger, dataRoom }: DataRoomUploaderProps) => {
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
@@ -40,7 +36,6 @@ const DataRoomUploader = ({
       <Uploader
         shouldUpload
         multiple={true}
-        identifier={companyPublicId}
         keyPrefix={`data-room/${dataRoom.publicId}`}
         tags={[TAG.DATA_ROOM]}
         onSuccess={async (upload: UploadReturn) => {

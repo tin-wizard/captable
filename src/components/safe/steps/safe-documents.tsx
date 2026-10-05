@@ -46,7 +46,6 @@ export function SafeDocuments() {
 
     for (const document of documentsList) {
       const { key, mimeType, name, size } = await uploadFile(document, {
-        identifier: session.user.companyPublicId,
         keyPrefix: "existing-safes",
       });
 

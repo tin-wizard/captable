@@ -352,6 +352,22 @@ const cases: Case[] = [
     run: (a, { b }) => a.document.create({ name: "doc", bucketId: b.bucketId }),
   },
   {
+    // a signed URL would carry B's key, which contains B_SECRET
+    name: "bucket.getUrl for B's bucket by id",
+    kind: "read",
+    run: (a, { b }) => a.bucket.getUrl({ bucketId: b.bucketId }),
+  },
+  {
+    name: "bucket.getUrl for B's bucket by key",
+    kind: "read",
+    run: async (a, { b }) => {
+      const { key } = await db.bucket.findUniqueOrThrow({
+        where: { id: b.bucketId },
+      });
+      return a.bucket.getUrl({ key });
+    },
+  },
+  {
     name: "documentShare.create for B's document",
     kind: "reference",
     run: (a, { b }) =>

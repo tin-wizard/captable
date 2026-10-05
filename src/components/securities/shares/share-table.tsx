@@ -26,6 +26,7 @@ import { DataTableHeader } from "@/components/ui/data-table/data-table-header";
 import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
 import type { RouterOutputs } from "@/trpc/shared";
 
+import { openFileOnTab } from "@/common/uploads";
 import { Button } from "@/components/ui/button";
 import { SortButton } from "@/components/ui/data-table/data-table-buttons";
 import {
@@ -35,7 +36,6 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { formatCurrency, formatNumber } from "@/lib/utils";
-import { getPresignedGetUrl } from "@/server/file-uploads";
 import { api } from "@/trpc/react";
 import {
   DropdownMenu,
@@ -248,11 +248,6 @@ export const columns: ColumnDef<Share[number]>[] = [
     },
     cell: ({ row }) => {
       const documents = row?.original?.documents;
-
-      const openFileOnTab = async (key: string) => {
-        const fileUrl = await getPresignedGetUrl(key);
-        window.open(fileUrl.url, "_blank");
-      };
 
       return (
         <DropdownMenu>

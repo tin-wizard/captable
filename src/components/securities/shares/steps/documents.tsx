@@ -45,7 +45,6 @@ export const Documents = () => {
     const uploadedDocuments: { name: string; bucketId: string }[] = [];
     for (const document of documentsList) {
       const { key, mimeType, name, size } = await uploadFile(document, {
-        identifier: session.user.companyPublicId,
         keyPrefix: "shares-docs",
       });
       const { id: bucketId, name: docName } = await handleBucketUpload({

@@ -38,9 +38,10 @@ async function seedMember(
   return { user, member };
 }
 
-function seedBucket(label: string) {
+function seedBucket(label: string, companyId: string) {
   return db.bucket.create({
     data: {
+      companyId,
       name: label,
       key: `${label}/${nanoid(8)}.pdf`,
       mimeType: "application/pdf",
@@ -87,7 +88,7 @@ async function seedCore(t: Tenant, label: string) {
       institutionName: label,
     },
   });
-  const bucket = await seedBucket(label);
+  const bucket = await seedBucket(label, companyId);
   const document = await db.document.create({
     data: {
       companyId,

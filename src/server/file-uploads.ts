@@ -1,10 +1,11 @@
-"use server";
-
+// Server-only S3 helpers. Deliberately not a server-action module (no
+// directive): every export of one is a public, unauthenticated endpoint.
+// Browsers go through the bucket tRPC procedures (presignUpload,
+// presignPublicUpload, getUrl), which derive and check ownership.
 import path from "node:path";
 import { customId } from "@/common/id";
 import { env } from "@/env";
 import {
-  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -63,7 +64,9 @@ export const getPresignedPutUrl = async ({
   identifier,
   bucketMode,
 }: getPresignedUrlOptions) => {
-  const { name, ext } = path.parse(fileName);
+  const { name, ext: rawExt } = path.parse(fileName);
+  // only a plain extension reaches the key and the public fileUrl
+  const ext = /^\.[a-z0-9]{1,10}$/i.test(rawExt) ? rawExt : "";
 
   const Key = `${identifier}/${keyPrefix}-${slugify(name)}-${customId(
     12,
@@ -101,11 +104,45 @@ export const getPresignedGetUrl = async (key: string) => {
   return { key, url };
 };
 
-export const deleteBucketFile = (key: string) => {
-  return S3.send(
-    new DeleteObjectCommand({
-      Bucket: process.env.UPLOAD_BUCKET_PRIVATE,
-      Key: key,
-    }),
-  );
+// Server-side upload (jobs, seeded templates): presign under a server-chosen
+// identifier and PUT the bytes.
+export const uploadFile = async (
+  file: File,
+  options: Pick<
+    getPresignedUrlOptions,
+    "expiresIn" | "keyPrefix" | "identifier"
+  >,
+  bucketMode: "publicBucket" | "privateBucket" = "privateBucket",
+) => {
+  const { url, key, bucketUrl } = await getPresignedPutUrl({
+    contentType: file.type,
+    fileName: file.name,
+    bucketMode,
+    ...options,
+  });
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/octet-stream" },
+    body: await file.arrayBuffer(),
+  });
+  if (!res.ok) {
+    throw new Error(
+      `Failed to upload file "${file.name}", failed with status code ${res.status}`,
+    );
+  }
+  const { name, type, size } = file;
+  return { key, name, mimeType: type, size, fileUrl: bucketUrl };
+};
+
+export type TUploadFile = Awaited<ReturnType<typeof uploadFile>>;
+
+export const getFileFromS3 = async (key: string) => {
+  const { url } = await getPresignedGetUrl(key);
+  const response = await fetch(url, { method: "GET" });
+  if (!response.ok) {
+    throw new Error(
+      `Failed to get file "${key}", failed with status code ${response.status}`,
+    );
+  }
+  return new Uint8Array(await response.arrayBuffer());
 };

@@ -69,7 +69,6 @@ export function AddRecipientStep({ companyPublicId }: AddRecipientStepProps) {
       throw new Error("no document found to upload");
     }
     const { key, mimeType, name, size } = await uploadFile(document, {
-      identifier: companyPublicId,
       keyPrefix: "unsigned-esign-doc",
     });
 

@@ -19,7 +19,7 @@ import type { TPrisma } from "./db";
  *   - `include`/`select` of a relation: returns whatever row the FK points at
  *   - create/createMany on a child model: the parent id is not checked
  *   - FK ids supplied as data (stakeholderId, bucketId, ...): Task 5b
- *   - Company and global models (User, Bucket, tokens, billing)
+ *   - Company and global models (User, tokens, billing)
  *   - BillingCustomer: companyId is nullable and billing rows are written by
  *     Stripe webhooks without a tenant, so it stays global on purpose
  */
@@ -43,6 +43,8 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   "ConvertibleNote",
   "Update",
   "EsignAudit",
+  // companyId is nullable only for legacy orphans, which no tenant can see
+  "Bucket",
 ]);
 
 // child models scoped only through a parent relation

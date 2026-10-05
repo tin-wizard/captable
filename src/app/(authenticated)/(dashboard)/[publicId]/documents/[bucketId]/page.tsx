@@ -2,7 +2,7 @@ import FileIcon from "@/components/common/file-icon";
 import FilePreview from "@/components/file/preview";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { withServerComponentSession } from "@/server/auth";
+import { getServerPermissions } from "@/lib/rbac/access-control";
 import { db } from "@/server/db";
 import { getPresignedGetUrl } from "@/server/file-uploads";
 import { RiArrowLeftSLine } from "@remixicon/react";
@@ -15,12 +15,14 @@ const DocumentPreview = async ({
 }: {
   params: { publicId: string; bucketId: string };
 }) => {
-  const session = await withServerComponentSession();
-  const companyId = session?.user?.companyId;
+  // the verified membership's company, not the JWT claim
+  const { membership } = await getServerPermissions();
+  const { companyId } = membership;
   const document = await db.document.findFirst({
     where: {
       bucketId,
       companyId,
+      bucket: { companyId },
     },
 
     include: { bucket: true },

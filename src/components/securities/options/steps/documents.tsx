@@ -49,7 +49,6 @@ export const Documents = () => {
 
     for (const document of documentsList) {
       const { key, mimeType, name, size } = await uploadFile(document, {
-        identifier: session.user.companyPublicId,
         keyPrefix: "stock-option-docs",
       });
 

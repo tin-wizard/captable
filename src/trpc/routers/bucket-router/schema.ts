@@ -12,3 +12,48 @@ export const ZodCreateBucketMutationSchema = z.object({
 export type TypeZodCreateBucketMutationSchema = z.infer<
   typeof ZodCreateBucketMutationSchema
 >;
+
+const file = {
+  fileName: z.string().min(1).max(255),
+  contentType: z
+    .string()
+    .max(255)
+    .regex(/^[\w.+-]+\/[\w.+-]+$/),
+};
+
+// The key's first segment (company publicId or user id) is always chosen by
+// the server, never sent by the client: .strict() rejects any extra field.
+export const ZodPresignUploadSchema = z
+  .object({
+    ...file,
+    keyPrefix: z.union([
+      z.enum([
+        "new-safes",
+        "existing-safes",
+        "signed-esign-doc",
+        "unsigned-esign-doc",
+        "stock-option-docs",
+        "generic-documents",
+        "shares-docs",
+      ]),
+      z.custom<`data-room/${string}`>(
+        (v) => typeof v === "string" && /^data-room\/[\w-]+$/.test(v),
+      ),
+    ]),
+  })
+  .strict();
+
+// public-read objects on the upload domain: raster images only, never
+// text/html or image/svg+xml (stored XSS)
+export const ZodPresignPublicUploadSchema = z
+  .object({
+    ...file,
+    contentType: z.enum(["image/png", "image/jpeg", "image/webp", "image/gif"]),
+    keyPrefix: z.enum(["company-logos", "profile-avatars"]),
+  })
+  .strict();
+
+export const ZodGetBucketUrlSchema = z.union([
+  z.object({ bucketId: z.string() }).strict(),
+  z.object({ key: z.string() }).strict(),
+]);

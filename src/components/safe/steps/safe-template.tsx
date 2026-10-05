@@ -116,7 +116,6 @@ export function SafeTemplate() {
       invariant(doc, "document not found");
 
       const { key, mimeType, name, size } = await uploadFile(doc, {
-        identifier: session.user.companyPublicId,
         keyPrefix: "new-safes",
       });
 
