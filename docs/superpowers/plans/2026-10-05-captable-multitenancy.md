@@ -81,6 +81,7 @@
 | 2. Cross-tenant matrix test (fails first) | `opus` | `general-purpose` | Security test design; decides what "isolated" means |
 | 3. `tenantDb` extension | `opus` | `general-purpose` | Tenant isolation core; security rule 3 |
 | 4. `withTenant` base procedure | `opus` | `general-purpose` | Auth path; security rule 3 |
+| 5b. Reference-integrity guard | `opus` | `general-purpose` | Tenant isolation; security rule 3 |
 | 5. Architecture guard test | `sonnet` | `general-purpose` | Test over file contents, clear spec |
 | 6–7. Migrate routers (batches) | `sonnet` | `general-purpose` | Mechanical across files; **opus review** each batch |
 | 8–9. RBAC subjects + policies | `opus` | `general-purpose` | Permissions design; rule 3 |
@@ -292,6 +293,27 @@ export const withTenant = t.procedure.use(authMiddleware).use(async ({ ctx, next
 
 - [ ] **Step 1: Write the test.** Scan `src/trpc/routers/**` and `src/server/api/routes/**`. Fail if a file (a) uses `withAuth` and references `ctx.db` outside an allowlist (`onboarding`, `passkey`, `common`, `get-profile`, `update-profile`, `update-password`, `accept-member`, `get-products`), (b) calls `$queryRaw`/`$executeRaw`, or (c) calls `.create` on a `PARENT_SCOPED` model without a parent id taken from a scoped lookup.
 - [ ] **Step 2: Run, expect FAIL listing every unmigrated file** — this list is the migration to-do for Tasks 6–7. Commit the test with the allowlist set to current offenders so CI is green, then shrink the allowlist to zero as tasks complete.
+
+#### Task 5b: Reference-integrity guard (added after the Task 2 matrix run)
+
+`tenantDb` scopes which rows a query touches; it does not validate **ids a client supplies as data** (a `bucketId` or `memberId` pointing at another tenant). The matrix found 14 such cases (marked `it.fails` / `// GAP:` in `tests/tenant/cross-tenant.test.ts`). Fix with one shared guard, extending `assertTenantOwns` (`src/server/tenant-guard.ts`):
+
+**Files:** Modify `src/server/tenant-guard.ts` (+ its test); modify the call sites below.
+
+**Interfaces:** `assertTenantOwns(tx, companyId, refs)` gains `memberId`, `customRoleId`, `documentId`, `templateRecipientId`, `bucketId` (bucket check depends on Task 12's `Bucket.companyId`; until then it checks the id is referenced only by this company's rows).
+
+| Gap (from the matrix) | Call site | Check |
+|---|---|---|
+| B's bucket attached to A's records | `add-share.ts:49`, `add-option.ts:45`, `create-safe.ts:79`, `add-existing-safe.ts:31`, `create-document.ts:33`, `create-template.ts:34` | `bucketId` |
+| Field points at B's recipient | `template-field-router/procedures/add-fields.ts:114` | recipient belongs to A's template |
+| Update/data-room recipient is B's member/stakeholder | `update/procedures/share-update.ts:53`, `data-room-router/router.ts:277` | `memberId`, `stakeholderId` |
+| A's member given B's custom role | `rbac/access-control.ts:148` (`getRoleById`), `update-member.ts:23`, `invite-member.ts:76` | role `companyId` |
+| `switchCompany` writes B's member row | `company-router/router.ts:48` | also `userId` (Task 10) |
+
+- [ ] **Step 1:** for each row, add the guard call, run the matrix; the matching `it.fails` case now fails (the gap closed) — flip it to a normal `it`.
+- [ ] **Step 2:** commit per row group. The 14 `it.fails` cases reach zero by the end of Phase 3.
+
+Also found (not tenancy, fix opportunistically): `add-stakeholders.ts:27` fires an `Audit.create` without awaiting it inside a transaction; `audit.allEsignAudits` is an existence oracle for template ids.
 
 #### Task 6: Migrate cap-table routers (batch 1: securities)
 
