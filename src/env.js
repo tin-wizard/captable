@@ -37,7 +37,12 @@ export const env = createEnv({
       .default("0")
       .transform((s) => s !== "false" && s !== "0"),
     NEXTAUTH_URL: z.string(),
-    NEXTAUTH_SECRET: z.string(),
+    NEXTAUTH_SECRET: z
+      .string()
+      .min(
+        32,
+        "NEXTAUTH_SECRET must be at least 32 characters (openssl rand -base64 32)",
+      ),
     EMAIL_SERVER: z.string().optional(),
     EMAIL_FROM: z.string(),
 
