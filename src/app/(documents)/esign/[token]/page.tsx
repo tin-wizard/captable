@@ -22,8 +22,6 @@ export default async function SigningPage(props: SigningPageProps) {
   const {
     fields,
     url,
-    recipientId,
-    templateId,
     signableFields,
     status: templateStatus,
   } = await api.template.getSigningFields.query({
@@ -55,8 +53,7 @@ export default async function SigningPage(props: SigningPageProps) {
         </div>
         <div className="sticky top-0 flex min-h-full w-80 flex-col lg:border-l">
           <SigningFields
-            recipientId={recipientId}
-            templateId={templateId}
+            token={token}
             fields={signableFields}
             companyPublicId={companyPublicId}
           />

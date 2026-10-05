@@ -1,6 +1,8 @@
 import { EsignService } from "@/services/esign-service";
 import { withoutAuth } from "@/trpc/api/trpc";
+import { TRPCError } from "@trpc/server";
 import { UAParser } from "ua-parser-js";
+import { DecodeEmailToken } from "../../template-field-router/procedures/add-fields";
 import { SignTemplateMutationSchema } from "../schema";
 
 export const signTemplateProcedure = withoutAuth
@@ -14,8 +16,17 @@ export const signTemplateProcedure = withoutAuth
 
     const eSignService = new EsignService();
 
+    // the signed email token, not client-supplied ids, identifies who is signing
+    const { id: templateId, rec: recipientId } = await DecodeEmailToken(
+      input.token,
+    );
+
     await db.$transaction(async (tx) => {
-      const template = await eSignService.getTemplate(input.templateId, tx);
+      const template = await eSignService.getTemplate(templateId, tx);
+
+      if (["DRAFT", "COMPLETE", "CANCELLED"].includes(template.status)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Not signable" });
+      }
 
       const bucketKey = template.bucket.key;
       const companyId = template.companyId;
@@ -28,12 +39,19 @@ export const signTemplateProcedure = withoutAuth
       const isOrderedDelivery = template.orderedDelivery;
 
       const recipient = await eSignService.getRecipient(
-        input.recipientId,
+        recipientId,
         template.id,
         tx,
       );
 
-      await eSignService.updateRecipientStatus(recipient.id, "SIGNED", tx);
+      // only a recipient still awaiting their signature may sign, exactly once
+      const claimed = await tx.esignRecipient.updateMany({
+        where: { id: recipient.id, status: "SENT" },
+        data: { status: "SIGNED" },
+      });
+      if (claimed.count !== 1) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Already signed" });
+      }
 
       await eSignService.createSignedAuditLog(
         {
