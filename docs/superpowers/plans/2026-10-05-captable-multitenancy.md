@@ -1,6 +1,6 @@
 # Captable Multitenancy: Status and Plan (v2)
 
-**Date:** 2026-10-05 · **Branch:** `feat/multitenancy-phase0` (29 commits ahead of `main`, not pushed) · **Tests:** 297 passing · **Production build:** passes
+**Date:** 2026-10-05 · **Branch:** `feat/multitenancy-phase0` (34 commits ahead of `main`, not pushed) · **Tests:** 344 passing · **Production build:** passes
 
 **Replaces:** the v1 plan (same path, see git history). v1 mixed a plan with a log and its code samples went stale; this version is status plus remaining work only.
 
@@ -88,9 +88,10 @@ Router coverage: 37 files on `withTenant`, 19 on `withAccessControl`, 9 `withAut
 | `6889d6c` | unauthenticated file upload/download/delete; bucket owner and backfill |
 | `6197ab6`, `07724f3`, `b1a1cbb` | Phase 2: no default admin role; roles on every tRPC mutation; last-admin rule; only an admin grants ADMIN |
 | `3c62586`, `de4031b` | dashboard pages on the scoped helper; active-only company lists; public links expire in 30 days with previous-secret verification |
+| `25d3c41`, `69a381e`, `4dcfc0e`, `5d81356` | Phase 3: per-company stakeholder email; bucket relation; signed upload size limits; REST cookie writes, header and page hygiene; leaking reads closed; `template.resendLink`; serializable last-admin check; cancelled envelopes stop handing out the document |
 | `855d303` | review fixes: role management ADMIN-only (no self-granting); REST role checks; link-minting reads need a permission |
 
-Test count by step: 13, 88, 115, 127, 131, 155, 159, 178, 193, 255, 273, 297.
+Test count by step: 13, 88, 115, 127, 131, 155, 159, 178, 193, 255, 273, 297, 317, 324, 343, 344.
 
 ## 5. Open findings (ranked)
 
@@ -101,13 +102,15 @@ Test count by step: 13, 88, 115, 127, 131, 155, 159, 178, 193, 255, 273, 297.
 | F3 | Public links expire after 30 days; previous-secret verification. **Done** (`de4031b`); operator turns on `PUBLIC_LINK_REQUIRE_EXPIRY` 30 days after deploy | Done | 2 |
 | F4 | `Member.role` default removed; onboarding and seeds set the role explicitly (`6197ab6`). **Done** | Done | 2 |
 | F5 | Company lists count only ACTIVE onboarded members. **Done** (`3c62586`) | Done | 2 |
-| F6 | Presigned PUTs have no size limit; `Bucket` has no DB-level relation to `Company` | Low | 3 |
-| F7 | `Stakeholder.email` is globally unique (one person cannot be a stakeholder of two companies; leaks existence) | Medium | 3 |
-| F8 | REST: cookie auth fails for requests with a body; header schema demands `Authorization` for cookie callers; pagination `limit` default ignored | Low | 3 |
-| F9 | `"use server"` left on 5 page files (not a hole; hygiene) | Low | 3 |
-| F11 | Open reads: `common.getContacts` (member and stakeholder emails), securities and share-class lists, templates, updates list, billing subscription, the document preview page presigns without `documents:read` | Medium | 3 |
-| F12 | No way to resend an e-sign link after it expires (cancel and recreate the envelope); data-room recipient `expiresAt` is stored but never enforced | Medium | 3 |
-| F13 | Last-admin check is count-then-write: two admins demoting each other at the same instant could both pass (needs a row lock or serializable transaction) | Low | 3 |
+| F6 | Upload size limit and Bucket-Company relation. **Done** (`25d3c41`) | Done | 3 |
+| F7 | `Stakeholder.email` unique per company. **Done** (`25d3c41`); rollback of that migration is one-way once an email exists in two companies | Done | 3 |
+| F8 | REST cookie writes with a body, optional Authorization header, pagination maximum. **Done** (`69a381e`) | Done | 3 |
+| F9 | Page-level `"use server"` removed from 6 pages. **Done** (`69a381e`); `investor-details` keeps it (client modals render it) | Done | 3 |
+| F11 | Reads that leaked protected data closed (billing subscription, contacts, document preview). **Done** (`4dcfc0e`); other cap-table reads stay open by design | Done | 3 |
+| F12 | `template.resendLink` mints a fresh link for the current signer. **Done** (`4dcfc0e`); no throttle yet; data-room recipient `expiresAt` is still stored but not enforced | Done | 3 |
+| F13 | Last-admin race fixed with serializable transactions and one retry (`4dcfc0e`); the race was reproduced before the fix. **Done** | Done | 3 |
+| F14 | The content type of a public-bucket upload is not signed, so the image-only rule is not enforced where the file is stored (a client can PUT `text/html` to a public key). Fix: sign `content-type` and send the presigned type from both upload paths; needs a real upload test | Medium | 4 |
+| F15 | Smaller follow-ups: `uploadFile` returns the wrong size so e-sign documents record 0; `resendLink` has no throttle (add a `singletonKey`); REST duplicate stakeholder returns 500 instead of 409; cookie-authenticated REST writes rely on SameSite=Lax (consider an Origin check); `Bucket.company` cascade should be `Restrict` once tests stop deleting companies; every activation toggle is audited as "activated"; `investor-details` is an exported server action that returns stakeholders to its caller | Low | 4 |
 | F10 | Keeping Captable's own tenancy is a fork of a Hub capability with no recorded decision (register D7) | Medium | 2 |
 
 ## 6. Remaining plan
@@ -125,9 +128,11 @@ Scope rule (ponytail): each task is the smallest change with a test that fails f
 
 ### Phase 3: hygiene
 
-- [ ] **T6 (F7).** `Stakeholder` unique on `(companyId, email)`; update callers using the old unique key.
-- [ ] **T7 (F6).** Add `Bucket -> Company` relation; presign size limit (`Content-Length` condition).
-- [ ] **T8 (F8, F9).** Fix REST cookie auth with a body, header schema, pagination default; drop the page-level `"use server"` directives.
+- [x] **T6 (F7), done `25d3c41`.** `Stakeholder` unique on `(companyId, email)`; update callers using the old unique key.
+- [x] **T7 (F6), done `25d3c41`.** Add `Bucket -> Company` relation; presign size limit (`Content-Length` condition).
+- [x] **T8 (F8, F9), done `69a381e`.**
+- [x] **T9 (F11), T10 (F12), T11 (F13), done `4dcfc0e`.** Reads that leaked protected data; `template.resendLink`; serializable last-admin check.
+- [x] **T11b, done `5d81356`.** A cancelled envelope's link no longer returns fields or the document URL (found by the Phase 3 review). Fix REST cookie auth with a body, header schema, pagination default; drop the page-level `"use server"` directives.
 
 ### Phase 4: Hub linkage (gated, not scheduled)
 
