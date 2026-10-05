@@ -1,14 +1,14 @@
 import { generatePublicId } from "@/common/id";
 import { Audit } from "@/server/audit";
-import { withAuth } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { UpdateMutationSchema } from "../schema";
 
-export const cloneUpdateProcedure = withAuth
+export const cloneUpdateProcedure = withAccessControl
   .input(UpdateMutationSchema)
+  .meta({ policies: { updates: { allow: ["create"] } } })
   .mutation(async ({ ctx, input }) => {
     try {
-      const authorId = ctx.session.user.memberId;
-      const companyId = ctx.session.user.companyId;
+      const { memberId: authorId, companyId } = ctx.tenant;
       const userId = ctx.session.user.id;
       const userName = ctx.session.user.name;
       const { userAgent, requestIp } = ctx;
@@ -21,7 +21,7 @@ export const cloneUpdateProcedure = withAuth
           message: "Title and content cannot be empty.",
         };
       }
-      await ctx.db.$transaction(async (tx) => {
+      await ctx.tenant.db.$transaction(async (tx) => {
         const update = await tx.update.create({
           data: {
             html,

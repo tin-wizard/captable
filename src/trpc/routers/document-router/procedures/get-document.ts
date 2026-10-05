@@ -1,5 +1,5 @@
 import { getPresignedGetUrl } from "@/server/file-uploads";
-import { withAccessControl, withAuth } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { ZodGetDocumentQuerySchema } from "../schema";
 
 export const getDocumentProcedure = withAccessControl
@@ -8,8 +8,7 @@ export const getDocumentProcedure = withAccessControl
   .query(
     async ({
       ctx: {
-        db,
-        membership: { companyId },
+        tenant: { db, companyId },
       },
       input,
     }) => {
@@ -17,6 +16,8 @@ export const getDocumentProcedure = withAccessControl
         where: {
           publicId: input.publicId,
           companyId,
+          // the relation is not tenant-scoped: never sign a bucket the company doesn't own
+          bucket: { companyId },
         },
         select: {
           bucket: {

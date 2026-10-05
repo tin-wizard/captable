@@ -25,6 +25,8 @@ const AuthHeaderSchema = z.object({
   authorization: z
     .string()
     .regex(/^Bearer [a-zA-Z0-9_]+/)
+    // optional: session-cookie callers send no bearer; the auth middleware decides
+    .optional()
     .openapi({
       description: "Bearer token to authorize the request",
       example: "Bearer api_x0X0x0X0x0X0x0X0x0X0x0X",

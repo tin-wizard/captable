@@ -148,6 +148,7 @@ model Company {
   equityPlans      EquityPlan[]
   documents        Document[]
   templates        Template[]
+  buckets          Bucket[]
   stakeholders     Stakeholder[]
   investments      Investment[]
   shares           Share[]
@@ -211,7 +212,7 @@ model Member {
   title        String?
   status       MemberStatusEnum @default(PENDING)
   isOnboarded  Boolean          @default(false)
-  role         Roles?           @default(ADMIN)
+  role         Roles?
   workEmail    String?
   lastAccessed DateTime         @default(now())
   createdAt    DateTime         @default(now())
@@ -277,7 +278,7 @@ enum StakeholderRelationshipEnum {
 model Stakeholder {
   id                  String                      @id @default(cuid())
   name                String
-  email               String                      @unique
+  email               String
   institutionName     String?
   stakeholderType     StakeholderTypeEnum         @default(INDIVIDUAL)
   currentRelationship StakeholderRelationshipEnum @default(EMPLOYEE)
@@ -303,6 +304,9 @@ model Stakeholder {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // unique per company, not globally: one person may hold stakes in several
+  // companies, and a duplicate elsewhere must not reveal that it exists
+  @@unique([companyId, email])
   @@index([companyId])
 }
 
@@ -410,11 +414,19 @@ model Bucket {
   size     Int
   tags     String[]
 
+  // owner; null only for legacy buckets no single company references
+  companyId String?
+  // relationMode "prisma": no database FK; Cascade emulated by Prisma Client,
+  // as for Document and Template
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   documents Document[]
   templates Template[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([companyId])
 }
 
 model Document {

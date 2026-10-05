@@ -11,7 +11,7 @@ export const PaginationQuerySchema = z.object({
         .int()
         .positive()
         .min(1)
-        .max(50)
+        .max(100)
         .default(DEFAULT_PAGINATION_LIMIT),
     )
     .openapi({
@@ -23,7 +23,7 @@ export const PaginationQuerySchema = z.object({
       example: 25,
       default: DEFAULT_PAGINATION_LIMIT,
       minimum: 1,
-      maximum: 250,
+      maximum: 100,
     }),
 
   cursor: z

@@ -7,7 +7,7 @@ export const bankAccountsRouter = createTRPCRouter({
     .meta({ policies: { "bank-accounts": { allow: ["read"] } } })
     .query(async ({ ctx }) => {
       const {
-        db,
+        tenant: { db },
         membership: { companyId },
       } = ctx;
 

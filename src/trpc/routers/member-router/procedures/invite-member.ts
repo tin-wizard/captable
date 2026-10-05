@@ -3,6 +3,7 @@ import { getRoleById } from "@/lib/rbac/access-control";
 import { generatePasswordResetToken } from "@/lib/token";
 import { Audit } from "@/server/audit";
 import { generateInviteToken, generateMemberIdentifier } from "@/server/member";
+import { assertAdmin } from "@/server/tenant-guard";
 import { withAccessControl } from "@/trpc/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { ZodInviteMemberMutationSchema } from "../schema";
@@ -28,7 +29,7 @@ export const inviteMemberProcedure = withAccessControl
     const { token: passwordResetToken } =
       await generatePasswordResetToken(email);
 
-    const { company, verificationToken } = await ctx.db.$transaction(
+    const { company, verificationToken } = await ctx.tenant.db.$transaction(
       async (tx) => {
         const company = await tx.company.findFirstOrThrow({
           where: {
@@ -73,7 +74,12 @@ export const inviteMemberProcedure = withAccessControl
           });
         }
 
-        const role = await getRoleById({ id: roleId, tx });
+        const role = await getRoleById({ id: roleId, companyId, tx });
+        // granting any role, or resetting the role of an earlier (inactive or
+        // pending) membership, is an admin matter
+        if (role.role || prevMember?.role) {
+          assertAdmin(ctx.tenant.role, "Only an admin can assign a role.");
+        }
 
         //  create member
         const member = await tx.member.upsert({

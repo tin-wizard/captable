@@ -1,42 +1,55 @@
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
-import { type TPrismaOrTransaction } from "@/server/db";
-import { withAuth, type withAuthTrpcContextType } from "@/trpc/api/trpc";
+import {
+  assertMayManageMember,
+  assertNotLastActiveAdmin,
+  runSerializable,
+} from "@/server/tenant-guard";
+import {
+  withAccessControl,
+  type withTenantTrpcContextType,
+} from "@/trpc/api/trpc";
 import {
   type TypeZodRemoveMemberMutationSchema,
   ZodRemoveMemberMutationSchema,
 } from "../schema";
 
-export const removeMemberProcedure = withAuth
+type TenantDb = withTenantTrpcContextType["tenant"]["db"];
+type TenantTx = Parameters<Parameters<TenantDb["$transaction"]>[0]>[0];
+
+export const removeMemberProcedure = withAccessControl
   .input(ZodRemoveMemberMutationSchema)
-  .mutation(async (args) => {
-    const data = await args.ctx.db.$transaction(async (db) => {
-      const data = await removeMemberHandler({
-        ...args,
-        ctx: { ...args.ctx, db },
-      });
-
-      return data;
-    });
-
-    return data;
-  });
+  .meta({ policies: { members: { allow: ["delete"] } } })
+  .mutation(async ({ ctx, input }) =>
+    runSerializable((options) =>
+      ctx.tenant.db.$transaction(
+        (tx) => removeMemberHandler({ ctx, db: tx, input }),
+        options,
+      ),
+    ),
+  );
 
 interface removeMemberHandlerOptions {
   input: TypeZodRemoveMemberMutationSchema;
-  ctx: Omit<withAuthTrpcContextType, "db"> & {
-    db: TPrismaOrTransaction;
-  };
+  // tenant-scoped client (or transaction) the delete and audit run on
+  db: TenantDb | TenantTx;
+  ctx: Pick<
+    withTenantTrpcContextType,
+    "session" | "requestIp" | "userAgent" | "tenant"
+  >;
 }
 
+// Callers run it in a runSerializable transaction (last-admin guard).
 export async function removeMemberHandler({
-  ctx: { db, session, requestIp, userAgent },
+  ctx: { session, requestIp, userAgent, tenant },
+  db,
   input,
 }: removeMemberHandlerOptions) {
   const user = session.user;
   const { memberId } = input;
+  const { companyId } = tenant;
 
-  const { companyId } = await checkMembership({ session, tx: db });
+  await assertMayManageMember(db, companyId, tenant.role, memberId);
+  await assertNotLastActiveAdmin(db, companyId, memberId);
 
   const member = await db.member.delete({
     where: {

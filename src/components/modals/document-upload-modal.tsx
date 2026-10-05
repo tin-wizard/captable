@@ -10,9 +10,8 @@ type DocumentUploadModalProps = {
   companyPublicId: string;
 };
 
-export const DocumentUploadModal = ({
-  companyPublicId,
-}: DocumentUploadModalProps) => {
+// companyPublicId is no longer used: the server picks the upload prefix
+export const DocumentUploadModal = (_props: DocumentUploadModalProps) => {
   const router = useRouter();
 
   const { mutateAsync } = api.document.create.useMutation();
@@ -24,7 +23,6 @@ export const DocumentUploadModal = ({
     >
       <Uploader
         shouldUpload={true}
-        identifier={companyPublicId}
         keyPrefix="generic-documents"
         tags={[TAG.GENERIC]}
         onSuccess={async (uploadedData: UploadReturn) => {

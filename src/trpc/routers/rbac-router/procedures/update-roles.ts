@@ -1,5 +1,6 @@
 import { getRoleById } from "@/lib/rbac/access-control";
 import { Audit } from "@/server/audit";
+import { assertAdmin } from "@/server/tenant-guard";
 import { withAccessControl } from "@/trpc/api/trpc";
 import { ZodUpdateRoleMutationSchema } from "../schema";
 import { extractPermission } from "./create-role";
@@ -14,12 +15,22 @@ export const updateRolesProcedure = withAccessControl
   .mutation(
     async ({
       input,
-      ctx: { db, membership, userAgent, requestIp, session },
+      ctx: {
+        tenant: { db, companyId, role: callerRole },
+        userAgent,
+        requestIp,
+        session,
+      },
     }) => {
+      assertAdmin(callerRole);
       const permissions = extractPermission(input.permissions);
       const { user } = session;
       await db.$transaction(async (tx) => {
-        const id = await getRoleById({ id: input.roleId, tx });
+        const id = await getRoleById({
+          id: input.roleId,
+          companyId,
+          tx,
+        });
 
         if (!id.customRoleId) {
           throw new Error("role id not found");
@@ -27,7 +38,7 @@ export const updateRolesProcedure = withAccessControl
 
         const role = await db.customRole.update({
           where: {
-            companyId: membership.companyId,
+            companyId,
             id: id.customRoleId,
           },
           data: {

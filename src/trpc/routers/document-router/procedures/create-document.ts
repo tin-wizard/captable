@@ -1,9 +1,10 @@
 import { generatePublicId } from "@/common/id";
 import { Audit } from "@/server/audit";
 import type { TPrismaOrTransaction } from "@/server/db";
+import { assertBucketUsable } from "@/server/tenant-guard";
 import {
   withAccessControl,
-  type withAuthTrpcContextType,
+  type withTenantTrpcContextType,
 } from "@/trpc/api/trpc";
 import {
   type TypeZodCreateDocumentMutationSchema,
@@ -11,7 +12,7 @@ import {
 } from "../schema";
 
 interface createDocumentHandlerOptions
-  extends Pick<withAuthTrpcContextType, "requestIp" | "userAgent"> {
+  extends Pick<withTenantTrpcContextType, "requestIp" | "userAgent"> {
   input: TypeZodCreateDocumentMutationSchema;
   companyId: string;
   uploaderName?: string | null | undefined;
@@ -28,6 +29,7 @@ export const createDocumentHandler = async ({
   uploaderName,
   uploaderId,
 }: createDocumentHandlerOptions) => {
+  await assertBucketUsable(db, companyId, input.bucketId);
   const publicId = generatePublicId();
 
   const document = await db.document.create({
@@ -65,8 +67,7 @@ export const createDocumentProcedure = withAccessControl
     const {
       userAgent,
       requestIp,
-      db,
-      membership: { companyId, memberId },
+      tenant: { db, companyId, memberId },
     } = ctx;
 
     const data = await db.$transaction(async (tx) => {

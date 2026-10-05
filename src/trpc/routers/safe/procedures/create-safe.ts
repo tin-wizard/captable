@@ -1,22 +1,22 @@
 import fs from "node:fs";
 import path from "node:path";
 import { generatePublicId } from "@/common/id";
-import { uploadFile } from "@/common/uploads";
 import { invariant } from "@/lib/error";
 import { TAG } from "@/lib/tags";
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
+import { uploadFile } from "@/server/file-uploads";
 import { assertTenantOwns } from "@/server/tenant-guard";
-import { withAuth } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import type { Prisma } from "@prisma/client";
 import { createBucketHandler } from "../../bucket-router/procedures/create-bucket";
 import { createTemplateHandler } from "../../template-router/procedures/create-template";
 import { ZodCreateSafeMutationSchema } from "../schema";
 
-export const createSafeProcedure = withAuth
+export const createSafeProcedure = withAccessControl
   .input(ZodCreateSafeMutationSchema)
+  .meta({ policies: { securities: { allow: ["create"] } } })
   .mutation(async ({ ctx, input }) => {
-    const { userAgent, requestIp, session } = ctx;
+    const { userAgent, requestIp } = ctx;
     const user = ctx.session.user;
     const safeTemplate = input.safeTemplate;
 
@@ -52,11 +52,8 @@ export const createSafeProcedure = withAuth
         );
       }
 
-      const { template } = await ctx.db.$transaction(async (tx) => {
-        const { companyId, memberId } = await checkMembership({
-          session,
-          tx,
-        });
+      const { template } = await ctx.tenant.db.$transaction(async (tx) => {
+        const { companyId, memberId } = ctx.tenant;
 
         if (uploadData) {
           const { fileUrl: _fileUrl, ...rest } = uploadData;
@@ -65,11 +62,8 @@ export const createSafeProcedure = withAuth
             input: { ...rest, tags: [TAG.SAFE] },
             userAgent,
             requestIp,
-            user: {
-              companyId: user.companyId,
-              id: user.id,
-              name: user.name || "",
-            },
+            companyId,
+            user: { id: user.id, name: user.name || "" },
           });
 
           document = { name: bucketName, bucketId };
@@ -99,7 +93,10 @@ export const createSafeProcedure = withAuth
 
         await assertTenantOwns(tx, companyId, inputRest);
 
-        type SafeCreateBody = Prisma.Args<typeof ctx.db.safe, "create">["data"];
+        type SafeCreateBody = Prisma.Args<
+          typeof ctx.tenant.db.safe,
+          "create"
+        >["data"];
 
         let safeData: null | SafeCreateBody;
 

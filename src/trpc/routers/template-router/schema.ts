@@ -27,9 +27,8 @@ export const ZodGetTemplateQuerySchema = z.object({
 });
 
 export const SignTemplateMutationSchema = z.object({
-  templateId: z.string(),
+  token: z.string(),
   data: z.record(z.string()),
-  recipientId: z.string(),
 });
 
 export const ZodGetSigningFieldsSchema = z.object({
@@ -39,4 +38,9 @@ export const ZodGetSigningFieldsSchema = z.object({
 export const ZodCancelTemplateMutationSchema = z.object({
   templateId: z.string(),
   publicId: z.string(),
+});
+
+export const ZodResendLinkMutationSchema = z.object({
+  templateId: z.string(),
+  recipientId: z.string(),
 });

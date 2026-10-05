@@ -1,13 +1,17 @@
 import { assertTenantOwns } from "@/server/tenant-guard";
-import { createTRPCRouter, withAuth } from "@/trpc/api/trpc";
+import {
+  createTRPCRouter,
+  withAccessControl,
+  withTenant,
+} from "@/trpc/api/trpc";
 import { ShareClassMutationSchema } from "./schema";
 
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
 
 export const shareClassRouter = createTRPCRouter({
-  create: withAuth
+  create: withAccessControl
     .input(ShareClassMutationSchema)
+    .meta({ policies: { "cap-table-settings": { allow: ["create"] } } })
     .mutation(async ({ ctx, input }) => {
       const { userAgent, requestIp } = ctx;
 
@@ -16,11 +20,8 @@ export const shareClassRouter = createTRPCRouter({
           | "CS"
           | "PS";
 
-        await ctx.db.$transaction(async (tx) => {
-          const { companyId } = await checkMembership({
-            tx,
-            session: ctx.session,
-          });
+        await ctx.tenant.db.$transaction(async (tx) => {
+          const { companyId } = ctx.tenant;
 
           const maxIdx = await tx.shareClass.count({
             where: {
@@ -80,8 +81,9 @@ export const shareClassRouter = createTRPCRouter({
       }
     }),
 
-  update: withAuth
+  update: withAccessControl
     .input(ShareClassMutationSchema)
+    .meta({ policies: { "cap-table-settings": { allow: ["update"] } } })
     .mutation(async ({ ctx, input }) => {
       const { userAgent, requestIp } = ctx;
 
@@ -90,11 +92,8 @@ export const shareClassRouter = createTRPCRouter({
           | "CS"
           | "PS";
 
-        await ctx.db.$transaction(async (tx) => {
-          const { companyId } = await checkMembership({
-            tx,
-            session: ctx.session,
-          });
+        await ctx.tenant.db.$transaction(async (tx) => {
+          const { companyId } = ctx.tenant;
 
           await assertTenantOwns(tx, companyId, {
             shareClassId: input.convertsToShareClassId,
@@ -148,9 +147,9 @@ export const shareClassRouter = createTRPCRouter({
       }
     }),
 
-  get: withAuth.query(async ({ ctx: { db, session } }) => {
-    const shareClass = await db.$transaction(async (tx) => {
-      const { companyId } = await checkMembership({ session, tx });
+  get: withTenant.query(async ({ ctx: { tenant } }) => {
+    const shareClass = await tenant.db.$transaction(async (tx) => {
+      const { companyId } = tenant;
 
       return await tx.shareClass.findMany({
         where: {

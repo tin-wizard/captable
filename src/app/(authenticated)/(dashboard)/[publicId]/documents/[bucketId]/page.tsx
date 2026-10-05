@@ -2,9 +2,11 @@ import FileIcon from "@/components/common/file-icon";
 import FilePreview from "@/components/file/preview";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { withServerComponentSession } from "@/server/auth";
-import { db } from "@/server/db";
+import { UnAuthorizedState } from "@/components/ui/un-authorized-state";
+import { hasPermission } from "@/lib/rbac";
+import { getServerPermissions } from "@/lib/rbac/access-control";
 import { getPresignedGetUrl } from "@/server/file-uploads";
+import { getServerTenant } from "@/server/tenant";
 import { RiArrowLeftSLine } from "@remixicon/react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -15,12 +17,17 @@ const DocumentPreview = async ({
 }: {
   params: { publicId: string; bucketId: string };
 }) => {
-  const session = await withServerComponentSession();
-  const companyId = session?.user?.companyId;
+  // same grant as bucket.getUrl: no documents:read, no presigned URL
+  const { permissions } = await getServerPermissions();
+  if (!hasPermission(permissions, "documents", "read")) {
+    return <UnAuthorizedState />;
+  }
+
+  const { db, companyId } = await getServerTenant();
   const document = await db.document.findFirst({
     where: {
       bucketId,
-      companyId,
+      bucket: { companyId },
     },
 
     include: { bucket: true },

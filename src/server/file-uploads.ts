@@ -1,10 +1,11 @@
-"use server";
-
+// Server-only S3 helpers. Deliberately not a server-action module (no
+// directive): every export of one is a public, unauthenticated endpoint.
+// Browsers go through the bucket tRPC procedures (presignUpload,
+// presignPublicUpload, getUrl), which derive and check ownership.
 import path from "node:path";
 import { customId } from "@/common/id";
 import { env } from "@/env";
 import {
-  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -45,6 +46,9 @@ export type TypeKeyPrefixes =
 
 export interface getPresignedUrlOptions {
   contentType: string;
+  // exact byte length of the body; signed as content-length, so the PUT must
+  // send exactly this many bytes
+  size: number;
   expiresIn?: number;
   fileName: string;
   keyPrefix: TypeKeyPrefixes;
@@ -57,13 +61,16 @@ const TEN_MINUTES_IN_SECONDS = 10 * 60;
 
 export const getPresignedPutUrl = async ({
   contentType,
+  size,
   expiresIn,
   fileName,
   keyPrefix,
   identifier,
   bucketMode,
 }: getPresignedUrlOptions) => {
-  const { name, ext } = path.parse(fileName);
+  const { name, ext: rawExt } = path.parse(fileName);
+  // only a plain extension reaches the key and the public fileUrl
+  const ext = /^\.[a-z0-9]{1,10}$/i.test(rawExt) ? rawExt : "";
 
   const Key = `${identifier}/${keyPrefix}-${slugify(name)}-${customId(
     12,
@@ -73,6 +80,7 @@ export const getPresignedPutUrl = async ({
     Bucket: bucketMode === "privateBucket" ? PrivateBucket : PublicBucket,
     Key,
     ContentType: contentType,
+    ContentLength: size,
     ACL: bucketMode === "privateBucket" ? "private" : "public-read",
   });
 
@@ -101,11 +109,49 @@ export const getPresignedGetUrl = async (key: string) => {
   return { key, url };
 };
 
-export const deleteBucketFile = (key: string) => {
-  return S3.send(
-    new DeleteObjectCommand({
-      Bucket: process.env.UPLOAD_BUCKET_PRIVATE,
-      Key: key,
-    }),
-  );
+// Server-side upload (jobs, seeded templates): presign under a server-chosen
+// identifier and PUT the bytes.
+export const uploadFile = async (
+  file: File,
+  options: Pick<
+    getPresignedUrlOptions,
+    "expiresIn" | "keyPrefix" | "identifier"
+  >,
+  bucketMode: "publicBucket" | "privateBucket" = "privateBucket",
+) => {
+  // callers pass File-shaped objects whose .size is not the real length
+  // (esign sets 0), so sign the length of the bytes actually sent
+  const body = await file.arrayBuffer();
+  const { url, key, bucketUrl } = await getPresignedPutUrl({
+    contentType: file.type,
+    fileName: file.name,
+    size: body.byteLength,
+    bucketMode,
+    ...options,
+  });
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/octet-stream" },
+    body,
+  });
+  if (!res.ok) {
+    throw new Error(
+      `Failed to upload file "${file.name}", failed with status code ${res.status}`,
+    );
+  }
+  const { name, type, size } = file;
+  return { key, name, mimeType: type, size, fileUrl: bucketUrl };
+};
+
+export type TUploadFile = Awaited<ReturnType<typeof uploadFile>>;
+
+export const getFileFromS3 = async (key: string) => {
+  const { url } = await getPresignedGetUrl(key);
+  const response = await fetch(url, { method: "GET" });
+  if (!response.ok) {
+    throw new Error(
+      `Failed to get file "${key}", failed with status code ${response.status}`,
+    );
+  }
+  return new Uint8Array(await response.arrayBuffer());
 };

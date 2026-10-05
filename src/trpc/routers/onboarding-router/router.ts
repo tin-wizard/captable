@@ -27,8 +27,9 @@ export const onboardingRouter = createTRPCRouter({
               id: ctx.session.user.id,
             },
             data: {
+              // email is never changed here: it is verified at sign-in, and an
+              // unverified overwrite lets a user claim someone else's address
               name: `${input.user.name}`,
-              email: `${input.user.email}`,
             },
             select: {
               id: true,
@@ -38,6 +39,8 @@ export const onboardingRouter = createTRPCRouter({
 
           await tx.member.create({
             data: {
+              // the company creator is its first admin (there is no schema default)
+              role: "ADMIN",
               isOnboarded: true,
               status: "ACTIVE",
               title: input.user.title,

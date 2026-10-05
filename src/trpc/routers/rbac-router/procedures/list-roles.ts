@@ -10,9 +10,9 @@ export const listRolesProcedure = withAccessControl
     },
   })
   .query(async ({ ctx }) => {
-    const customRoles = await ctx.db.customRole.findMany({
+    const customRoles = await ctx.tenant.db.customRole.findMany({
       where: {
-        companyId: ctx.membership.companyId,
+        companyId: ctx.tenant.companyId,
       },
       select: {
         id: true,

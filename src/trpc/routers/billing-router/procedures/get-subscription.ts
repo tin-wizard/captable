@@ -1,48 +1,49 @@
-import { checkMembership } from "@/server/auth";
-import { withAuth } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 
-export const getSubscriptionProcedure = withAuth.query(async ({ ctx }) => {
-  const { db, session } = ctx;
+export const getSubscriptionProcedure = withAccessControl
+  .meta({ policies: { billing: { allow: ["read"] } } })
+  .query(async ({ ctx }) => {
+    const { tenant } = ctx;
 
-  const { subscription } = await db.$transaction(async (tx) => {
-    const { companyId } = await checkMembership({ session, tx });
+    const { subscription } = await tenant.db.$transaction(async (tx) => {
+      const { companyId } = tenant;
 
-    const customer = await tx.billingCustomer.findFirst({
-      where: {
-        companyId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!customer) {
-      return { subscription: null };
-    }
-
-    const subscription = await tx.billingSubscription.findFirst({
-      where: {
-        customerId: customer.id,
-        status: {
-          in: ["active", "trialing"],
+      const customer = await tx.billingCustomer.findFirst({
+        where: {
+          companyId,
         },
-      },
-      include: {
-        price: {
-          select: {
-            product: {
-              select: {
-                name: true,
-              },
-            },
-            unitAmount: true,
+        select: {
+          id: true,
+        },
+      });
+
+      if (!customer) {
+        return { subscription: null };
+      }
+
+      const subscription = await tx.billingSubscription.findFirst({
+        where: {
+          customerId: customer.id,
+          status: {
+            in: ["active", "trialing"],
           },
         },
-      },
+        include: {
+          price: {
+            select: {
+              product: {
+                select: {
+                  name: true,
+                },
+              },
+              unitAmount: true,
+            },
+          },
+        },
+      });
+
+      return { subscription };
     });
 
     return { subscription };
   });
-
-  return { subscription };
-});

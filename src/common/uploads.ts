@@ -1,45 +1,58 @@
 import { env } from "@/env";
-import {
-  getPresignedGetUrl,
-  getPresignedPutUrl,
-  type getPresignedUrlOptions,
-} from "@/server/file-uploads";
+import type { AppRouter } from "@/trpc/api/root";
+import type {
+  ZodPresignPublicUploadSchema,
+  ZodPresignUploadSchema,
+} from "@/trpc/routers/bucket-router/schema";
+import { getUrl, transformer } from "@/trpc/shared";
+import { createTRPCProxyClient, httpBatchLink } from "@trpc/client";
+import { toast } from "sonner";
+import type { z } from "zod";
+
+// Browser-side uploads. The server picks where a file lands (company publicId
+// or user id) in the bucket procedures; this module never touches S3 config.
+const client = createTRPCProxyClient<AppRouter>({
+  transformer,
+  links: [httpBatchLink({ url: getUrl() })],
+});
+
+type PrivatePrefix = z.infer<typeof ZodPresignUploadSchema>["keyPrefix"];
+type PublicPrefix = z.infer<typeof ZodPresignPublicUploadSchema>["keyPrefix"];
+type PublicType = z.infer<typeof ZodPresignPublicUploadSchema>["contentType"];
 
 /**
  * usage
  * ```js
- * import { uploadFile } from '@/common/uploads'
- *
- * const handleUpload = async (file: File) => {
- *   const { uploadKey } = await uploadFile(file);
- *
- *   // save to the database
- *   saveDB({ uploadKey });
- * };
+ * const { key } = await uploadFile(file, { keyPrefix: "generic-documents" });
+ * // then register it: api.bucket.create({ key, ... })
  * ```
  */
-
 export const uploadFile = async (
   file: File,
-  options: Pick<
-    getPresignedUrlOptions,
-    "expiresIn" | "keyPrefix" | "identifier"
-  >,
-  bucketMode: "publicBucket" | "privateBucket" = "privateBucket",
+  { keyPrefix }: { keyPrefix: PrivatePrefix | PublicPrefix },
 ) => {
-  const { url, key, bucketUrl } = await getPresignedPutUrl({
-    contentType: file.type,
+  const input = {
     fileName: file.name,
-    bucketMode,
-    ...options,
-  });
-  const body = await file.arrayBuffer();
+    contentType: file.type || "application/octet-stream",
+    // signed as content-length: the PUT below must send exactly these bytes
+    size: file.size,
+  };
+  const isPublic =
+    keyPrefix === "company-logos" || keyPrefix === "profile-avatars";
+  const { url, key, bucketUrl } = isPublic
+    ? await client.bucket.presignPublicUpload.mutate({
+        ...input,
+        // callers validate image types first (validateFile); the server rejects others
+        contentType: input.contentType as PublicType,
+        keyPrefix,
+      })
+    : await client.bucket.presignUpload.mutate({ ...input, keyPrefix });
   const res = await fetch(url, {
     method: "PUT",
     headers: {
       "Content-Type": "application/octet-stream",
     },
-    body,
+    body: await file.arrayBuffer(),
   });
   if (!res.ok) {
     throw new Error(
@@ -53,7 +66,7 @@ export const uploadFile = async (
   const uploadDomain =
     process.env.NEXT_PUBLIC_UPLOAD_DOMAIN || env.NEXT_PUBLIC_UPLOAD_DOMAIN;
 
-  if (bucketMode === "publicBucket" && uploadDomain) {
+  if (isPublic && uploadDomain) {
     fileUrl = `${uploadDomain}/${key}`;
   }
 
@@ -68,22 +81,13 @@ export const uploadFile = async (
 
 export type TUploadFile = Awaited<ReturnType<typeof uploadFile>>;
 
-export const getFileFromS3 = async (key: string) => {
-  const { url } = await getPresignedGetUrl(key);
-
-  const response = await fetch(url, {
-    method: "GET",
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to get file "${key}", failed with status code ${response.status}`,
-    );
+// Opens one of the caller's company's files. getUrl refuses a bucket the
+// company does not own (another company's, or a legacy one with no owner).
+export const openFileOnTab = async (key: string) => {
+  try {
+    const { url } = await client.bucket.getUrl.query({ key });
+    window.open(url, "_blank");
+  } catch {
+    toast.error("This file is not available");
   }
-
-  const buffer = await response.arrayBuffer();
-
-  const binaryData = new Uint8Array(buffer);
-
-  return binaryData;
 };

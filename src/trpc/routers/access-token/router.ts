@@ -11,7 +11,7 @@ export const accessTokenRouter = createTRPCRouter({
     .input(z.object({ typeEnum: z.nativeEnum(AccessTokenType) }))
     .query(async ({ ctx, input }) => {
       const {
-        db,
+        tenant: { db },
         membership: { userId },
       } = ctx;
 
@@ -43,9 +43,10 @@ export const accessTokenRouter = createTRPCRouter({
 
   create: withAccessControl
     .input(z.object({ typeEnum: z.nativeEnum(AccessTokenType) }))
+    .meta({ policies: { developer: { allow: ["create"] } } })
     .mutation(async ({ ctx, input }) => {
       const {
-        db,
+        tenant: { db },
         membership: { userId, companyId },
         userAgent,
         requestIp,
@@ -96,7 +97,7 @@ export const accessTokenRouter = createTRPCRouter({
     .input(z.object({ tokenId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const {
-        db,
+        tenant: { db },
         membership: { userId, companyId },
         session,
         requestIp,

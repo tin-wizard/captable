@@ -1,31 +1,34 @@
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
-import { withAuth, type withAuthTrpcContextType } from "@/trpc/api/trpc";
+import {
+  withAccessControl,
+  type withTenantTrpcContextType,
+} from "@/trpc/api/trpc";
 import {
   type TypeZodDeleteShareMutationSchema,
   ZodDeleteShareMutationSchema,
 } from "../schema";
 
-export const deleteShareProcedure = withAuth
+export const deleteShareProcedure = withAccessControl
   .input(ZodDeleteShareMutationSchema)
+  .meta({ policies: { securities: { allow: ["delete"] } } })
   .mutation(async (args) => {
     return await deleteShareHandler(args);
   });
 
 interface deleteShareHandlerOptions {
   input: TypeZodDeleteShareMutationSchema;
-  ctx: withAuthTrpcContextType;
+  ctx: withTenantTrpcContextType;
 }
 
 export async function deleteShareHandler({
-  ctx: { db, session, requestIp, userAgent },
+  ctx: { tenant, session, requestIp, userAgent },
   input,
 }: deleteShareHandlerOptions) {
   const user = session.user;
   const { shareId } = input;
   try {
-    await db.$transaction(async (tx) => {
-      const { companyId } = await checkMembership({ session, tx });
+    await tenant.db.$transaction(async (tx) => {
+      const { companyId } = tenant;
 
       const share = await tx.share.delete({
         where: {

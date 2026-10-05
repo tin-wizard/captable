@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Captable Multitenancy: Architecture Blueprint</title>
+<style>
+@page { size: A4; margin: 16mm 14mm 16mm 14mm; }
+:root { --ink:#17202a; --mute:#566170; --line:#cfd5dd; --soft:#f3f5f8; --built:#1f7a4d; --target:#a85d00; --blue:#1f4e8c; }
+* { box-sizing: border-box; }
+body { font-family: -apple-system,'Helvetica Neue',Arial,sans-serif; font-size: 9.8pt; line-height: 1.42; color: var(--ink); margin: 0; }
+h1 { font-size: 22pt; margin: 0 0 4px; letter-spacing: -0.3px; }
+.sub { color: var(--mute); margin: 0 0 10px; }
+h2 { font-size: 13.5pt; margin: 18px 0 6px; padding-bottom: 3px; border-bottom: 1.5px solid var(--ink); break-after: avoid; }
+h3 { font-size: 10.8pt; margin: 12px 0 3px; break-after: avoid; }
+p { margin: 4px 0; }
+code { font-family: 'SF Mono',Menlo,monospace; font-size: 8.4pt; background: var(--soft); padding: 0 3px; border-radius: 3px; }
+table { border-collapse: collapse; width: 100%; margin: 6px 0 8px; font-size: 8.7pt; }
+tr { break-inside: avoid; }
+th { background: var(--soft); text-align: left; border: 1px solid var(--line); padding: 3px 6px; }
+td { border: 1px solid #dde1e7; padding: 3px 6px; vertical-align: top; }
+ul { margin: 3px 0 5px 18px; padding: 0; } li { margin: 1.5px 0; }
+.badge { display: inline-block; font-size: 7.6pt; font-weight: 700; padding: 0 5px; border-radius: 8px; color: #fff; vertical-align: 1px; }
+.b { background: var(--built); } .t { background: var(--target); }
+figure { margin: 8px 0 10px; break-inside: avoid; }
+figcaption { font-size: 8.4pt; color: var(--mute); margin-top: 2px; }
+svg { width: 100%; height: auto; display: block; }
+.legend { font-size: 8.6pt; color: var(--mute); margin: 2px 0 8px; }
+.box { border: 1px solid var(--line); background: var(--soft); border-radius: 5px; padding: 6px 9px; margin: 6px 0; }
+.pb { break-before: page; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+</style>
+</head>
+<body>
+
+<h1>Captable Multitenancy: Architecture Blueprint</h1>
+<p class="sub">Target structure of a multi-company cap-table platform on Next.js, tRPC, Prisma and Neon, linked to the TIN Hub for identity. Version 1 · 2026-10-05 · derived from the code (graph of 534 files, 2,196 nodes, 90 communities) and checked against current library documentation.</p>
+<p class="legend"><span class="badge b">BUILT</span> exists in the code today and is covered by tests &nbsp; <span class="badge t">TARGET</span> part of the architecture, not yet implemented. This document describes structure; the work sequence is in the separate plan.</p>
+
+<h2>1. Architecture at a glance</h2>
+<p>One application serves many companies. <strong>A company is the tenant.</strong> A person (<code>User</code>) joins companies through memberships (<code>Member</code>), each with a status and a role. Every request must resolve to exactly one active membership, and every tenant-owned row is reached only through a client scoped to that membership's company. Identity (who the person is) is meant to come from the Hub; authorization inside a company stays in Captable.</p>
+
+<figure>
+<svg viewBox="0 0 760 560" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif" font-size="11">
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#566170"/></marker></defs>
+  <!-- actors -->
+  <text x="10" y="16" font-weight="700" fill="#566170">ACTORS</text>
+  <rect x="10" y="22" width="170" height="40" rx="5" fill="#fff" stroke="#9aa5b1"/><text x="95" y="40" text-anchor="middle" font-weight="600">Company members</text><text x="95" y="54" text-anchor="middle" fill="#566170">browser, NextAuth cookie</text>
+  <rect x="195" y="22" width="170" height="40" rx="5" fill="#fff" stroke="#9aa5b1"/><text x="280" y="40" text-anchor="middle" font-weight="600">API clients</text><text x="280" y="54" text-anchor="middle" fill="#566170">bearer clientId:secret</text>
+  <rect x="380" y="22" width="170" height="40" rx="5" fill="#fff" stroke="#9aa5b1"/><text x="465" y="40" text-anchor="middle" font-weight="600">External recipients</text><text x="465" y="54" text-anchor="middle" fill="#566170">signers, data-room viewers</text>
+  <rect x="565" y="22" width="185" height="40" rx="5" fill="#fff" stroke="#9aa5b1"/><text x="657" y="40" text-anchor="middle" font-weight="600">Background jobs</text><text x="657" y="54" text-anchor="middle" fill="#566170">pg-boss workers</text>
+  <!-- entry -->
+  <text x="10" y="86" font-weight="700" fill="#566170">ENTRY POINTS</text>
+  <rect x="10" y="92" width="130" height="44" rx="5" fill="#e8f1fb" stroke="#1f4e8c"/><text x="75" y="111" text-anchor="middle" font-weight="600">tRPC</text><text x="75" y="125" text-anchor="middle" fill="#566170">/api/trpc</text>
+  <rect x="150" y="92" width="130" height="44" rx="5" fill="#e8f1fb" stroke="#1f4e8c"/><text x="215" y="111" text-anchor="middle" font-weight="600">REST (Hono)</text><text x="215" y="125" text-anchor="middle" fill="#566170">/api/v1/{companyId}</text>
+  <rect x="290" y="92" width="130" height="44" rx="5" fill="#e8f1fb" stroke="#1f4e8c"/><text x="355" y="111" text-anchor="middle" font-weight="600">Server components</text><text x="355" y="125" text-anchor="middle" fill="#a85d00">scoping: target</text>
+  <rect x="430" y="92" width="150" height="44" rx="5" fill="#fff6e5" stroke="#a85d00"/><text x="505" y="111" text-anchor="middle" font-weight="600">Public token pages</text><text x="505" y="125" text-anchor="middle" fill="#566170">signed token binds resource</text>
+  <rect x="590" y="92" width="160" height="44" rx="5" fill="#fff6e5" stroke="#a85d00"/><text x="670" y="111" text-anchor="middle" font-weight="600">Job handlers</text><text x="670" y="125" text-anchor="middle" fill="#566170">trusted queue payloads</text>
+  <!-- identity/tenant context -->
+  <text x="10" y="160" font-weight="700" fill="#566170">TENANT CONTEXT</text>
+  <rect x="10" y="166" width="540" height="58" rx="6" fill="#eaf6ef" stroke="#1f7a4d"/>
+  <text x="22" y="184" font-weight="700" fill="#1f7a4d">Identity + membership resolution (withTenant / bearer + cookie middleware)</text>
+  <text x="22" y="200" fill="#17202a">session or token → ONE ACTIVE, onboarded Member (user, member, company ids all required)</text>
+  <text x="22" y="215" fill="#17202a">→ ctx.tenant { db (scoped), companyId, memberId, role, customRoleId }   ·   empty/partial session = 401</text>
+  <rect x="565" y="166" width="185" height="58" rx="6" fill="#fff6e5" stroke="#a85d00" stroke-dasharray="5 3"/>
+  <text x="657" y="186" text-anchor="middle" font-weight="700" fill="#a85d00">TIN Hub (target)</text><text x="657" y="201" text-anchor="middle" fill="#566170">identity, login, tenant id</text><text x="657" y="215" text-anchor="middle" fill="#566170">sync via signed webhook</text>
+  <!-- authz -->
+  <text x="10" y="248" font-weight="700" fill="#566170">AUTHORIZATION</text>
+  <rect x="10" y="254" width="540" height="46" rx="6" fill="#eaf6ef" stroke="#1f7a4d"/>
+  <text x="22" y="272" font-weight="700" fill="#1f7a4d">RBAC (withAccessControl): role + custom permissions per subject/action</text>
+  <text x="22" y="288" fill="#17202a">every tRPC mutation and REST write; <tspan fill="#a85d00" font-weight="700">open reads remain (follow-up)</tspan></text>
+  <!-- data access -->
+  <text x="10" y="324" font-weight="700" fill="#566170">DATA ACCESS</text>
+  <rect x="10" y="330" width="260" height="70" rx="6" fill="#eaf6ef" stroke="#1f7a4d"/>
+  <text x="22" y="348" font-weight="700" fill="#1f7a4d">tenantDb (scoped Prisma client)</text><text x="22" y="364" fill="#17202a">forces companyId on reads/updates/deletes,</text><text x="22" y="378" fill="#17202a">stamps creates, scopes child models, no raw SQL</text><text x="22" y="392" fill="#566170">18 direct + 6 child models</text>
+  <rect x="285" y="330" width="265" height="70" rx="6" fill="#eaf6ef" stroke="#1f7a4d"/>
+  <text x="297" y="348" font-weight="700" fill="#1f7a4d">Reference guards</text><text x="297" y="364" fill="#17202a">assertTenantOwns: ids supplied as data</text><text x="297" y="378" fill="#17202a">assertBucketUsable: file ownership</text><text x="297" y="392" fill="#566170">no DB foreign keys (relationMode=prisma)</text>
+  <rect x="565" y="254" width="185" height="146" rx="6" fill="#fff" stroke="#9aa5b1" stroke-dasharray="2 3"/>
+  <text x="657" y="274" text-anchor="middle" font-weight="700">Regression guards</text><text x="657" y="292" text-anchor="middle" fill="#566170">isolation matrix (tRPC, REST)</text><text x="657" y="306" text-anchor="middle" fill="#566170">architecture scan of routers</text><text x="657" y="320" text-anchor="middle" fill="#566170">upload ownership tests</text><text x="657" y="342" text-anchor="middle" fill="#a85d00" font-weight="700">target: run in CI</text>
+  <!-- stores -->
+  <text x="10" y="424" font-weight="700" fill="#566170">STORES</text>
+  <rect x="10" y="430" width="230" height="56" rx="6" fill="#fff" stroke="#17202a"/><text x="125" y="452" text-anchor="middle" font-weight="700">PostgreSQL (Neon)</text><text x="125" y="468" text-anchor="middle" fill="#566170">tenant data + auth tables</text><text x="125" y="480" text-anchor="middle" fill="#566170">pooled URL at runtime, direct for migrations</text>
+  <rect x="255" y="430" width="230" height="56" rx="6" fill="#fff" stroke="#17202a"/><text x="370" y="452" text-anchor="middle" font-weight="700">Object storage (S3 / R2)</text><text x="370" y="468" text-anchor="middle" fill="#566170">private bucket: company files</text><text x="370" y="480" text-anchor="middle" fill="#566170">public bucket: logos, avatars</text>
+  <rect x="500" y="430" width="250" height="56" rx="6" fill="#fff" stroke="#17202a"/><text x="625" y="452" text-anchor="middle" font-weight="700">Job queue (pg-boss)</text><text x="625" y="468" text-anchor="middle" fill="#566170">schema captable_queue in Postgres</text><text x="625" y="480" text-anchor="middle" fill="#566170">needs a long-running worker process</text>
+  <!-- arrows -->
+  <g stroke="#566170" stroke-width="1.3" marker-end="url(#a)" fill="none">
+    <line x1="125" y1="62" x2="125" y2="90"/><line x1="215" y1="62" x2="215" y2="90"/><line x1="465" y1="62" x2="505" y2="90" stroke-dasharray="4 3"/><line x1="657" y1="62" x2="670" y2="90" stroke-dasharray="4 3"/>
+    <line x1="125" y1="136" x2="125" y2="164"/><line x1="235" y1="136" x2="235" y2="164"/><line x1="355" y1="136" x2="355" y2="164"/>
+    <line x1="150" y1="224" x2="150" y2="252"/><line x1="150" y1="300" x2="150" y2="328"/><line x1="400" y1="300" x2="400" y2="328"/>
+    <line x1="125" y1="400" x2="125" y2="428"/><line x1="370" y1="400" x2="370" y2="428"/>
+  </g>
+  <!-- bypass lane for by-design exceptions: runs in the gap between the left layers and the right column, straight to the stores -->
+  <g stroke="#a85d00" stroke-width="1.3" fill="none" stroke-dasharray="4 3">
+    <path d="M557,136 L557,420"/><path d="M670,136 L670,150 L557,150"/>
+  </g>
+  <text x="552" y="414" text-anchor="end" fill="#a85d00" font-size="9.5">bypass: global client → stores</text>
+  <line x1="550" y1="195" x2="563" y2="195" stroke="#a85d00" stroke-dasharray="4 3" stroke-width="1.5"/>
+  <text x="380" y="520" text-anchor="middle" fill="#566170">Dashed paths (public token pages, job handlers) skip the membership layer by design: the signed token or the trusted queue payload binds the resource.</text>
+  <text x="380" y="536" text-anchor="middle" fill="#566170">They use the global client and are the only code allowed to.</text>
+</svg>
+<figcaption>Figure 1. Layered architecture. Green = built and tested; orange = target or by-design exception.</figcaption>
+</figure>
+
+<h2>2. Tenancy model</h2>
+<div class="two">
+<div>
+<h3>Entities</h3>
+<table>
+<tr><th>Entity</th><th>Meaning</th></tr>
+<tr><td><code>Company</code></td><td>The tenant. Internal cuid <code>id</code> plus a unique 12-char <code>publicId</code> used in URLs and in storage keys.</td></tr>
+<tr><td><code>User</code></td><td>A person. Global; belongs to no tenant by itself.</td></tr>
+<tr><td><code>Member</code></td><td>User in Company. Unique on (company, user). Status <code>ACTIVE / INACTIVE / PENDING</code>, <code>isOnboarded</code>, role <code>ADMIN</code> or <code>CUSTOM</code> (+ <code>customRoleId</code>).</td></tr>
+<tr><td><code>CustomRole</code></td><td>Per-company list of <code>{subject, actions}</code>. Cannot be shared across companies.</td></tr>
+</table>
+</div>
+<div>
+<h3>Rules</h3>
+<ul>
+<li>A user may belong to many companies; one membership is <em>active</em> per session.</li>
+<li>Only an <strong>ACTIVE, onboarded</strong> member can act. The JWT carries <code>companyId</code>/<code>memberId</code> as hints; they are re-verified against the database on every request.</li>
+<li>The tenant is flat: no agencies, sub-tenants or workspaces. The Hub has that hierarchy; Captable does not need it.</li>
+<li>Any signed-in user can create a company and becomes its first ADMIN.</li>
+</ul>
+</div>
+</div>
+
+<figure>
+<svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif" font-size="10.5">
+  <rect x="10" y="10" width="170" height="64" rx="6" fill="#fff" stroke="#9aa5b1"/><text x="95" y="30" text-anchor="middle" font-weight="700">User (global)</text><text x="95" y="46" text-anchor="middle" fill="#566170">Account, Session, Passkey,</text><text x="95" y="60" text-anchor="middle" fill="#566170">tokens, AccessToken</text>
+  <rect x="215" y="22" width="130" height="40" rx="6" fill="#eaf6ef" stroke="#1f7a4d"/><text x="280" y="40" text-anchor="middle" font-weight="700">Member</text><text x="280" y="54" text-anchor="middle" fill="#566170">status · role · title</text>
+  <rect x="380" y="10" width="150" height="64" rx="6" fill="#fff" stroke="#9aa5b1"/><text x="455" y="30" text-anchor="middle" font-weight="700">Company (the tenant)</text><text x="455" y="46" text-anchor="middle" fill="#566170">id · publicId</text><text x="455" y="60" text-anchor="middle" fill="#a85d00">hubTenantId (target)</text>
+  <rect x="565" y="10" width="185" height="64" rx="6" fill="#fff" stroke="#9aa5b1" stroke-dasharray="3 3"/><text x="657" y="30" text-anchor="middle" font-weight="700">Billing (global)</text><text x="657" y="46" text-anchor="middle" fill="#566170">Product, Price, Subscription,</text><text x="657" y="60" text-anchor="middle" fill="#566170">Customer (nullable companyId)</text>
+  <g stroke="#566170" stroke-width="1.3" fill="none"><line x1="180" y1="42" x2="215" y2="42"/><line x1="345" y1="42" x2="380" y2="42"/><line x1="530" y1="42" x2="565" y2="42" stroke-dasharray="3 3"/></g>
+  <!-- tenant owned groups -->
+  <rect x="10" y="100" width="740" height="222" rx="8" fill="#f6fbf8" stroke="#1f7a4d"/>
+  <text x="22" y="118" font-weight="700" fill="#1f7a4d">Tenant-owned data: every row carries companyId (18 models) or hangs off a parent that does (6 models). Reached only through tenantDb.</text>
+  <rect x="24" y="130" width="228" height="180" rx="6" fill="#fff" stroke="#9aa5b1"/>
+  <text x="138" y="148" text-anchor="middle" font-weight="700">Cap table</text>
+  <text x="36" y="166">Stakeholder</text><text x="36" y="180">ShareClass</text><text x="36" y="194">EquityPlan</text><text x="36" y="208">Share · Option · Safe</text><text x="36" y="222">ConvertibleNote · Investment</text>
+  <text x="36" y="246" fill="#566170">References checked on write:</text><text x="36" y="260" fill="#566170">stakeholder, share class, plan,</text><text x="36" y="274" fill="#566170">member, role, document, bucket</text><text x="36" y="296" fill="#1f7a4d" font-weight="700">assertTenantOwns / assertBucketUsable</text>
+  <rect x="266" y="130" width="250" height="180" rx="6" fill="#fff" stroke="#9aa5b1"/>
+  <text x="391" y="148" text-anchor="middle" font-weight="700">Documents and sharing</text>
+  <text x="278" y="166">Document · Bucket (file, owned)</text><text x="278" y="180">Template → TemplateField, EsignRecipient *</text><text x="278" y="194">DataRoom → DataRoomDocument,</text><text x="278" y="208">   DataRoomRecipient *</text><text x="278" y="222">DocumentShare *  ·  Update → UpdateRecipient *</text>
+  <text x="278" y="246" fill="#566170">* child models: scoped through the parent</text><text x="278" y="260" fill="#566170">relation (their own where gets parent.companyId)</text>
+  <text x="278" y="290" fill="#a85d00">creates on child models: caller checks the parent</text><text x="278" y="304" fill="#566170">(architecture test enforces)</text>
+  <rect x="530" y="130" width="208" height="180" rx="6" fill="#fff" stroke="#9aa5b1"/>
+  <text x="634" y="148" text-anchor="middle" font-weight="700">Governance</text>
+  <text x="542" y="166">Member (itself tenant-owned)</text><text x="542" y="180">CustomRole</text><text x="542" y="194">Audit · EsignAudit</text><text x="542" y="208">BankAccount</text>
+  <text x="542" y="236" fill="#566170">Audit rows are stamped with the</text><text x="542" y="250" fill="#566170">tenant by the scoped client</text>
+</svg>
+<figcaption>Figure 2. Data model by ownership. 37 models: 18 tenant-owned, 6 child, 13 global (including Company, User, authentication and billing).</figcaption>
+</figure>
+
+<h2>3. Request lifecycle and trust boundaries</h2>
+<figure>
+<svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif" font-size="10.5">
+  <defs><marker id="b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#566170"/></marker></defs>
+  <g font-weight="700" text-anchor="middle">
+  <rect x="6" y="20" width="104" height="70" rx="6" fill="#fff" stroke="#9aa5b1"/><text x="58" y="40">1 Client</text><text x="58" y="56" font-weight="400" fill="#566170">cookie JWT or</text><text x="58" y="70" font-weight="400" fill="#566170">bearer token</text>
+  <rect x="124" y="20" width="104" height="70" rx="6" fill="#e8f1fb" stroke="#1f4e8c"/><text x="176" y="40">2 Authenticate</text><text x="176" y="56" font-weight="400" fill="#566170">session present?</text><text x="176" y="70" font-weight="400" fill="#566170">token not expired</text>
+  <rect x="242" y="20" width="118" height="70" rx="6" fill="#eaf6ef" stroke="#1f7a4d"/><text x="301" y="40">3 Resolve member</text><text x="301" y="56" font-weight="400" fill="#566170">ids present, ACTIVE,</text><text x="301" y="70" font-weight="400" fill="#566170">onboarded, user match</text>
+  <rect x="374" y="20" width="104" height="70" rx="6" fill="#eaf6ef" stroke="#1f7a4d"/><text x="426" y="40">4 Authorize</text><text x="426" y="56" font-weight="400" fill="#566170">role / custom role</text><text x="426" y="70" font-weight="400" fill="#566170">vs subject:action</text>
+  <rect x="492" y="20" width="118" height="70" rx="6" fill="#eaf6ef" stroke="#1f7a4d"/><text x="551" y="40">5 Procedure</text><text x="551" y="56" font-weight="400" fill="#566170">uses ctx.tenant.db;</text><text x="551" y="70" font-weight="400" fill="#566170">validates input ids</text>
+  <rect x="624" y="20" width="130" height="70" rx="6" fill="#fff" stroke="#17202a"/><text x="689" y="40">6 Scoped query</text><text x="689" y="56" font-weight="400" fill="#566170">companyId forced,</text><text x="689" y="70" font-weight="400" fill="#566170">then PostgreSQL</text>
+  </g>
+  <g stroke="#566170" stroke-width="1.3" fill="none" marker-end="url(#b)"><line x1="110" y1="55" x2="122" y2="55"/><line x1="228" y1="55" x2="240" y2="55"/><line x1="360" y1="55" x2="372" y2="55"/><line x1="478" y1="55" x2="490" y2="55"/><line x1="610" y1="55" x2="622" y2="55"/></g>
+  <text x="6" y="118" font-weight="700" fill="#b3261e">Fails closed (rejects before any data is read):</text>
+  <g fill="#17202a">
+  <text x="6" y="136">2: no session, or next-auth's empty <tspan font-family="monospace">{}</tspan> for an undecodable cookie → 401. Expired or inactive access token → 401.</text>
+  <text x="6" y="152">3: any of user id / member id / company id missing, member not ACTIVE or not onboarded, or token's company ≠ URL company → 401.</text>
+  <text x="6" y="168">4: no matching permission → UNAUTHORIZED. (every mutation; REST writes return 403.)</text>
+  <text x="6" y="184">5: an id supplied by the client that is not this company's (stakeholder, class, plan, member, role, document, bucket) → rejected.</text>
+  <text x="6" y="200">6: a caller-supplied <tspan font-family="monospace">companyId</tspan> is overwritten with the member's company; raw SQL on the scoped client throws.</text>
+  </g>
+  <text x="6" y="228" font-weight="700" fill="#566170">Trust rule:</text>
+  <text x="76" y="228" fill="#17202a">JWT claims and URL values are hints. Only the database row found in step 3 defines the tenant.</text>
+  <text x="76" y="243" fill="#17202a">Never trust: companyId from the client, path or token alone; ids inside request bodies.</text>
+</svg>
+<figcaption>Figure 3. Request path (tRPC and REST share steps 2 to 6). Steps 3 and 6 are the structural guarantees.</figcaption>
+</figure>
+
+<h2>4. Isolation guarantees</h2>
+<table>
+<tr><th>#</th><th>Invariant</th><th>Mechanism</th><th>Status</th></tr>
+<tr><td>I1</td><td>A request never reads or changes another company's rows</td><td><code>tenantDb</code> forces <code>companyId</code> (equality) on every where-based operation; child models scoped through their parent</td><td><span class="badge b">BUILT</span></td></tr>
+<tr><td>I2</td><td>A client cannot link its data to another company's rows</td><td><code>assertTenantOwns</code> for stakeholder, class, plan, member, role, document; <code>assertBucketUsable</code> for files</td><td><span class="badge b">BUILT</span></td></tr>
+<tr><td>I3</td><td>Files belong to one company</td><td><code>Bucket.companyId</code>; server-issued key <code>${companyPublicId}/…</code>; exact key-shape check on register; owner check on download</td><td><span class="badge b">BUILT</span></td></tr>
+<tr><td>I4</td><td>Every entry point proves identity</td><td>Empty or partial sessions rejected in <code>checkMembership</code> and the cookie middleware; no unauthenticated server actions</td><td><span class="badge b">BUILT</span></td></tr>
+<tr><td>I5</td><td>Public links reach only their own resource</td><td>Signed token binds template, recipient, data room or update; one-time signing state</td><td><span class="badge b">BUILT</span> · expiry <span class="badge t">TARGET</span></td></tr>
+<tr><td>I6</td><td>Inside a company, actions follow the member's role</td><td>RBAC subjects and actions on every mutation (tRPC and REST); role definition and assignment are ADMIN-only; last-ADMIN protection; least-privilege default role</td><td><span class="badge b">BUILT</span> (every tRPC mutation and every REST write; open reads remain, see below)</td></tr>
+<tr><td>I7</td><td>Tenant data is never read by unscoped code outside the by-design exceptions</td><td>Architecture scan of routers and REST routes; dashboard pages through one scoped helper</td><td>routers, REST and pages <span class="badge b">BUILT</span></td></tr>
+<tr><td>I8</td><td>These guarantees cannot silently regress</td><td>Two-tenant isolation matrix (tRPC and REST), upload tests, architecture test; run in CI</td><td>tests <span class="badge b">BUILT</span> · CI <span class="badge t">TARGET</span></td></tr>
+</table>
+<h3>Known limits of the scoped client (design constraints, not defects)</h3>
+<ul>
+<li>It does not cover <strong>nested writes</strong> (relation <code>connect</code> inside <code>data</code>), <strong>relation includes</strong>, <strong>ids supplied as data</strong> (guards cover those), or <strong>creates on child models</strong> (callers must check the parent).</li>
+<li>It rewrites any <code>companyId</code> condition to equality, so code that must read <em>another</em> company (listing the user's companies, switching company, accepting an invite) uses the global client on purpose and is allow-listed in the architecture test.</li>
+<li>Prisma treats an <code>undefined</code> filter value as "do nothing"; that is why identity fields are checked for presence before any lookup.</li>
+</ul>
+
+<h2 class="pb">5. Authentication and session</h2>
+<table>
+<tr><th>Channel</th><th>Credential</th><th>Resolves to</th></tr>
+<tr><td>Web app</td><td>NextAuth 4 JWT cookie (credentials with verified email, passkeys, Google). Secret must be 32+ chars. No automatic account linking by email.</td><td>Session with <code>id, memberId, companyId, companyPublicId</code>; re-verified per request</td></tr>
+<tr><td>REST, cookie</td><td>Same cookie, session fetched from <code>/api/auth/session</code></td><td>Same member check; empty session rejected</td></tr>
+<tr><td>REST, bearer</td><td><code>clientId:secret</code>, secret stored as a hash; active, unexpired token</td><td>The token's user, as ACTIVE member of the company in the URL</td></tr>
+<tr><td>Public links</td><td>Signed HS256 token (e-sign, data room, update)</td><td>One resource; no membership</td></tr>
+<tr><td>Jobs</td><td>pg-boss payload written by the server</td><td>Company id supplied by the enqueuer</td></tr>
+</table>
+<h3>Tenant switching</h3>
+<p>The session points at the member with the most recent <code>lastAccessed</code>. <code>switchCompany</code> accepts only the caller's own ACTIVE, onboarded membership, updates <code>lastAccessed</code> and refreshes the session. It deliberately uses the global client because it reads a membership in a different company.</p>
+
+<h2>6. Authorization architecture <span class="badge b">BUILT</span></h2>
+<div class="two">
+<div>
+<p>A permission is <code>subject:action</code>. <code>ADMIN</code> holds <code>*</code>; <code>CUSTOM</code> holds the list in its <code>CustomRole</code>; a member with no role holds nothing. Enforcement is a tRPC middleware (<code>withAccessControl</code>) driven by <code>.meta({policies})</code>, so a procedure's required permission is visible beside its definition.</p>
+<p>Subjects: billing, members, stakeholder, roles, audits, documents, company, developer, bank-accounts, <code>securities</code>, <code>cap-table-settings</code>, <code>updates</code>, <code>data-rooms</code>, <code>templates</code>. The REST API enforces the same check (fail-closed) on stakeholder and share writes, so an API token carries only its owner's role in the company named in the URL.</p>
+</div>
+<div>
+<table>
+<tr><th>Rule</th><th>Default</th></tr>
+<tr><td>Read cap-table data</td><td>any active member (exceptions: stakeholders, documents, and anything that mints a public link need their read permission)</td></tr>
+<tr><td>Create, edit, delete securities and settings</td><td>ADMIN or granted</td></tr>
+<tr><td>Define or assign roles; invite with a role; act on an ADMIN</td><td><strong>ADMIN only</strong> (an unchanged role resent by the UI is not a change)</td></tr>
+<tr><td>Other member management (titles, non-admin members)</td><td>ADMIN or granted <code>members</code> permission</td></tr>
+<tr><td>Last ADMIN</td><td>cannot be removed, deactivated or demoted</td></tr>
+<tr><td>New member without a role</td><td>no permissions (the schema default is removed)</td></tr>
+</table>
+</div>
+</div>
+
+<h2>7. File storage architecture</h2>
+<figure>
+<svg viewBox="0 0 760 170" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif" font-size="10.5">
+  <defs><marker id="c" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#566170"/></marker></defs>
+  <g font-weight="700" text-anchor="middle">
+  <rect x="6" y="14" width="118" height="64" rx="6" fill="#fff" stroke="#9aa5b1"/><text x="65" y="36">Browser</text><text x="65" y="52" font-weight="400" fill="#566170">asks to upload</text><text x="65" y="66" font-weight="400" fill="#566170">name, type, prefix</text>
+  <rect x="150" y="14" width="150" height="64" rx="6" fill="#eaf6ef" stroke="#1f7a4d"/><text x="225" y="36">presignUpload</text><text x="225" y="52" font-weight="400" fill="#566170">server builds the key</text><text x="225" y="66" font-weight="400" fill="#566170">companyPublicId/prefix-…</text>
+  <rect x="326" y="14" width="110" height="64" rx="6" fill="#fff" stroke="#17202a"/><text x="381" y="36">S3 / R2</text><text x="381" y="52" font-weight="400" fill="#566170">browser PUTs to</text><text x="381" y="66" font-weight="400" fill="#566170">the signed URL</text>
+  <rect x="462" y="14" width="140" height="64" rx="6" fill="#eaf6ef" stroke="#1f7a4d"/><text x="532" y="36">bucket.create</text><text x="532" y="52" font-weight="400" fill="#566170">exact key shape,</text><text x="532" y="66" font-weight="400" fill="#566170">stamps companyId</text>
+  <rect x="628" y="14" width="126" height="64" rx="6" fill="#eaf6ef" stroke="#1f7a4d"/><text x="691" y="36">Attach</text><text x="691" y="52" font-weight="400" fill="#566170">assertBucketUsable</text><text x="691" y="66" font-weight="400" fill="#566170">(owner = caller)</text>
+  </g>
+  <g stroke="#566170" stroke-width="1.3" fill="none" marker-end="url(#c)"><line x1="124" y1="46" x2="148" y2="46"/><line x1="300" y1="46" x2="324" y2="46"/><line x1="436" y1="46" x2="460" y2="46"/><line x1="602" y1="46" x2="626" y2="46"/></g>
+  <text x="6" y="110" font-weight="700">Download:</text><text x="70" y="110">bucket.getUrl → look up the bucket through the scoped client (owner check) → 10-minute signed GET URL. Unowned or foreign bucket: not found.</text>
+  <text x="6" y="128" font-weight="700">Public bucket:</text><text x="90" y="128">logos and avatars only; images only (PNG, JPEG, WebP, GIF); key under the signed-in user's id.</text>
+  <text x="6" y="146" font-weight="700">Never exposed:</text><text x="90" y="146">any callable that signs or deletes by key without a session and an ownership check (the old server-action module is gone).</text>
+</svg>
+<figcaption>Figure 4. Upload and download path. The client never chooses the storage prefix.</figcaption>
+</figure>
+
+<h2 class="pb">8. Hub integration <span class="badge t">TARGET</span></h2>
+<p>Principle: the Hub owns identity, Captable owns authorization inside a company, and tenant logic is never duplicated. Captable keeps its own <code>Company</code>/<code>Member</code> model and <em>links</em> to the Hub; it does not adopt the Hub's packages, because they depend on Supabase's <code>auth.uid()</code> for isolation and give a Prisma app no protection.</p>
+<figure>
+<svg viewBox="0 0 760 270" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif" font-size="10.5">
+  <defs><marker id="d" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#a85d00"/></marker></defs>
+  <rect x="10" y="10" width="330" height="250" rx="8" fill="#f6fbf8" stroke="#1f7a4d"/>
+  <text x="175" y="30" text-anchor="middle" font-weight="700" fill="#1f7a4d">Captable (owns authorization and data)</text>
+  <rect x="26" y="44" width="140" height="44" rx="5" fill="#fff" stroke="#9aa5b1"/><text x="96" y="62" text-anchor="middle" font-weight="700">Company</text><text x="96" y="76" text-anchor="middle" fill="#a85d00">hubTenantId (unique)</text>
+  <rect x="184" y="44" width="140" height="44" rx="5" fill="#fff" stroke="#9aa5b1"/><text x="254" y="62" text-anchor="middle" font-weight="700">NextAuth</text><text x="254" y="76" text-anchor="middle" fill="#566170">+ OIDC / WorkOS provider</text>
+  <rect x="26" y="104" width="140" height="44" rx="5" fill="#fff" stroke="#9aa5b1"/><text x="96" y="122" text-anchor="middle" font-weight="700">Member + roles</text><text x="96" y="136" text-anchor="middle" fill="#566170">status, CustomRole</text>
+  <rect x="184" y="104" width="140" height="44" rx="5" fill="#fff" stroke="#9aa5b1"/><text x="254" y="122" text-anchor="middle" font-weight="700">Membership webhook</text><text x="254" y="136" text-anchor="middle" fill="#566170">signed, idempotent</text>
+  <rect x="26" y="164" width="298" height="84" rx="5" fill="#fff" stroke="#9aa5b1"/><text x="175" y="182" text-anchor="middle" font-weight="700">Unchanged by the link</text>
+  <text x="38" y="200" fill="#17202a">· scoped client, guards, RBAC, request lifecycle (Figure 3)</text><text x="38" y="215" fill="#17202a">· what a member may do inside a company</text><text x="38" y="230" fill="#17202a">· a Hub claim never grants cap-table permissions</text><text x="38" y="243" fill="#17202a">· at most a coarse platform-operator flag</text>
+  <rect x="430" y="10" width="320" height="250" rx="8" fill="#fff6e5" stroke="#a85d00" stroke-dasharray="5 3"/>
+  <text x="590" y="30" text-anchor="middle" font-weight="700" fill="#a85d00">TIN Hub (owns identity and tenant identity)</text>
+  <rect x="446" y="44" width="288" height="44" rx="5" fill="#fff" stroke="#9aa5b1"/><text x="590" y="62" text-anchor="middle" font-weight="700">shared-identity-hub (library, Supabase RLS)</text><text x="590" y="76" text-anchor="middle" fill="#566170">users, tenants, agencies, workspaces, role bindings</text>
+  <rect x="446" y="104" width="288" height="44" rx="5" fill="#fff" stroke="#9aa5b1"/><text x="590" y="122" text-anchor="middle" font-weight="700">tin-boss-api (Fastify service)</text><text x="590" y="136" text-anchor="middle" fill="#566170">session and 5-minute signed claims; tenant surface unbuilt</text>
+  <text x="446" y="172" font-weight="700">Needed from the Hub before linking:</text>
+  <text x="446" y="188" fill="#17202a">· signing-key endpoint (JWKS); claims with tenant id</text><text x="446" y="203" fill="#17202a">· tenant and membership read endpoint or webhook</text><text x="446" y="218" fill="#17202a">· one tenant resolution; close the header bypass</text><text x="446" y="233" fill="#17202a">· a decision on the login provider (Supabase Auth or WorkOS)</text>
+  <g stroke="#a85d00" stroke-width="1.5" stroke-dasharray="4 3" fill="none" marker-end="url(#d)">
+    <line x1="446" y1="66" x2="328" y2="66"/><line x1="446" y1="126" x2="326" y2="126"/>
+  </g>
+  <text x="387" y="58" text-anchor="middle" fill="#a85d00" font-size="9.5">login</text><text x="385" y="118" text-anchor="middle" fill="#a85d00" font-size="9.5">sync</text>
+</svg>
+<figcaption>Figure 5. Target integration. Dashed = not yet buildable; the Hub side does not provide the required endpoints today.</figcaption>
+</figure>
+<table>
+<tr><th>Concern</th><th>Owner</th></tr>
+<tr><td>Who a person is, login, platform operators</td><td>Hub</td></tr>
+<tr><td>Which tenant a customer is (<code>tenant_id</code>)</td><td>Hub; stored on <code>Company.hubTenantId</code></td></tr>
+<tr><td>Membership, status, role inside a company</td><td>Captable (<code>Member</code>); status may be pushed by the Hub</td></tr>
+<tr><td>What a role may do on cap-table data</td><td>Captable (RBAC)</td></tr>
+<tr><td>Tenant-scoped data access</td><td>Captable (scoped client)</td></tr>
+</table>
+
+<h2>9. Deployment topology</h2>
+<table>
+<tr><th>Component</th><th>Choice</th><th>Why</th></tr>
+<tr><td>Application</td><td>Long-running Node server (recommended: Fly.io; Railway equivalent)</td><td>The job queue (<code>pg-boss</code>) needs a process that stays up; serverless hosting would need the jobs moved to an external queue</td></tr>
+<tr><td>Database</td><td>Neon PostgreSQL. Pooled URL for the app at runtime on serverless; direct URL for migrations and <code>pg-boss</code></td><td>Prisma migrations and queue locks do not work through a pooler</td></tr>
+<tr><td>Object storage</td><td>Cloudflare R2 or S3, private and public buckets</td><td>The app already speaks the S3 API</td></tr>
+<tr><td>Email</td><td>SMTP provider (Resend or Postmark)</td><td>Invites, e-sign requests</td></tr>
+<tr><td>Secrets</td><td><code>NEXTAUTH_SECRET</code> (32+ chars; also signs public-link tokens), storage and SMTP credentials</td><td>The app refuses to start with a short secret</td></tr>
+<tr><td>Quality gate</td><td>CI job: Postgres service, migrate, tests, typecheck, lint <span class="badge t">TARGET</span></td><td>No workflow runs tests today</td></tr>
+</table>
+
+<h2>10. Threat model summary</h2>
+<table>
+<tr><th>Threat</th><th>Where it appears</th><th>Control</th><th>Residual</th></tr>
+<tr><td>Spoofing a member</td><td>Cookie and bearer paths</td><td>Per-request member lookup; empty-session rejection; hashed token secret with expiry</td><td>Public links expire after 30 days; links sent before expiry existed keep working until the operator enables the strict switch</td></tr>
+<tr><td>Cross-tenant read or write</td><td>Any query; ids in request bodies</td><td>Scoped client; reference guards; two-tenant matrix</td><td>Nested writes and includes (documented limits); dashboard pages use the scoped helper</td></tr>
+<tr><td>Elevation inside a tenant</td><td>Mutations without role checks; self-granting roles; default admin role</td><td>RBAC on tRPC and REST; ADMIN-only role management; least-privilege default; last-admin rule</td><td>Many reads still open to any active member by design (cap-table lists); the last-admin check runs serializable with one retry</td></tr>
+<tr><td>File access</td><td>Presigned URLs, storage keys</td><td>Server-built keys, owner check, exact key shape, image-only public uploads</td><td>Size is signed (25 MiB private, 5 MiB public images); the content type of a public upload is not signed, so it is not enforced where the file is stored; legacy unowned buckets unusable until assigned</td></tr>
+<tr><td>Information disclosure</td><td>Errors, global unique emails</td><td>Not-found instead of forbidden for foreign ids</td><td>Stakeholder email is unique per company; a duplicate within one company still returns a generic 500 on REST</td></tr>
+<tr><td>Regression</td><td>New procedure bypassing the structure</td><td>Architecture test; coverage guard in the matrix</td><td>Not enforced in CI <span class="badge t">TARGET</span></td></tr>
+</table>
+
+<h2>11. Architecture decisions</h2>
+<table>
+<tr><th>Decision</th><th>Reason</th><th>Revisit when</th></tr>
+<tr><td>Company is the tenant; flat, no hierarchy</td><td>Matches the product; the Hub's agency/workspace tiers add cost with no Captable use</td><td>A customer needs sub-organisations</td></tr>
+<tr><td>Application-level scoping (client extension), not database row-level security</td><td>Works with Prisma and Neon today; small blast radius; testable</td><td>A second isolation bug despite it, or a compliance requirement (then add RLS using per-query <code>set_config</code>, a documented Prisma pattern)</td></tr>
+<tr><td>Keep NextAuth and Prisma; link to the Hub by tenant id</td><td>The Hub's packages require Supabase; adopting them is a rewrite</td><td>The Hub ships a framework-neutral adapter</td></tr>
+<tr><td>Buckets are owned by a company; keys are server-issued</td><td>Object ownership cannot be inferred from a URL; client-chosen keys were the hole</td><td>Per-file sharing across companies is needed</td></tr>
+<tr><td>Public flows use signed tokens, not accounts</td><td>Signers and data-room viewers are not members</td><td>Tokens need revocation (add a token table)</td></tr>
+<tr><td>Authorization stays in Captable</td><td>Roles are about cap-table actions the Hub does not model</td><td>The Hub gains a per-app permission service</td></tr>
+</table>
+
+<p class="legend" style="margin-top:12px">Evidence: code graph of <code>src/</code> (graphify), library behaviour checked with Context7 (Prisma <code>undefined</code> filters, query extensions and per-query <code>set_config</code>; Next.js server actions as public endpoints; NextAuth empty session; tRPC context middleware) and by the automated tests (193 passing, production build green).</p>
+
+</body>
+</html>

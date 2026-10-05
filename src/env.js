@@ -37,7 +37,16 @@ export const env = createEnv({
       .default("0")
       .transform((s) => s !== "false" && s !== "0"),
     NEXTAUTH_URL: z.string(),
-    NEXTAUTH_SECRET: z.string(),
+    NEXTAUTH_SECRET: z
+      .string()
+      .min(
+        32,
+        "NEXTAUTH_SECRET must be at least 32 characters (openssl rand -base64 32)",
+      ),
+    // rotation: public links signed with the old secret keep verifying
+    NEXTAUTH_SECRET_PREVIOUS: z.string().min(32).optional(),
+    // "1" rejects public links without exp (turn on 30 days after deploy)
+    PUBLIC_LINK_REQUIRE_EXPIRY: z.enum(["0", "1"]).optional(),
     EMAIL_SERVER: z.string().optional(),
     EMAIL_FROM: z.string(),
 
@@ -92,6 +101,8 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
+    NEXTAUTH_SECRET_PREVIOUS: process.env.NEXTAUTH_SECRET_PREVIOUS,
+    PUBLIC_LINK_REQUIRE_EXPIRY: process.env.PUBLIC_LINK_REQUIRE_EXPIRY,
     EMAIL_SERVER: process.env.EMAIL_SERVER,
     EMAIL_FROM: process.env.EMAIL_FROM,
 

@@ -14,12 +14,10 @@ import { ZodError } from "zod";
 import { isSentryEnabled } from "@/constants/sentry";
 import { getIp, getUserAgent } from "@/lib/headers";
 import { RBAC, type addPolicyOption } from "@/lib/rbac";
-import {
-  checkAccessControlMembership,
-  getPermissions,
-} from "@/lib/rbac/access-control";
-import { getServerAuthSession } from "@/server/auth";
+import { getPermissionsForRole } from "@/lib/rbac/access-control";
+import { checkMembership, getServerAuthSession } from "@/server/auth";
 import { db } from "@/server/db";
+import { tenantDb } from "@/server/tenant-db";
 import * as Sentry from "@sentry/nextjs";
 
 interface Meta {
@@ -68,20 +66,51 @@ const withAuthTrpcContext = ({ session, ...rest }: CreateTRPCContextType) => {
 
 export type withAuthTrpcContextType = ReturnType<typeof withAuthTrpcContext>;
 
+// One membership lookup per request; withAccessControl builds on this.
+const withTenantTrpcContext = async (ctx: withAuthTrpcContextType) => {
+  const membership = await checkMembership({
+    session: ctx.session,
+    tx: ctx.db,
+  }).catch((err: Error) => {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: err.message });
+  });
+  const { companyId, memberId, role, customRoleId } = membership;
+
+  return {
+    ...ctx,
+    membership,
+    tenant: {
+      db: tenantDb(ctx.db, companyId),
+      companyId,
+      memberId,
+      role,
+      customRoleId,
+    },
+  };
+};
+
+export type withTenantTrpcContextType = Awaited<
+  ReturnType<typeof withTenantTrpcContext>
+>;
+
 const withAccessControlTrpcContext = async ({
   meta,
   ...ctx
-}: withAuthTrpcContextType & { meta: Meta | undefined }) => {
+}: withTenantTrpcContextType & { meta: Meta | undefined }) => {
   const rbac = new RBAC();
 
   if (meta?.policies) {
     rbac.addPolicies(meta.policies);
   }
 
-  const { err: permissionError, val: permission } = await getPermissions({
-    db: ctx.db,
-    session: ctx.session,
-  });
+  const { membership } = ctx;
+  const { err: permissionError, val: permissions } =
+    await getPermissionsForRole({
+      role: membership.role,
+      tx: ctx.db,
+      companyId: membership.companyId,
+      customRoleId: membership.customRoleId,
+    });
 
   if (permissionError) {
     throw new TRPCError({
@@ -89,8 +118,6 @@ const withAccessControlTrpcContext = async ({
       message: permissionError.message,
     });
   }
-
-  const { permissions, membership } = permission;
 
   const { err, val } = rbac.enforce(permissions);
 
@@ -110,7 +137,6 @@ const withAccessControlTrpcContext = async ({
 
   return {
     ...ctx,
-    membership,
     permissions,
   };
 };
@@ -204,8 +230,19 @@ export const withoutAuth = t.procedure;
  */
 export const withAuth = t.procedure.use(authMiddleware);
 
+const tenantMiddleware = authMiddleware.unstable_pipe(async ({ ctx, next }) =>
+  next({ ctx: await withTenantTrpcContext(ctx) }),
+);
+
+/**
+ * Tenant procedure: withAuth + an ACTIVE, onboarded membership matching the
+ * session. `ctx.tenant.db` is scoped to the member's company (see tenant-db.ts
+ * for what it does not cover).
+ */
+export const withTenant = t.procedure.use(tenantMiddleware);
+
 export const withAccessControl = t.procedure.use(
-  authMiddleware.unstable_pipe(async ({ ctx: ctx_, next, meta }) => {
+  tenantMiddleware.unstable_pipe(async ({ ctx: ctx_, next, meta }) => {
     const ctx = await withAccessControlTrpcContext({ ...ctx_, meta });
 
     return next({

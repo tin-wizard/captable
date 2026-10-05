@@ -1,18 +1,19 @@
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
-import { createTRPCRouter, withAccessControl, withAuth } from "@/trpc/api/trpc";
+import {
+  createTRPCRouter,
+  withAccessControl,
+  withTenant,
+} from "@/trpc/api/trpc";
 import { ZodOnboardingMutationSchema } from "../onboarding-router/schema";
-import { ZodSwitchCompanyMutationSchema } from "./schema";
+import { switchCompanyProcedure } from "./procedures/switch-company";
 
 export const companyRouter = createTRPCRouter({
-  getCompany: withAuth.query(async ({ ctx }) => {
-    const user = ctx.session.user;
-    const companyId = user.companyId;
+  getCompany: withTenant.query(async ({ ctx }) => {
+    const { memberId } = ctx.tenant;
 
-    const company = await ctx.db.member.findFirstOrThrow({
+    const company = await ctx.tenant.db.member.findFirstOrThrow({
       where: {
-        id: user.memberId,
-        companyId,
+        id: memberId,
       },
       select: {
         id: true,
@@ -39,35 +40,7 @@ export const companyRouter = createTRPCRouter({
     });
     return company;
   }),
-  switchCompany: withAuth
-    .input(ZodSwitchCompanyMutationSchema)
-    .mutation(async ({ ctx, input }) => {
-      const { db } = ctx;
-
-      await db.$transaction(async (tx) => {
-        const member = await tx.member.findFirst({
-          where: {
-            id: input.id,
-            isOnboarded: true,
-          },
-        });
-
-        if (!member) {
-          return { success: true };
-        }
-
-        await tx.member.update({
-          where: {
-            id: member.id,
-          },
-          data: {
-            lastAccessed: new Date(),
-          },
-        });
-      });
-
-      return { success: true };
-    }),
+  switchCompany: switchCompanyProcedure,
   updateCompany: withAccessControl
     .meta({ policies: { company: { allow: ["update"] } } })
     .input(ZodOnboardingMutationSchema)
@@ -75,9 +48,10 @@ export const companyRouter = createTRPCRouter({
       try {
         const { company } = input;
         const { incorporationDate, ...rest } = company;
-        const { requestIp, userAgent, session, db } = ctx;
+        const { requestIp, userAgent, session } = ctx;
+        const db = ctx.tenant.db;
         const { user } = session;
-        const { companyId } = ctx.membership;
+        const { companyId } = ctx.tenant;
 
         await db.company.update({
           where: {
@@ -92,13 +66,13 @@ export const companyRouter = createTRPCRouter({
         await Audit.create(
           {
             action: "company.updated",
-            companyId: user.companyId,
+            companyId,
             actor: { type: "user", id: user.id },
             context: {
               userAgent,
               requestIp,
             },
-            target: [{ type: "company", id: user.companyId }],
+            target: [{ type: "company", id: companyId }],
             summary: `${user.name} updated the company ${company.name}`,
           },
           db,

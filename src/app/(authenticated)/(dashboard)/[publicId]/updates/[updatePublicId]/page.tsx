@@ -1,5 +1,4 @@
-"use server";
-import { db } from "@/server/db";
+import { getServerTenant } from "@/server/tenant";
 import dynamic from "next/dynamic";
 
 const Editor = dynamic(
@@ -8,9 +7,8 @@ const Editor = dynamic(
 );
 
 const getUpdate = async (publicId: string) => {
-  return await db.update.findFirstOrThrow({
-    where: { publicId },
-  });
+  const { db } = await getServerTenant();
+  return await db.update.findFirstOrThrow({ where: { publicId } });
 };
 
 const UpdatePage = async ({

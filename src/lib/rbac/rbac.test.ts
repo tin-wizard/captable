@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { RBAC, type addPolicyOption } from ".";
+import { RBAC, type addPolicyOption, hasPermission } from ".";
+import { ADMIN_PERMISSION, DEFAULT_PERMISSION } from "./constants";
 import type { TPermission } from "./schema";
 
 describe("evaluating a query", () => {
@@ -72,4 +73,23 @@ describe("evaluating a query", () => {
       expect(res.val?.valid).toBe(tc.valid);
     });
   }
+});
+
+// used by the document preview page and common.getContacts
+describe("hasPermission", () => {
+  test("ADMIN holds everything, no role holds nothing", () => {
+    expect(hasPermission(ADMIN_PERMISSION, "documents", "read")).toBe(true);
+    expect(hasPermission(DEFAULT_PERMISSION, "documents", "read")).toBe(false);
+    expect(hasPermission([], "documents", "read")).toBe(false);
+  });
+
+  test("a custom role holds exactly its grants", () => {
+    const perms: TPermission[] = [
+      { subject: "documents", actions: ["read"] },
+      { subject: "members", actions: ["update"] },
+    ];
+    expect(hasPermission(perms, "documents", "read")).toBe(true);
+    expect(hasPermission(perms, "members", "read")).toBe(false);
+    expect(hasPermission(perms, "stakeholder", "read")).toBe(false);
+  });
 });

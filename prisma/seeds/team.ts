@@ -5,15 +5,6 @@ import bcrypt from "bcryptjs";
 import colors from "colors";
 colors.enable();
 
-type UserType = {
-  name: string;
-  email: string;
-  title?: string;
-  image?: string;
-  isOnboarded?: boolean;
-  status?: MemberStatusEnum;
-};
-
 const seedTeam = async () => {
   const team = [
     {
@@ -62,8 +53,8 @@ const seedTeam = async () => {
   console.log(`Seeding ${team.length} team members`.blue);
   const companies = await db.company.findMany();
 
-  team.forEach(async (t) => {
-    // const { name, email, image, title, status, isOnboarded } = t
+  // for...of so every write finishes before the seed reports success
+  for (const t of team) {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash("P@ssw0rd!", salt);
     const { name, email, title, status, isOnboarded } = t;
@@ -77,9 +68,10 @@ const seedTeam = async () => {
       },
     });
 
-    companies.forEach(async (company) => {
+    for (const company of companies) {
       await db.member.create({
         data: {
+          role: "ADMIN",
           title,
           isOnboarded,
           status: status as MemberStatusEnum,
@@ -87,8 +79,8 @@ const seedTeam = async () => {
           companyId: company.id,
         },
       });
-    });
-  });
+    }
+  }
 
   console.log(`🎉 Seeded ${team.length} team members`.green);
   return team;

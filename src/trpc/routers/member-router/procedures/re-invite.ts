@@ -1,108 +1,117 @@
 import { sendMemberInviteEmailJob } from "@/jobs/member-inivite-email";
 import { generatePasswordResetToken } from "@/lib/token";
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
 import {
   generateInviteToken,
   generateMemberIdentifier,
   revokeExistingInviteTokens,
 } from "@/server/member";
-import { withAuth } from "@/trpc/api/trpc";
+import { assertMayManageMember } from "@/server/tenant-guard";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { ZodReInviteMutationSchema } from "../schema";
 
-export const reInviteProcedure = withAuth
+export const reInviteProcedure = withAccessControl
   .input(ZodReInviteMutationSchema)
-  .mutation(async ({ ctx: { session, db, requestIp, userAgent }, input }) => {
-    const user = session.user;
+  .meta({ policies: { members: { allow: ["update"] } } })
+  .mutation(
+    async ({ ctx: { session, tenant, requestIp, userAgent }, input }) => {
+      const { companyId } = tenant;
+      const user = session.user;
 
-    const { expires, memberInviteTokenHash } = await generateInviteToken();
+      const { expires, memberInviteTokenHash } = await generateInviteToken();
 
-    const { company, verificationToken, email, passwordResetToken } =
-      await db.$transaction(async (tx) => {
-        const { companyId } = await checkMembership({ session, tx });
-
-        const company = await tx.company.findFirstOrThrow({
-          where: {
-            id: companyId,
-          },
-          select: {
-            name: true,
-            id: true,
-          },
-        });
-
-        const member = await tx.member.findFirstOrThrow({
-          where: {
-            id: input.memberId,
-            status: "PENDING",
+      const { company, verificationToken, email, passwordResetToken } =
+        await tenant.db.$transaction(async (tx) => {
+          await assertMayManageMember(
+            tx,
             companyId,
-          },
+            tenant.role,
+            input.memberId,
+          );
+          const company = await tx.company.findFirstOrThrow({
+            where: {
+              id: companyId,
+            },
+            select: {
+              name: true,
+              id: true,
+            },
+          });
 
-          include: {
-            user: {
-              select: {
-                name: true,
-                email: true,
+          const member = await tx.member.findFirstOrThrow({
+            where: {
+              id: input.memberId,
+              status: "PENDING",
+              companyId,
+            },
+
+            include: {
+              user: {
+                select: {
+                  name: true,
+                  email: true,
+                },
               },
             },
-          },
-        });
+          });
 
-        const email = member.user.email;
+          const email = member.user.email;
 
-        if (!email) {
-          throw new Error("invited email not found");
-        }
+          if (!email) {
+            throw new Error("invited email not found");
+          }
 
-        await revokeExistingInviteTokens({
-          memberId: member.id,
-          email,
-          tx,
-        });
+          await revokeExistingInviteTokens({
+            memberId: member.id,
+            email,
+            tx,
+          });
 
-        // custom verification token for member invitation
-        const { token: verificationToken } = await tx.verificationToken.create({
-          data: {
-            identifier: generateMemberIdentifier({
-              email,
-              memberId: member.id,
-            }),
-            token: memberInviteTokenHash,
-            expires,
-          },
-        });
+          // custom verification token for member invitation
+          const { token: verificationToken } =
+            await tx.verificationToken.create({
+              data: {
+                identifier: generateMemberIdentifier({
+                  email,
+                  memberId: member.id,
+                }),
+                token: memberInviteTokenHash,
+                expires,
+              },
+            });
 
-        await Audit.create(
-          {
-            action: "member.re-invited",
-            companyId: company.id,
-            actor: { type: "user", id: user.id },
-            context: {
-              requestIp,
-              userAgent,
+          await Audit.create(
+            {
+              action: "member.re-invited",
+              companyId: company.id,
+              actor: { type: "user", id: user.id },
+              context: {
+                requestIp,
+                userAgent,
+              },
+              target: [{ type: "user", id: member.userId }],
+              summary: `${user.name} reinvited ${member.user?.name} to join ${company.name}`,
             },
-            target: [{ type: "user", id: member.userId }],
-            summary: `${user.name} reinvited ${member.user?.name} to join ${company.name}`,
-          },
-          tx,
-        );
+            tx,
+          );
 
-        const { token: passwordResetToken } =
-          await generatePasswordResetToken(email);
+          const { token: passwordResetToken } =
+            await generatePasswordResetToken(email);
 
-        return { verificationToken, company, email, passwordResetToken };
+          return { verificationToken, company, email, passwordResetToken };
+        });
+
+      await sendMemberInviteEmailJob.emit({
+        verificationToken,
+        passwordResetToken,
+        email,
+        company,
+        user: {
+          email: user.email,
+          name: user.name,
+        },
       });
 
-    await sendMemberInviteEmailJob.emit({
-      verificationToken,
-      passwordResetToken,
-      email,
-      company,
-      user: {
-        email: user.email,
-        name: user.name,
-      },
-    });
-
-    return { success: true };
-  });
+      return { success: true };
+    },
+  );

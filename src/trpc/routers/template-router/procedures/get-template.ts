@@ -1,18 +1,18 @@
-import { checkMembership } from "@/server/auth";
 import { getPresignedGetUrl } from "@/server/file-uploads";
-import { withAuth } from "@/trpc/api/trpc";
+import { withTenant } from "@/trpc/api/trpc";
 import { ZodGetTemplateQuerySchema } from "../schema";
 
-export const getTemplateProcedure = withAuth
+export const getTemplateProcedure = withTenant
   .input(ZodGetTemplateQuerySchema)
   .query(async ({ ctx, input }) => {
-    const { template } = await ctx.db.$transaction(async (tx) => {
-      const { companyId } = await checkMembership({ tx, session: ctx.session });
-
+    const { companyId } = ctx.tenant;
+    const { template } = await ctx.tenant.db.$transaction(async (tx) => {
       const template = await tx.template.findFirstOrThrow({
         where: {
           publicId: input.publicId,
           companyId: companyId,
+          // the relation is not tenant-scoped: never sign a bucket the company doesn't own
+          bucket: { companyId },
           ...(input.isDraftOnly && { status: "DRAFT" }),
         },
         select: {

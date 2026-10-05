@@ -112,15 +112,9 @@ export const CompanyForm = ({ type, data }: CompanyFormProps) => {
 
   async function handleLogoUpload(file: File): Promise<{ imageUrl: string }> {
     if (user?.user.id) {
-      const { fileUrl } = await uploadFile(
-        file,
-        {
-          expiresIn: 3600,
-          keyPrefix: "company-logos",
-          identifier: user.user.id,
-        },
-        "publicBucket",
-      );
+      const { fileUrl } = await uploadFile(file, {
+        keyPrefix: "company-logos",
+      });
       setImageUrl(fileUrl);
 
       return { imageUrl: fileUrl };

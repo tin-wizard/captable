@@ -1,4 +1,5 @@
 import { verifySecureHash } from "@/lib/crypto";
+import { tenantDb } from "@/server/tenant-db";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import { ApiError } from "../error";
@@ -84,6 +85,8 @@ async function authenticateWithAccessToken(
     c.set("session", {
       membership: { memberId, ...rest },
     });
+    // rest.companyId is the member row's, which checkMembership matched to the path
+    c.set("tenantDb", tenantDb(c.get("services").db, rest.companyId));
   }
 }
 

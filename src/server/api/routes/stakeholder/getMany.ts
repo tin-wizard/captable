@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi";
+import { requirePermission } from "../../middlewares/permission";
 import {
   PaginationQuerySchema,
   PaginationResponseSchema,
@@ -31,7 +32,7 @@ export const getMany = withAuthApiV1
     tags: ["Stakeholder"],
     method: "get",
     path: "/v1/{companyId}/stakeholders",
-    middleware: [authMiddleware()],
+    middleware: [authMiddleware(), requirePermission("stakeholder", "read")],
     request: {
       query: PaginationQuerySchema,
       params: ParamsSchema,
@@ -49,7 +50,7 @@ export const getMany = withAuthApiV1
   })
   .handler(async (c) => {
     const { membership } = c.get("session");
-    const { db } = c.get("services");
+    const db = c.get("tenantDb");
     const query = c.req.valid("query");
 
     const [data, meta] = await db.stakeholder
@@ -57,6 +58,9 @@ export const getMany = withAuthApiV1
       .withCursor({
         limit: query.limit,
         after: query.cursor,
+        // ids are cuids; the extension's default cursor expects numbers
+        getCursor: ({ id }) => id,
+        parseCursor: (id) => ({ id }),
       });
 
     const response: z.infer<typeof ResponseSchema> = {

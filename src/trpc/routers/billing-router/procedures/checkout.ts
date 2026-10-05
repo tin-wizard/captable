@@ -1,19 +1,19 @@
 import { env } from "@/env";
 import { invariant } from "@/lib/error";
-import { checkMembership } from "@/server/auth";
 import { createOrRetrieveCustomer, stripe } from "@/server/stripe";
-import { withAuth } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import type Stripe from "stripe";
 import { ZodCheckoutMutationSchema } from "../schema";
 
-export const checkoutProcedure = withAuth
+export const checkoutProcedure = withAccessControl
   .input(ZodCheckoutMutationSchema)
+  .meta({ policies: { billing: { allow: ["create"] } } })
   .mutation(async ({ ctx, input }) => {
     const { priceId, priceType } = input;
-    const { db, session } = ctx;
+    const { tenant, session } = ctx;
 
-    const { stripeSessionId } = await db.$transaction(async (tx) => {
-      const { companyId } = await checkMembership({ session, tx });
+    const { stripeSessionId } = await tenant.db.$transaction(async (tx) => {
+      const { companyId } = tenant;
 
       let customer: string;
       try {

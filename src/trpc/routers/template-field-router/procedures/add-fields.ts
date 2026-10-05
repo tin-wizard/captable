@@ -4,8 +4,7 @@ import {
 } from "@/jobs/esign-email";
 import { decode, encode } from "@/lib/jwt";
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
-import { withAuth } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { ZodAddFieldMutationSchema } from "../schema";
@@ -35,16 +34,23 @@ export function EncodeEmailToken({
 }
 
 export async function DecodeEmailToken(jwt: string) {
-  const { payload } = await decode(jwt);
+  const { payload } = await decode(jwt).catch(() => {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "This signing link is invalid or has expired.",
+    });
+  });
   return emailTokenPayloadSchema.parse(payload);
 }
 
-export const addFieldProcedure = withAuth
+export const addFieldProcedure = withAccessControl
   .input(ZodAddFieldMutationSchema)
+  .meta({ policies: { templates: { allow: ["update"] } } })
   .mutation(async ({ ctx, input }) => {
     try {
       const user = ctx.session.user;
       const { userAgent, requestIp } = ctx;
+      const { companyId } = ctx.tenant;
       const mails: TESignNotificationEmailJobInput[] = [];
 
       if (input.status === "PENDING" && (!user.email || !user.name)) {
@@ -55,12 +61,7 @@ export const addFieldProcedure = withAuth
         };
       }
 
-      const template = await ctx.db.$transaction(async (tx) => {
-        const { companyId } = await checkMembership({
-          tx,
-          session: ctx.session,
-        });
-
+      const template = await ctx.tenant.db.$transaction(async (tx) => {
         const template = await tx.template.findFirstOrThrow({
           where: {
             publicId: input.templatePublicId,
@@ -108,6 +109,14 @@ export const addFieldProcedure = withAuth
             email: true,
           },
         });
+
+        // every field's recipient must belong to this (company-scoped) template
+        if (recipientList.length !== new Set(recipientIdList).size) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Invalid recipient",
+          });
+        }
 
         const fieldsList = [];
 

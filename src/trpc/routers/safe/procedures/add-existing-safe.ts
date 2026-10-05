@@ -1,20 +1,20 @@
 import { generatePublicId } from "@/common/id";
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
-import { assertTenantOwns } from "@/server/tenant-guard";
-import { withAuth } from "@/trpc/api/trpc";
+import { assertBucketUsable, assertTenantOwns } from "@/server/tenant-guard";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { ZodAddExistingSafeMutationSchema } from "../schema";
 
-export const addExistingSafeProcedure = withAuth
+export const addExistingSafeProcedure = withAccessControl
   .input(ZodAddExistingSafeMutationSchema)
+  .meta({ policies: { securities: { allow: ["create"] } } })
   .mutation(async ({ ctx, input }) => {
-    const { userAgent, requestIp, session } = ctx;
+    const { userAgent, requestIp } = ctx;
     const user = ctx.session.user;
     const { documents, ...rest } = input;
 
     try {
-      await ctx.db.$transaction(async (tx) => {
-        const { companyId, memberId } = await checkMembership({ session, tx });
+      await ctx.tenant.db.$transaction(async (tx) => {
+        const { companyId, memberId } = ctx.tenant;
 
         await assertTenantOwns(tx, companyId, input);
 
@@ -27,6 +27,10 @@ export const addExistingSafeProcedure = withAuth
             boardApprovalDate: new Date(input.boardApprovalDate),
           },
         });
+
+        for (const doc of documents) {
+          await assertBucketUsable(tx, companyId, doc.bucketId);
+        }
 
         const bulkDocuments = documents.map((doc) => ({
           companyId,

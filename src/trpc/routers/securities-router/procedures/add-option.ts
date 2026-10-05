@@ -1,23 +1,20 @@
 import { generatePublicId } from "@/common/id";
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
-import { assertTenantOwns } from "@/server/tenant-guard";
-import { withAuth } from "@/trpc/api/trpc";
+import { assertBucketUsable, assertTenantOwns } from "@/server/tenant-guard";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { ZodAddOptionMutationSchema } from "../schema";
 
-export const addOptionProcedure = withAuth
+export const addOptionProcedure = withAccessControl
   .input(ZodAddOptionMutationSchema)
+  .meta({ policies: { securities: { allow: ["create"] } } })
   .mutation(async ({ ctx, input }) => {
     const { userAgent, requestIp } = ctx;
     try {
       const user = ctx.session.user;
       const documents = input.documents;
 
-      await ctx.db.$transaction(async (tx) => {
-        const { companyId } = await checkMembership({
-          tx,
-          session: ctx.session,
-        });
+      await ctx.tenant.db.$transaction(async (tx) => {
+        const { companyId } = ctx.tenant;
 
         await assertTenantOwns(tx, companyId, input);
 
@@ -41,6 +38,10 @@ export const addOptionProcedure = withAuth
         };
 
         const option = await tx.option.create({ data });
+
+        for (const doc of documents) {
+          await assertBucketUsable(tx, companyId, doc.bucketId);
+        }
 
         const bulkDocuments = documents.map((doc) => ({
           companyId,

@@ -1,9 +1,9 @@
 import { z } from "@hono/zod-openapi";
 import { ApiError } from "../../error";
+import { requirePermission } from "../../middlewares/permission";
 import {
   StakeholderSchema,
   type TStakeholderSchema,
-  type TUpdateStakeholderSchema,
   UpdateStakeholderSchema,
 } from "../../schema/stakeholder";
 import { authMiddleware, withAuthApiV1 } from "../../utils/endpoint-creator";
@@ -41,7 +41,7 @@ export const update = withAuthApiV1
     tags: ["Stakeholder"],
     method: "patch",
     path: "/v1/{companyId}/stakeholders/{id}",
-    middleware: [authMiddleware()],
+    middleware: [authMiddleware(), requirePermission("stakeholder", "update")],
     request: {
       params: ParamsSchema,
       body: {
@@ -65,14 +65,15 @@ export const update = withAuthApiV1
   })
   .handler(async (c) => {
     const { id } = c.req.valid("param");
-    const { db, audit, client } = c.get("services");
+    const { audit, client } = c.get("services");
+    const db = c.get("tenantDb");
     const { membership } = c.get("session");
     const { requestIp, userAgent } = client as {
       requestIp: string;
       userAgent: string;
     };
 
-    const body = await c.req.json<TUpdateStakeholderSchema>();
+    const body = c.req.valid("json");
 
     const updatedStakeHolder = await db.$transaction(async (tx) => {
       const stakeholder = await tx.stakeholder.findUnique({

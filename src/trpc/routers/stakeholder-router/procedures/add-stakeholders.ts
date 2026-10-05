@@ -7,7 +7,12 @@ export const addStakeholdersProcedure = withAccessControl
   .meta({ policies: { stakeholder: { allow: ["create"] } } })
   .mutation(
     async ({
-      ctx: { db, membership, userAgent, requestIp, session },
+      ctx: {
+        tenant: { db, companyId },
+        userAgent,
+        requestIp,
+        session,
+      },
       input,
     }) => {
       try {
@@ -16,7 +21,7 @@ export const addStakeholdersProcedure = withAccessControl
           // insert companyId in every input
           const inputDataWithCompanyId = input.map((stakeholder) => ({
             ...stakeholder,
-            companyId: membership.companyId,
+            companyId,
           }));
 
           await tx.stakeholder.createMany({

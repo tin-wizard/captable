@@ -1,5 +1,6 @@
 import { invariant } from "@/lib/error";
 import { getPermissions } from "@/lib/rbac/access-control";
+import { tenantDb } from "@/server/tenant-db";
 import type { Context } from "hono";
 import { getCookie } from "hono/cookie";
 import { createMiddleware } from "hono/factory";
@@ -41,6 +42,10 @@ function determineCookieName(authUrl: string): string {
 
 async function validateSessionCookie(authUrl: string, c: Context) {
   const session = await fetchSessionFromAuthUrl(authUrl, c);
+  // next-auth answers 200 with {} for a missing or undecodable cookie
+  if (!session?.user?.id || !session.user.memberId) {
+    throw new Error("Not authenticated");
+  }
   const companyIdParam = c.req.param("companyId");
   const { db } = c.get("services");
 
@@ -60,21 +65,21 @@ async function validateSessionCookie(authUrl: string, c: Context) {
   }
 
   c.set("session", { membership: val.membership });
+  // the verified member row's company (equal to the path companyId when present)
+  c.set("tenantDb", tenantDb(db, val.membership.companyId));
 }
 
 async function fetchSessionFromAuthUrl(
   authUrl: string,
   c: Context,
 ): Promise<Session> {
-  const rawRequest = c.req.raw;
-  const clonedRequest = rawRequest.clone();
   const newUrl = new URL("/api/auth/session", authUrl).toString();
 
   const response = await fetch(
     new Request(newUrl, {
       method: "GET",
-      headers: clonedRequest.headers,
-      body: clonedRequest.body,
+      // only the cookie: the original body and its content headers must not reach a GET
+      headers: { cookie: c.req.header("cookie") ?? "" },
     }),
   );
 

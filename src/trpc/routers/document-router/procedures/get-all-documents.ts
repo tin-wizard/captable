@@ -5,8 +5,7 @@ export const getAllDocumentsProcedure = withAccessControl
   .query(
     async ({
       ctx: {
-        db,
-        membership: { companyId },
+        tenant: { db, companyId },
       },
     }) => {
       const data = await db.document.findMany({
