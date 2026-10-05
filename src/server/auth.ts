@@ -146,7 +146,7 @@ export const authOptions: NextAuthOptions = {
   },
   // @ts-expect-error
   adapter: PrismaAdapter(db),
-  secret: env.NEXTAUTH_SECRET ?? "secret",
+  secret: env.NEXTAUTH_SECRET,
   session: {
     strategy: "jwt",
   },
@@ -279,7 +279,6 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: GOOGLE_CLIENT_ID as string,
       clientSecret: GOOGLE_CLIENT_SECRET as string,
-      allowDangerousEmailAccountLinking: true,
     }),
   ],
 

@@ -27,8 +27,9 @@ export const onboardingRouter = createTRPCRouter({
               id: ctx.session.user.id,
             },
             data: {
+              // email is never changed here: it is verified at sign-in, and an
+              // unverified overwrite lets a user claim someone else's address
               name: `${input.user.name}`,
-              email: `${input.user.email}`,
             },
             select: {
               id: true,

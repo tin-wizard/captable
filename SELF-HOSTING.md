@@ -55,7 +55,7 @@ NEXT_PUBLIC_UPLOAD_DOMAIN="https://custom.your-domain.com"
 docker run -d \
   -e NODE_ENV="replace" \
   -e DATABASE_URL="replace" \
-  -e NEXTAUTH_SECRET="replace" \
+  -e NEXTAUTH_SECRET="$(openssl rand -base64 32)" \
   -e NEXTAUTH_URL="replace" \
   -e NEXT_PUBLIC_BASE_URL="replace" \
   -e EMAIL_FROM="replace" \
