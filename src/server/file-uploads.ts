@@ -76,22 +76,34 @@ export const getPresignedPutUrl = async ({
     12,
   )}${ext}`;
 
+  // no declared type means octet-stream; this exact value is signed and must be
+  // the Content-Type of the PUT (callers read it from the return value)
+  const type = contentType || "application/octet-stream";
+
   const putObjectCommand = new PutObjectCommand({
     Bucket: bucketMode === "privateBucket" ? PrivateBucket : PublicBucket,
     Key,
-    ContentType: contentType,
+    ContentType: type,
     ContentLength: size,
     ACL: bucketMode === "privateBucket" ? "private" : "public-read",
   });
 
+  // the presigner hoists nothing for content-type by default: sign it, or the
+  // uploader could store any type (e.g. text/html under a public-read key)
   const url: string = await getSignedUrl(S3, putObjectCommand, {
     expiresIn: expiresIn ?? TEN_MINUTES_IN_SECONDS,
+    signableHeaders: new Set(["content-type"]),
   });
 
   const bucketUrl = new URL(url);
   bucketUrl.search = "";
 
-  return { url, key: Key, bucketUrl: bucketUrl.toString() };
+  return {
+    url,
+    key: Key,
+    bucketUrl: bucketUrl.toString(),
+    contentType: type,
+  };
 };
 
 export const getPresignedGetUrl = async (key: string) => {
@@ -122,7 +134,7 @@ export const uploadFile = async (
   // callers pass File-shaped objects whose .size is not the real length
   // (esign sets 0), so sign the length of the bytes actually sent
   const body = await file.arrayBuffer();
-  const { url, key, bucketUrl } = await getPresignedPutUrl({
+  const { url, key, bucketUrl, contentType } = await getPresignedPutUrl({
     contentType: file.type,
     fileName: file.name,
     size: body.byteLength,
@@ -131,7 +143,7 @@ export const uploadFile = async (
   });
   const res = await fetch(url, {
     method: "PUT",
-    headers: { "Content-Type": "application/octet-stream" },
+    headers: { "Content-Type": contentType },
     body,
   });
   if (!res.ok) {

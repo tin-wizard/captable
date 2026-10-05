@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { generatePublicId } from "@/common/id";
 import { db } from "@/server/db";
-import { getPresignedPutUrl } from "@/server/file-uploads";
+import { getPresignedPutUrl, uploadFile } from "@/server/file-uploads";
 import { tenantDb } from "@/server/tenant-db";
 import { assertBucketUsable } from "@/server/tenant-guard";
 import {
@@ -578,5 +578,78 @@ describe("Bucket.companyId backfill", () => {
         Object.entries(seed).map(([name, [, , owner]]) => [name, owner]),
       ),
     );
+  });
+});
+
+// The type a client declares must be the type S3 stores: without `content-type`
+// in the signed headers a caller could PUT any type (text/html to a public key)
+// whatever the presign said.
+describe("upload content type is signed", () => {
+  const signed = (url: string) =>
+    new URL(url).searchParams.get("X-Amz-SignedHeaders")?.split(";") ?? [];
+
+  it("presignUpload signs content-type together with content-length", async () => {
+    const { url } = await callerA.bucket.presignUpload({
+      ...file,
+      size: 10,
+      keyPrefix: "generic-documents",
+    });
+    expect(signed(url)).toEqual(["content-length", "content-type", "host"]);
+  });
+
+  it("presignPublicUpload signs content-type", async () => {
+    const { url } = await callerA.bucket.presignPublicUpload({
+      fileName: "me.png",
+      contentType: "image/png",
+      size: 10,
+      keyPrefix: "profile-avatars",
+    });
+    expect(signed(url)).toEqual(["content-length", "content-type", "host"]);
+  });
+
+  it("getPresignedPutUrl signs content-type for server-side uploads", async () => {
+    const { url } = await getPresignedPutUrl({
+      contentType: "application/pdf",
+      size: 10,
+      fileName: "a.pdf",
+      keyPrefix: "generic-documents",
+      identifier: "srv",
+      bucketMode: "privateBucket",
+    });
+    expect(signed(url)).toContain("content-type");
+  });
+
+  describe("server-side uploadFile sends exactly the type it signed", () => {
+    const put = () =>
+      vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response(null, { status: 200 }));
+    const options = {
+      keyPrefix: "generic-documents",
+      identifier: "srv",
+    } as const;
+
+    it("the file's own type", async () => {
+      const fetchSpy = put();
+      await uploadFile(
+        new File(["%PDF"], "a.pdf", { type: "application/pdf" }),
+        options,
+      );
+      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(signed(url)).toContain("content-type");
+      expect(init.headers).toMatchObject({ "Content-Type": "application/pdf" });
+      fetchSpy.mockRestore();
+    });
+
+    it("application/octet-stream when the file has no type", async () => {
+      const fetchSpy = put();
+      await uploadFile(new File(["x"], "b.bin"), options);
+      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(signed(url)).toContain("content-type");
+      expect(init.headers).toMatchObject({
+        "Content-Type": "application/octet-stream",
+      });
+      fetchSpy.mockRestore();
+    });
   });
 });

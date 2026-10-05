@@ -49,9 +49,8 @@ export const uploadFile = async (
     : await client.bucket.presignUpload.mutate({ ...input, keyPrefix });
   const res = await fetch(url, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/octet-stream",
-    },
+    // the content type was signed into the URL: send exactly what was declared
+    headers: { "Content-Type": input.contentType },
     body: await file.arrayBuffer(),
   });
   if (!res.ok) {
