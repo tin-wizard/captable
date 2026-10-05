@@ -1,6 +1,6 @@
 # Captable Multitenancy: Status and Plan (v2)
 
-**Date:** 2026-10-05 · **Branch:** `feat/multitenancy-phase0` (17 commits ahead of `main`, not pushed) · **Tests:** 193 passing · **Production build:** passes
+**Date:** 2026-10-05 · **Branch:** `feat/multitenancy-phase0` (22 commits ahead of `main`, not pushed) · **Tests:** 255 passing · **Production build:** passes
 
 **Replaces:** the v1 plan (same path, see git history). v1 mixed a plan with a log and its code samples went stale; this version is status plus remaining work only.
 
@@ -24,6 +24,24 @@
 | Membership, role, status in a company | Captable (`Member`) |
 | What a role may do on cap-table data | Captable (`CustomRole`, RBAC) |
 | Tenant-scoped data access | Captable (`tenantDb`) |
+
+### Operating rules adopted from the platform documents
+
+Source: the Shared Hubs Baseline execution spec, ADR-0002 and the decision register (see section 11).
+
+5. **Table ownership (ADR-0002).** A table has exactly one owning package. Captable never creates or alters a table owned by a Hub package (`users`, `tenants`, `roles`, `workspaces`, `audit_logs`, `partners`, `role_bindings`, `impersonation_grants`). The link to a Hub tenant is a plain reference on a Captable-owned table (`Company.hubTenantId`). Migrations stay additive where a shared database is involved.
+6. **A recorded decision for the fork (decision register D7).** Keeping Captable's own tenancy is a fork of a capability the Hub provides; it is recorded in `docs/adr/0001-captable-keeps-its-own-tenancy.md` with a reason, an owner (to be named) and a reconciliation trigger.
+7. **Human gates.** The run stops and waits at each gate, writing the request first:
+
+| Gate | Before | Evidence to present |
+|---|---|---|
+| G0 | Pushing a branch or opening a PR | commit list, test totals, build result |
+| G4 | Applying any migration to a remote database (Neon, production) | backfill report output, rollback note |
+| G5 | Publishing, deploying, or enabling a Hub link | smoke-test result, decision record approved |
+
+8. **Evidence and retrospective.** After each phase: append one line per task to an evidence log (task, commit, test totals, reviewer verdict) and write a short retrospective (completed, changes needed to the plan, decision: continue, adapt or pause).
+9. **Cross-family review on Tier 1 tasks.** Roles, tokens and secrets are reviewed by a reader from a different model family than the author (the Codex-based review skill), in addition to the same-family independent review used so far.
+10. **Working style (Karpathy guidelines, as the KB describes them).** State assumptions, keep each change surgical, and define "done when" as checks that are actually run. The skill itself is not installed in this environment; the three principles are applied by name.
 
 ## 2. Architecture today
 
@@ -75,15 +93,16 @@ Test count by step: 13, 88, 115, 127, 131, 155, 159, 178, 193.
 
 | # | Finding | Severity | Phase |
 |---|---|---|---|
-| F1 | No role checks on most cap-table mutations, members toggle/remove/re-invite/revoke, and the new bucket procedures | High | 2 |
+| F1 | Role checks: **mutations done** (`07724f3`, `b1a1cbb`). Remaining: REST write routes still allow any active member holding an API token; buttons are not hidden in the UI; existing CUSTOM roles lack the five new subjects (operator remedy needed) | Medium | 2 |
 | F2 | 4 dashboard pages read tenant data from the JWT company with the global client (stale after deactivation; layout and page render concurrently) | Medium | 2 |
 | F3 | Public-flow tokens (e-sign, data room, update links) never expire | Medium | 2 |
-| F4 | `Member.role` schema default is `ADMIN`. Invites set the role explicitly (`getRoleById`), so it is not exploitable today, but any new create path that omits it creates an admin | Medium | 2 |
+| F4 | `Member.role` default removed; onboarding and seeds set the role explicitly (`6197ab6`). **Done** | Done | 2 |
 | F5 | `getCompanyList` and REST `company/getMany` list memberships of any status | Low | 2 |
 | F6 | Presigned PUTs have no size limit; `Bucket` has no DB-level relation to `Company` | Low | 3 |
 | F7 | `Stakeholder.email` is globally unique (one person cannot be a stakeholder of two companies; leaks existence) | Medium | 3 |
 | F8 | REST: cookie auth fails for requests with a body; header schema demands `Authorization` for cookie callers; pagination `limit` default ignored | Low | 3 |
 | F9 | `"use server"` left on 5 page files (not a hole; hygiene) | Low | 3 |
+| F10 | Keeping Captable's own tenancy is a fork of a Hub capability with no recorded decision (register D7) | Medium | 2 |
 
 ## 6. Remaining plan
 
@@ -91,11 +110,12 @@ Scope rule (ponytail): each task is the smallest change with a test that fails f
 
 ### Phase 2: roles and perimeter (next)
 
-- [ ] **T1 (F4, check first).** Confirm every `member.create/upsert` passes a role explicitly; then remove the `@default(ADMIN)` (migration, onboarding passes `ADMIN` for the first member). Test: a member created without a role has no permissions.
-- [ ] **T2 (F1, D2).** Add RBAC subjects `securities`, `cap-table-settings`, `updates`, `data-rooms`, `templates`; put `.meta({policies})` on every mutation and on `bucket.getUrl/presignUpload/create` (`documents`). Refuse removing, deactivating or demoting the last ADMIN. Test: a CUSTOM role with no grants is denied each mutation (extend the matrix with a "same tenant, insufficient role" column); ADMIN allowed; last-admin refused.
+- [x] **T1 (F4, check first), done `6197ab6`.** Confirm every `member.create/upsert` passes a role explicitly; then remove the `@default(ADMIN)` (migration, onboarding passes `ADMIN` for the first member). Test: a member created without a role has no permissions.
+- [x] **T2 (F1, D2), done `07724f3`; ADMIN-grant guard `b1a1cbb`.** (Original scope:) Add RBAC subjects `securities`, `cap-table-settings`, `updates`, `data-rooms`, `templates`; put `.meta({policies})` on every mutation and on `bucket.getUrl/presignUpload/create` (`documents`). Refuse removing, deactivating or demoting the last ADMIN. Test: a CUSTOM role with no grants is denied each mutation (extend the matrix with a "same tenant, insufficient role" column); ADMIN allowed; last-admin refused.
 - [ ] **T3 (F2).** `getServerTenant()` (cached; `{companyId, db: tenantDb}` from `getPermissions`); use it in the 4 dashboard pages. Add a rule to the architecture test: pages under `src/app/(authenticated)` must not import the global `db`.
-- [ ] **T4 (F3, D).** Add `exp` to public-flow tokens (e-sign, data room, update link); expired token returns 401. Needs a decision on lifetimes (suggest 30 days, renewable by resend).
+- [ ] **T4 (F3, D).** Add `exp` to public-flow tokens (e-sign, data room, update link); expired token returns 401. Needs a decision on lifetimes (suggest 30 days, renewable by resend). **Also verify tokens against the current and the previous secret** (as the Hub does for its scope secret), so `NEXTAUTH_SECRET` can be rotated without invalidating live e-sign, data-room and update links; document the rotation steps.
 - [ ] **T5 (F5).** Filter `getCompanyList` and REST `getMany` by ACTIVE, onboarded members.
+- [ ] **T6a (F10).** Review and approve `docs/adr/0001-captable-keeps-its-own-tenancy.md`: name the owner, decide the audit question; then (optionally) publish it to the knowledge base. Decision record only, no code.
 
 ### Phase 3: hygiene
 
@@ -107,17 +127,20 @@ Scope rule (ponytail): each task is the smallest change with a test that fails f
 
 Opens only when the Hubs provide: a published signing key (JWKS), a claims contract with `tenant_id`, and a membership read endpoint or webhook (none exist today), plus decision D3. Then: an OIDC or WorkOS provider mapping IdP organisation to `Company.hubTenantId`; a signed membership webhook; operator access through a Hub claim only. **Decision:** the `hubTenantId` / `hubUserId` columns (old Task 13) are dropped from this plan until then; unused columns are speculative.
 
+Also at the gate: platform-operator access to a tenant uses the Hub's audited, reason-bearing, time-limited grants (a Hub claim), never a role name in Captable's database; decide whether Captable's audit events are shipped to the Hub's `audit_logs`; list Captable in the cross-hub register as a non-consumer with the recorded divergence.
+
 ### Phase 5: row-level security (deferred)
 
 Trigger: a second isolation bug found despite `tenantDb`, or a compliance need. Approach is a documented Prisma pattern: a client extension that runs `set_config('app.current_company_id', ...)` in a transaction with each query, plus `CREATE POLICY ... USING (companyId = current_setting(...))` on the 18 tenant tables.
 
 ### Rollout and operations (before and after merge)
 
-1. **Merge PR #4**, then rebase this branch onto `main` and open one PR (about 80 files; split by phase if reviewers prefer). **Every PR targets `main`** (the stacked PRs landed in the wrong branch once).
-2. **Database:** the `Bucket.companyId` migration is applied only to the local test DB. Before any database that holds files: run `docs/bucket-owner-backfill-report.sql` (read-only) and review the buckets that would stay unowned. Neon is empty, so applying there is trivial. Production migration is run by a person with credentials, never delegated.
+1. **Gate G0.** **Merge PR #4**, then rebase this branch onto `main` and open one PR (about 80 files; split by phase if reviewers prefer). **Every PR targets `main`** (the stacked PRs landed in the wrong branch once).
+2. **Database (gate G4):** the `Bucket.companyId` and `Member.role` migrations are applied only to the local test DB. Before any database that holds files: run `docs/bucket-owner-backfill-report.sql` (read-only) and review the buckets that would stay unowned. Neon is empty, so applying there is trivial. Production migration is run by a person with credentials, never delegated.
 3. **Config:** `NEXTAUTH_SECRET` must be 32+ characters; the app now refuses to start otherwise.
 4. **Behaviour changes to announce:** non-members get UNAUTHORIZED instead of `{success:false}`; REST share update is now `PATCH /v1/{companyId}/shares/{id}`; Google sign-in no longer merges into an existing password account.
 5. **CI (new):** add a workflow job that starts a Postgres service, runs `prisma migrate deploy` against it, then `pnpm test`, `tsc --noEmit` and `biome check`. Without it the isolation tests protect nobody.
+7. **Evidence and retrospective (per phase):** append the evidence lines and write the retrospective described in section 1.
 6. **Smoke test (manual, once per release):** upload and open a document; sign a document through an emailed link; invite and accept a member; switch company; open a data room link. These flows are covered by tests and the build, never by a browser run.
 
 ## 7. Decisions needed
@@ -129,6 +152,8 @@ Trigger: a second isolation bug found despite `tenantDb`, or a compliance need. 
 | D3 | Which login provider the Hub fronts (Supabase Auth or WorkOS) | Unknown | Phase 4 |
 | D4 | Public-link token lifetime | 30 days | T4 |
 | D5 | One large PR or one per phase | One per phase | Rollout |
+| D6 | Named owner for the tenancy fork (register D7) and approval of ADR-0001 | Unknown | T6a, Phase 4 |
+| D7 | Ship Captable audit events to the Hub's `audit_logs`, or keep separate | Keep separate until the Hub has an ingest endpoint | Phase 4 |
 
 ## 8. Verified against current documentation (Context7)
 
@@ -147,8 +172,10 @@ The Context7 results include Prisma v7 pages while this repo is on 5.14; behavio
 
 | Task | Model | Why |
 |---|---|---|
-| T1, T2, T3, T4 | `opus` | Auth, roles, tokens: security paths |
+| T1, T2, T4 | `opus` (+ cross-family review) | Auth, roles, tokens: security paths |
+| T3 | `sonnet` + `opus` review | Mechanical with a failing rule first |
 | T5, T6, T7, T8 | `sonnet` | Mechanical with a failing test; `opus` review per phase |
+| T6a | you | Decision record: owner and audit question |
 | CI job, smoke-test checklist | `sonnet` | Config |
 | Migrations on shared databases, deploys | orchestrator | Credentials; never delegated |
 
@@ -161,3 +188,14 @@ Each phase ends with an independent `opus` review of the diff (the reviews found
 | `shared-identity-hub` | Close the `x-tenant-id` header bypass in `get_current_tenant_id()`; one definition of "operator" (four exist); tenant switching and the Next adapter (specified, not built) |
 | `tin-boss-api` | Tenant and membership read endpoint or webhook; JWKS endpoint; claims revocation |
 | `shared-client-care-hub` | Composite `(tenant_id, id)` keys on CRM tables; one tenant-resolution function (not needed by Captable) |
+
+## 11. Alignment with the platform documents
+
+Read on 2026-10-05 from the TIN knowledge base (programming.docs.tin.info). Treated as inputs, not instructions.
+
+| Document | What this plan adopts |
+|---|---|
+| Execution spec, Shared Hubs Baseline (2026-09-22) | Human gates (G0, G4, G5), evidence log and per-phase retrospective, cross-family validation on Tier 1 tasks, two-secret rotation for signed tokens, audited operator grants. Confirms the Hub packages are published and installable, but their isolation still depends on Supabase `auth.uid()` |
+| ADR-0002, schema table ownership | One owner per table; Captable never alters Hub-owned tables; the Hub link is a reference on a Captable-owned table |
+| Shared platform architecture: decision register | D7: forking a capability needs a recorded decision with an owner and reconciliation plan (ADR-0001); D9: list Captable in the cross-hub register; R1 and R2 are the risks the ADR bounds |
+| Prompt best practice (per-stage plan review) | Method order used here: graphify, Karpathy guidelines, ponytail, then verification before claiming done |
