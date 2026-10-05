@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 // Static scan (no DB). Guards the tenant architecture from regressing.
 const ROOTS = ["src/trpc/routers", "src/server/api/routes"];
 const R = "src/trpc/routers/";
+// Rule (f) only: pages/layouts must not touch the global db at all
+const PAGES_ROOT = "src/app/(authenticated)";
 
 // Rule (a) exceptions: tenantless by design (no company in scope).
 const ALLOWLIST_TENANTLESS: Record<string, string> = {
@@ -103,6 +105,8 @@ const violatesA = (src: string) => {
 const SERVICES_DB =
   /c\.get\(\s*["']services["']\s*\)\.db\b|\{[^}]*\bdb\b[^}]*\}\s*=\s*c\.get\(\s*["']services["']\s*\)/;
 const violatesD = (src: string) => SERVICES_DB.test(stripComments(src));
+// pages: use getServerTenant().db (src/server/tenant.ts), never the global db
+const violatesF = (src: string) => IMPORTS_GLOBAL_DB.test(stripComments(src));
 const violatesB = (src: string) => RAW_SQL.test(stripComments(src));
 const violatesC = (src: string) => CHILD_CREATE.test(stripComments(src));
 
@@ -118,6 +122,11 @@ const files = ROOTS.flatMap((r) => walk(path.resolve(process.cwd(), r)))
   .map((f) => path.relative(process.cwd(), f).split(path.sep).join("/"))
   .sort();
 const src = new Map(files.map((f) => [f, readFileSync(f, "utf8")]));
+// Rule (f) exceptions: pages that legitimately need the global db (none yet).
+const ALLOWLIST_PAGES_GLOBAL: Record<string, string> = {};
+const pageFiles = walk(path.resolve(process.cwd(), PAGES_ROOT))
+  .map((f) => path.relative(process.cwd(), f).split(path.sep).join("/"))
+  .sort();
 const hits = (pred: (s: string) => boolean) =>
   files.filter((f) => pred(src.get(f) ?? ""));
 
@@ -199,6 +208,17 @@ describe("tenant architecture guard", () => {
     ).toEqual([]);
   });
 
+  it("(f) authenticated pages never import the global db client by value", () => {
+    const bad = pageFiles.filter(
+      (f) =>
+        violatesF(readFileSync(f, "utf8")) && !(f in ALLOWLIST_PAGES_GLOBAL),
+    );
+    expect(
+      bad,
+      `use getServerTenant().db from "@/server/tenant":\n${bad.join("\n")}`,
+    ).toEqual([]);
+  });
+
   it("scanner detects each rule on in-memory strings (not vacuous)", () => {
     expect(
       violatesA("export const p = withAuth.query(({ ctx }) => ctx.db.x)"),
@@ -262,5 +282,10 @@ describe("tenant architecture guard", () => {
       false,
     );
     expect(violatesD('const db = c.get("tenantDb");')).toBe(false);
+    expect(violatesF('import { db } from "@/server/db";')).toBe(true);
+    expect(violatesF('import type { TPrisma } from "@/server/db";')).toBe(
+      false,
+    );
+    expect(violatesF('// import { db } from "@/server/db";')).toBe(false);
   });
 });

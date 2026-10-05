@@ -1,8 +1,7 @@
 import EmptyState from "@/components/common/empty-state";
 import Tldr from "@/components/common/tldr";
 import { Card } from "@/components/ui/card";
-import { withServerComponentSession } from "@/server/auth";
-import { db } from "@/server/db";
+import { getServerTenant } from "@/server/tenant";
 import type { EquityPlanMutationType } from "@/trpc/routers/equity-plan/schema";
 import type { ShareClassMutationType } from "@/trpc/routers/share-class/schema";
 import { RiAddFill, RiPieChart2Line } from "@remixicon/react";
@@ -14,32 +13,12 @@ export const metadata: Metadata = {
   title: "Equity plans",
 };
 
-const getEquityPlans = async (companyId: string) => {
-  return await db.equityPlan.findMany({
-    where: { companyId },
-  });
-};
-
-const getShareClasses = async (companyId: string) => {
-  return await db.shareClass.findMany({
-    where: { companyId },
-  });
-};
-
 const EquityPlanPage = async () => {
-  const session = await withServerComponentSession();
-  const companyId = session?.user?.companyId;
-  let equityPlans: EquityPlanMutationType[] = [];
-
-  if (companyId) {
-    equityPlans = (await getEquityPlans(
-      companyId,
-    )) as unknown as EquityPlanMutationType[];
-  }
-
-  const shareClasses: ShareClassMutationType[] = (await getShareClasses(
-    companyId,
-  )) as unknown as ShareClassMutationType[];
+  const { db } = await getServerTenant();
+  const equityPlans =
+    (await db.equityPlan.findMany()) as unknown as EquityPlanMutationType[];
+  const shareClasses =
+    (await db.shareClass.findMany()) as unknown as ShareClassMutationType[];
 
   if (equityPlans.length === 0) {
     return (

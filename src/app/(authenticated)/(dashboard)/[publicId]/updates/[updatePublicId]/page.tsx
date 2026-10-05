@@ -1,6 +1,5 @@
 "use server";
-import { getServerPermissions } from "@/lib/rbac/access-control";
-import { db } from "@/server/db";
+import { getServerTenant } from "@/server/tenant";
 import dynamic from "next/dynamic";
 
 const Editor = dynamic(
@@ -9,11 +8,8 @@ const Editor = dynamic(
 );
 
 const getUpdate = async (publicId: string) => {
-  // scope to the verified membership's company, not just the public id
-  const { membership } = await getServerPermissions();
-  return await db.update.findFirstOrThrow({
-    where: { publicId, companyId: membership.companyId },
-  });
+  const { db } = await getServerTenant();
+  return await db.update.findFirstOrThrow({ where: { publicId } });
 };
 
 const UpdatePage = async ({

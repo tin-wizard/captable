@@ -2,9 +2,8 @@ import FileIcon from "@/components/common/file-icon";
 import FilePreview from "@/components/file/preview";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { getServerPermissions } from "@/lib/rbac/access-control";
-import { db } from "@/server/db";
 import { getPresignedGetUrl } from "@/server/file-uploads";
+import { getServerTenant } from "@/server/tenant";
 import { RiArrowLeftSLine } from "@remixicon/react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -15,13 +14,10 @@ const DocumentPreview = async ({
 }: {
   params: { publicId: string; bucketId: string };
 }) => {
-  // the verified membership's company, not the JWT claim
-  const { membership } = await getServerPermissions();
-  const { companyId } = membership;
+  const { db, companyId } = await getServerTenant();
   const document = await db.document.findFirst({
     where: {
       bucketId,
-      companyId,
       bucket: { companyId },
     },
 

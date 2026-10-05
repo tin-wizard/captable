@@ -2,19 +2,19 @@
 
 import EmptyState from "@/components/common/empty-state";
 import { Button } from "@/components/ui/button";
-import { getServerComponentAuthSession } from "@/server/auth";
-import { db } from "@/server/db";
+import { getServerTenant } from "@/server/tenant";
 import { RiAddFill, RiFolderCheckFill } from "@remixicon/react";
 import { Fragment } from "react";
 import DataRoomPopover from "./components/data-room-popover";
 import Folders from "./components/dataroom-folders";
 
-const getDataRooms = (companyId: string) => {
-  return db.dataRoom.findMany({
-    where: {
-      companyId,
-    },
-
+const DataRoomPage = async ({
+  params: { publicId: companyPublicId },
+}: {
+  params: { publicId: string };
+}) => {
+  const { db } = await getServerTenant();
+  const dataRooms = await db.dataRoom.findMany({
     include: {
       _count: {
         select: { documents: true },
@@ -25,17 +25,6 @@ const getDataRooms = (companyId: string) => {
       createdAt: "desc",
     },
   });
-};
-
-const DataRoomPage = async () => {
-  const session = await getServerComponentAuthSession();
-
-  if (!session || !session.user) {
-    return null;
-  }
-
-  const { companyId, companyPublicId } = session.user;
-  const dataRooms = await getDataRooms(companyId);
 
   return (
     <Fragment>

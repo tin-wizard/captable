@@ -4,6 +4,8 @@ export const getCompanyList = async (userId: string) => {
   const data = await db.member.findMany({
     where: {
       userId,
+      status: "ACTIVE",
+      isOnboarded: true,
     },
     select: {
       id: true,
