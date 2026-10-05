@@ -144,6 +144,7 @@ export const dataRoomRouter = createTRPCRouter({
           room = await tx.dataRoom.update({
             where: {
               publicId,
+              companyId,
             },
             data: {
               name: input.name,
@@ -166,6 +167,34 @@ export const dataRoomRouter = createTRPCRouter({
           );
 
           const { documents, recipients } = input;
+
+          // every referenced document/member/stakeholder must belong to this company
+          if (documents?.length) {
+            const ids = [...new Set(documents.map((d) => d.documentId))];
+            const owned = await tx.document.count({
+              where: { id: { in: ids }, companyId },
+            });
+            if (owned !== ids.length) throw new Error("Invalid document");
+          }
+          const memberIds = [
+            ...new Set(recipients?.flatMap((r) => r.memberId ?? []) ?? []),
+          ];
+          if (memberIds.length) {
+            const owned = await tx.member.count({
+              where: { id: { in: memberIds }, companyId },
+            });
+            if (owned !== memberIds.length) throw new Error("Invalid member");
+          }
+          const stakeholderIds = [
+            ...new Set(recipients?.flatMap((r) => r.stakeholderId ?? []) ?? []),
+          ];
+          if (stakeholderIds.length) {
+            const owned = await tx.stakeholder.count({
+              where: { id: { in: stakeholderIds }, companyId },
+            });
+            if (owned !== stakeholderIds.length)
+              throw new Error("Invalid stakeholder");
+          }
 
           if (documents) {
             await tx.dataRoomDocument.createMany({

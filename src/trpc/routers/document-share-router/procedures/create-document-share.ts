@@ -24,7 +24,12 @@ export const createDocumentShareHandler = async ({
     await ctx.db.$transaction(async (tx) => {
       const { companyId } = await checkMembership({ session, tx });
 
-      const documentShare = await ctx.db.documentShare.create({
+      const owned = await tx.document.count({
+        where: { id: rest.documentId, companyId },
+      });
+      if (!owned) throw new Error("Invalid document");
+
+      const documentShare = await tx.documentShare.create({
         data: {
           ...rest,
           recipients: recipients ? [recipients] : [],
@@ -48,7 +53,7 @@ export const createDocumentShareHandler = async ({
     });
 
     return { success: true, message: "Document share created successfully." };
-  } catch (err) {
+  } catch {
     return {
       success: false,
       message: "Oops, something went wrong. Please try again later.",
@@ -58,6 +63,4 @@ export const createDocumentShareHandler = async ({
 
 export const createDocumentShareProcedure = withAuth
   .input(DocumentShareMutationSchema)
-  .mutation(async (opts) => {
-    return createDocumentShareHandler(opts);
-  });
+  .mutation((opts) => createDocumentShareHandler(opts));

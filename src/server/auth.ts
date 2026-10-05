@@ -331,7 +331,9 @@ export async function checkMembership({ session, tx }: checkMembershipOptions) {
     where: {
       id: session.user.memberId,
       companyId: session.user.companyId,
+      userId: session.user.id,
       isOnboarded: true,
+      status: "ACTIVE",
     },
     select: {
       id: true,

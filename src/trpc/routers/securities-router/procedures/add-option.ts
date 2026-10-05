@@ -1,6 +1,7 @@
 import { generatePublicId } from "@/common/id";
 import { Audit } from "@/server/audit";
 import { checkMembership } from "@/server/auth";
+import { assertTenantOwns } from "@/server/tenant-guard";
 import { withAuth } from "@/trpc/api/trpc";
 import { ZodAddOptionMutationSchema } from "../schema";
 
@@ -17,6 +18,8 @@ export const addOptionProcedure = withAuth
           tx,
           session: ctx.session,
         });
+
+        await assertTenantOwns(tx, companyId, input);
 
         const data = {
           companyId,

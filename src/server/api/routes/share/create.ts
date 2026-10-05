@@ -1,3 +1,4 @@
+import { assertTenantOwns } from "@/server/tenant-guard";
 import { z } from "@hono/zod-openapi";
 import {
   CreateShareSchema,
@@ -60,6 +61,7 @@ export const create = withAuthApiV1
     const body = c.req.valid("json");
 
     const share = await db.$transaction(async (tx) => {
+      await assertTenantOwns(tx, membership.companyId, body);
       const share = await tx.share.create({
         data: { ...body, companyId: membership.companyId },
       });

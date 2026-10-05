@@ -6,6 +6,7 @@ import { invariant } from "@/lib/error";
 import { TAG } from "@/lib/tags";
 import { Audit } from "@/server/audit";
 import { checkMembership } from "@/server/auth";
+import { assertTenantOwns } from "@/server/tenant-guard";
 import { withAuth } from "@/trpc/api/trpc";
 import type { Prisma } from "@prisma/client";
 import { createBucketHandler } from "../../bucket-router/procedures/create-bucket";
@@ -95,6 +96,8 @@ export const createSafeProcedure = withAuth
             recipients,
           },
         });
+
+        await assertTenantOwns(tx, companyId, inputRest);
 
         type SafeCreateBody = Prisma.Args<typeof ctx.db.safe, "create">["data"];
 

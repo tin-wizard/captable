@@ -1,6 +1,7 @@
 import { generatePublicId } from "@/common/id";
 import { Audit } from "@/server/audit";
 import { checkMembership } from "@/server/auth";
+import { assertTenantOwns } from "@/server/tenant-guard";
 import { withAuth } from "@/trpc/api/trpc";
 import { ZodAddExistingSafeMutationSchema } from "../schema";
 
@@ -14,6 +15,8 @@ export const addExistingSafeProcedure = withAuth
     try {
       await ctx.db.$transaction(async (tx) => {
         const { companyId, memberId } = await checkMembership({ session, tx });
+
+        await assertTenantOwns(tx, companyId, input);
 
         const safe = await tx.safe.create({
           data: {
