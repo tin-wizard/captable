@@ -1,9 +1,8 @@
 import { generatePublicId } from "@/common/id";
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
 import type { PrismaTransactionalClient } from "@/server/db";
 import { assertBucketUsable } from "@/server/tenant-guard";
-import { withAuth } from "@/trpc/api/trpc";
+import { withTenant } from "@/trpc/api/trpc";
 import {
   type TypeZodCreateTemplateMutationSchema,
   ZodCreateTemplateMutationSchema,
@@ -71,7 +70,7 @@ export async function createTemplateHandler({
   return template;
 }
 
-export const createTemplateProcedure = withAuth
+export const createTemplateProcedure = withTenant
   .input(ZodCreateTemplateMutationSchema)
   .mutation(async ({ ctx, input }) => {
     const { requestIp, userAgent, session } = ctx;
@@ -82,12 +81,9 @@ export const createTemplateProcedure = withAuth
       companyId: session.user.companyId,
     };
 
-    const data = await ctx.db.$transaction(async (tx) => {
-      const { companyId, memberId: uploaderId } = await checkMembership({
-        tx,
-        session: ctx.session,
-      });
+    const { companyId, memberId: uploaderId } = ctx.tenant;
 
+    const data = await ctx.tenant.db.$transaction(async (tx) => {
       return await createTemplateHandler({
         input: {
           ...input,

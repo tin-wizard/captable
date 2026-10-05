@@ -4,15 +4,14 @@ import { shareDataRoomEmailJob } from "@/jobs/share-data-room-email";
 import { encode } from "@/lib/jwt";
 import { ShareRecipientSchema } from "@/schema/contacts";
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
 import { assertTenantOwns } from "@/server/tenant-guard";
-import { createTRPCRouter, withAuth } from "@/trpc/api/trpc";
+import { createTRPCRouter, withTenant } from "@/trpc/api/trpc";
 import type { DataRoom } from "@prisma/client";
 import { z } from "zod";
 import { DataRoomSchema } from "./schema";
 
 export const dataRoomRouter = createTRPCRouter({
-  getDataRoom: withAuth
+  getDataRoom: withTenant
     .input(
       z.object({
         dataRoomPublicId: z.string(),
@@ -36,12 +35,10 @@ export const dataRoomRouter = createTRPCRouter({
         company: object;
       };
 
-      const { db, session } = ctx;
+      const { db, companyId } = ctx.tenant;
       const { dataRoomPublicId, include } = input;
 
       const { dataRoom } = await db.$transaction(async (tx) => {
-        const { companyId } = await checkMembership({ session, tx });
-
         const dataRoom = await tx.dataRoom.findUniqueOrThrow({
           where: {
             publicId: dataRoomPublicId,
@@ -108,15 +105,15 @@ export const dataRoomRouter = createTRPCRouter({
       return response;
     }),
 
-  save: withAuth.input(DataRoomSchema).mutation(async ({ ctx, input }) => {
+  save: withTenant.input(DataRoomSchema).mutation(async ({ ctx, input }) => {
     try {
       let room = {} as DataRoom;
-      const { db, session, userAgent, requestIp } = ctx;
+      const { session, userAgent, requestIp } = ctx;
+      const { db, companyId } = ctx.tenant;
 
       const { publicId } = input;
 
       await db.$transaction(async (tx) => {
-        const { companyId } = await checkMembership({ tx, session });
         const { user } = session;
         if (!publicId) {
           room = await tx.dataRoom.create({
@@ -235,7 +232,7 @@ export const dataRoomRouter = createTRPCRouter({
     }
   }),
 
-  share: withAuth
+  share: withTenant
     .input(
       z.object({
         dataRoomId: z.string(),
@@ -244,9 +241,10 @@ export const dataRoomRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { session, db, requestIp, userAgent } = ctx;
+      const { session, requestIp, userAgent } = ctx;
+      const { db, companyId } = ctx.tenant;
       const { dataRoomId, others, selectedContacts } = input;
-      const { name: senderName, email: senderEmail, companyId } = session.user;
+      const { name: senderName, email: senderEmail } = session.user;
       const { user } = session;
       const dataRoom = await db.dataRoom.findUniqueOrThrow({
         where: {
@@ -350,7 +348,7 @@ export const dataRoomRouter = createTRPCRouter({
       };
     }),
 
-  unShare: withAuth
+  unShare: withTenant
     .input(
       z.object({
         dataRoomId: z.string(),
@@ -358,9 +356,9 @@ export const dataRoomRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { session, db, requestIp, userAgent } = ctx;
+      const { session, requestIp, userAgent } = ctx;
+      const { db, companyId } = ctx.tenant;
       const { dataRoomId, recipientId } = input;
-      const companyId = session.user.companyId;
       const { user } = session;
       const dataRoom = await db.dataRoom.findUniqueOrThrow({
         where: {

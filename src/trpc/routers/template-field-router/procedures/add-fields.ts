@@ -4,8 +4,7 @@ import {
 } from "@/jobs/esign-email";
 import { decode, encode } from "@/lib/jwt";
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
-import { withAuth } from "@/trpc/api/trpc";
+import { withTenant } from "@/trpc/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { ZodAddFieldMutationSchema } from "../schema";
@@ -39,12 +38,13 @@ export async function DecodeEmailToken(jwt: string) {
   return emailTokenPayloadSchema.parse(payload);
 }
 
-export const addFieldProcedure = withAuth
+export const addFieldProcedure = withTenant
   .input(ZodAddFieldMutationSchema)
   .mutation(async ({ ctx, input }) => {
     try {
       const user = ctx.session.user;
       const { userAgent, requestIp } = ctx;
+      const { companyId } = ctx.tenant;
       const mails: TESignNotificationEmailJobInput[] = [];
 
       if (input.status === "PENDING" && (!user.email || !user.name)) {
@@ -55,12 +55,7 @@ export const addFieldProcedure = withAuth
         };
       }
 
-      const template = await ctx.db.$transaction(async (tx) => {
-        const { companyId } = await checkMembership({
-          tx,
-          session: ctx.session,
-        });
-
+      const template = await ctx.tenant.db.$transaction(async (tx) => {
         const template = await tx.template.findFirstOrThrow({
           where: {
             publicId: input.templatePublicId,

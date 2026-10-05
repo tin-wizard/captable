@@ -14,14 +14,19 @@ export const updateRolesProcedure = withAccessControl
   .mutation(
     async ({
       input,
-      ctx: { db, membership, userAgent, requestIp, session },
+      ctx: {
+        tenant: { db, companyId },
+        userAgent,
+        requestIp,
+        session,
+      },
     }) => {
       const permissions = extractPermission(input.permissions);
       const { user } = session;
       await db.$transaction(async (tx) => {
         const id = await getRoleById({
           id: input.roleId,
-          companyId: membership.companyId,
+          companyId,
           tx,
         });
 
@@ -31,7 +36,7 @@ export const updateRolesProcedure = withAccessControl
 
         const role = await db.customRole.update({
           where: {
-            companyId: membership.companyId,
+            companyId,
             id: id.customRoleId,
           },
           data: {

@@ -1,16 +1,13 @@
 import { encode } from "@/lib/jwt";
-import { withAuth } from "@/trpc/api/trpc";
+import { withTenant } from "@/trpc/api/trpc";
 import { z } from "zod";
 
-export const getUpdatesProcedure = withAuth.query(async ({ ctx }) => {
-  const {
-    db,
-    session: { user },
-  } = ctx;
+export const getUpdatesProcedure = withTenant.query(async ({ ctx }) => {
+  const { db, companyId } = ctx.tenant;
 
   const data = await db.update.findMany({
     where: {
-      companyId: user.companyId,
+      companyId,
     },
     include: {
       recipients: true,
@@ -23,16 +20,12 @@ export const getUpdatesProcedure = withAuth.query(async ({ ctx }) => {
   return { data };
 });
 
-export const getRecipientsProcedure = withAuth
+export const getRecipientsProcedure = withTenant
   .input(z.object({ updateId: z.string() }))
   .query(async ({ ctx, input }) => {
-    const {
-      db,
-      session: { user },
-    } = ctx;
+    const { db, companyId } = ctx.tenant;
 
     const { updateId } = input;
-    const { companyId } = user;
 
     const data = await db.updateRecipient.findMany({
       where: {

@@ -12,12 +12,12 @@ export const deleteRoleProcedure = withAccessControl
   .input(ZodDeleteRoleMutationSchema)
   .mutation(async ({ ctx, input }) => {
     const {
-      membership: { companyId },
+      tenant: { companyId },
       userAgent,
       requestIp,
       session,
     } = ctx;
-    await ctx.db.$transaction(async (tx) => {
+    await ctx.tenant.db.$transaction(async (tx) => {
       const role = await getRoleById({ id: input.roleId, companyId, tx });
       const { user } = session;
       if (!role.customRoleId) {

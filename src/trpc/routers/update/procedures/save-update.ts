@@ -1,15 +1,13 @@
 import { generatePublicId } from "@/common/id";
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
-import { withAuth } from "@/trpc/api/trpc";
+import { withTenant } from "@/trpc/api/trpc";
 import { UpdateMutationSchema } from "../schema";
 
-export const saveUpdateProcedure = withAuth
+export const saveUpdateProcedure = withTenant
   .input(UpdateMutationSchema)
   .mutation(async ({ ctx, input }) => {
     try {
-      const authorId = ctx.session.user.memberId;
-      const companyId = ctx.session.user.companyId;
+      const { memberId: authorId, companyId } = ctx.tenant;
       const userId = ctx.session.user.id;
       const userName = ctx.session.user.name;
       const { userAgent, requestIp } = ctx;
@@ -22,8 +20,7 @@ export const saveUpdateProcedure = withAuth
           message: "Title and content cannot be empty.",
         };
       }
-      await ctx.db.$transaction(async (tx) => {
-        await checkMembership({ session: ctx.session, tx });
+      await ctx.tenant.db.$transaction(async (tx) => {
         if (input.publicId) {
           const update = await tx.update.update({
             where: { publicId, companyId },

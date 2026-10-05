@@ -1,10 +1,8 @@
-import { checkMembership } from "@/server/auth";
-import { withAuth } from "@/trpc/api/trpc";
+import { withTenant } from "@/trpc/api/trpc";
 
-export const getAllTemplateProcedure = withAuth.query(async ({ ctx }) => {
-  const { documents } = await ctx.db.$transaction(async (tx) => {
-    const { companyId } = await checkMembership({ tx, session: ctx.session });
-
+export const getAllTemplateProcedure = withTenant.query(async ({ ctx }) => {
+  const { companyId } = ctx.tenant;
+  const { documents } = await ctx.tenant.db.$transaction(async (tx) => {
     const documents = await tx.template.findMany({
       where: {
         companyId,

@@ -1,6 +1,6 @@
 import { Audit } from "@/server/audit";
 import type { TPrismaOrTransaction } from "@/server/db";
-import { withAuth } from "@/trpc/api/trpc";
+import { withTenant } from "@/trpc/api/trpc";
 import {
   type TypeZodCreateBucketMutationSchema,
   ZodCreateBucketMutationSchema,
@@ -45,16 +45,26 @@ export const createBucketHandler = async ({
   return bucket;
 };
 
-export const createBucketProcedure = withAuth
+export const createBucketProcedure = withTenant
   .input(ZodCreateBucketMutationSchema)
-  .mutation(async ({ ctx: { db, userAgent, requestIp, session }, input }) => {
-    const { name, companyId, id } = session.user;
-
-    return await createBucketHandler({
+  .mutation(
+    async ({
+      ctx: {
+        tenant: { db },
+        userAgent,
+        requestIp,
+        session,
+      },
       input,
-      db,
-      userAgent,
-      requestIp,
-      user: { name: name || "", companyId, id },
-    });
-  });
+    }) => {
+      const { name, companyId, id } = session.user;
+
+      return await createBucketHandler({
+        input,
+        db,
+        userAgent,
+        requestIp,
+        user: { name: name || "", companyId, id },
+      });
+    },
+  );

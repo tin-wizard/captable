@@ -9,10 +9,9 @@ export const updateStakeholderProcedure = withAccessControl
     async ({
       ctx: {
         session,
-        db,
+        tenant: { db, companyId },
         requestIp,
         userAgent,
-        membership: { companyId },
       },
       input,
     }) => {

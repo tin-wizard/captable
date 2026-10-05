@@ -4,12 +4,11 @@ import { encode } from "@/lib/jwt";
 import { UpdateStatusEnum } from "@/prisma/enums";
 import { ShareRecipientSchema } from "@/schema/contacts";
 import { Audit } from "@/server/audit";
-import { checkMembership } from "@/server/auth";
 import { assertTenantOwns } from "@/server/tenant-guard";
-import { withAuth } from "@/trpc/api/trpc";
+import { withTenant } from "@/trpc/api/trpc";
 import { z } from "zod";
 
-export const shareUpdateProcedure = withAuth
+export const shareUpdateProcedure = withTenant
   .input(
     z.object({
       updateId: z.string(),
@@ -18,11 +17,10 @@ export const shareUpdateProcedure = withAuth
     }),
   )
   .mutation(async ({ ctx, input }) => {
-    const { session, db, userAgent, requestIp } = ctx;
+    const { session, userAgent, requestIp } = ctx;
+    const { db, companyId } = ctx.tenant;
     const { updateId, others, selectedContacts } = input;
     const { name: senderName, email: senderEmail, id } = session.user;
-
-    const { companyId } = await checkMembership({ session, tx: db });
 
     const update = await db.update.findUniqueOrThrow({
       where: {
@@ -135,7 +133,7 @@ export const shareUpdateProcedure = withAuth
     };
   });
 
-export const unshareUpdateProcedure = withAuth
+export const unshareUpdateProcedure = withTenant
   .input(
     z.object({
       updateId: z.string(),
@@ -143,9 +141,9 @@ export const unshareUpdateProcedure = withAuth
     }),
   )
   .mutation(async ({ ctx, input }) => {
-    const { session, db, userAgent, requestIp } = ctx;
+    const { session, userAgent, requestIp } = ctx;
+    const { db, companyId } = ctx.tenant;
     const { updateId, recipientId } = input;
-    const companyId = session.user.companyId;
     const { user } = session;
 
     const update = await db.update.findUniqueOrThrow({

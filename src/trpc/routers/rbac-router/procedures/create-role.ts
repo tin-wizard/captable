@@ -18,13 +18,18 @@ export const createRolesProcedure = withAccessControl
   .mutation(
     async ({
       input,
-      ctx: { db, membership, requestIp, userAgent, session },
+      ctx: {
+        tenant: { db, companyId },
+        requestIp,
+        userAgent,
+        session,
+      },
     }) => {
       const { user } = session;
       const permissions = extractPermission(input.permissions);
       const role = await db.customRole.create({
         data: {
-          companyId: membership.companyId,
+          companyId,
           name: input.name,
           permissions,
         },

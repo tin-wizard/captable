@@ -1,14 +1,12 @@
-import { checkMembership } from "@/server/auth";
-import { withAuth } from "@/trpc/api/trpc";
+import { withTenant } from "@/trpc/api/trpc";
 import { ZodCancelTemplateMutationSchema } from "../schema";
 
-export const cancelTemplateProcedure = withAuth
+export const cancelTemplateProcedure = withTenant
   .input(ZodCancelTemplateMutationSchema)
   .mutation(async ({ input, ctx }) => {
     const { templateId, publicId } = input;
-    const res = await ctx.db.$transaction(async (tx) => {
-      const { companyId } = await checkMembership({ tx, session: ctx.session });
-
+    const { companyId } = ctx.tenant;
+    const res = await ctx.tenant.db.$transaction(async (tx) => {
       const template = await tx.template.findFirst({
         where: {
           id: templateId,

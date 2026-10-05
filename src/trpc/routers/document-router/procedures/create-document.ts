@@ -4,7 +4,7 @@ import type { TPrismaOrTransaction } from "@/server/db";
 import { assertBucketUsable } from "@/server/tenant-guard";
 import {
   withAccessControl,
-  type withAuthTrpcContextType,
+  type withTenantTrpcContextType,
 } from "@/trpc/api/trpc";
 import {
   type TypeZodCreateDocumentMutationSchema,
@@ -12,7 +12,7 @@ import {
 } from "../schema";
 
 interface createDocumentHandlerOptions
-  extends Pick<withAuthTrpcContextType, "requestIp" | "userAgent"> {
+  extends Pick<withTenantTrpcContextType, "requestIp" | "userAgent"> {
   input: TypeZodCreateDocumentMutationSchema;
   companyId: string;
   uploaderName?: string | null | undefined;
@@ -67,8 +67,7 @@ export const createDocumentProcedure = withAccessControl
     const {
       userAgent,
       requestIp,
-      db,
-      membership: { companyId, memberId },
+      tenant: { db, companyId, memberId },
     } = ctx;
 
     const data = await db.$transaction(async (tx) => {
