@@ -6,11 +6,13 @@ import { Fragment } from "react";
 import DataRoomPopover from "./components/data-room-popover";
 import Folders from "./components/dataroom-folders";
 
-const DataRoomPage = async ({
-  params: { publicId: companyPublicId },
-}: {
-  params: { publicId: string };
+const DataRoomPage = async (props: {
+  params: Promise<{ publicId: string }>;
 }) => {
+  const params = await props.params;
+
+  const { publicId: companyPublicId } = params;
+
   const { db } = await getServerTenant();
   const dataRooms = await db.dataRoom.findMany({
     include: {

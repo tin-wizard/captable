@@ -12,11 +12,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Fragment } from "react";
 
-const DocumentPreview = async ({
-  params: { publicId, bucketId },
-}: {
-  params: { publicId: string; bucketId: string };
+const DocumentPreview = async (props: {
+  params: Promise<{ publicId: string; bucketId: string }>;
 }) => {
+  const params = await props.params;
+
+  const { publicId, bucketId } = params;
+
   // same grant as bucket.getUrl: no documents:read, no presigned URL
   const { permissions } = await getServerPermissions();
   if (!hasPermission(permissions, "documents", "read")) {

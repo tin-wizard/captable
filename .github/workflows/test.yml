@@ -83,6 +83,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: pnpm test
 
+      # The tests do not boot Next, so only a build catches a framework break
+      - name: 🏗️ Build
+        if: ${{ !cancelled() }}
+        run: pnpm build
+        env:
+          SKIP_ENV_VALIDATION: "1"
+
       # The repo has legacy lint errors, so lint only what this PR changes (the
       # pre-commit hook does the same for staged files).
       - name: 🧹 Lint changed files
