@@ -5,7 +5,7 @@ import { env } from "./env";
 
 const log = logger.child({ module: "middleware" });
 // This function can be marked `async` if using `await` inside
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   if (env.LOGS || env.NODE_ENV === "production" || env.NODE_ENV === "staging") {
     const { url, method } = request;
     // NextRequest.ip and .geo were removed in Next 15

@@ -1,5 +1,5 @@
 import withBundleAnalyzer from "@next/bundle-analyzer";
-import { withSentryConfig } from "@sentry/nextjs";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 const bundleAnalyzer = withBundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
@@ -26,18 +26,9 @@ const nextConfig = {
       },
     ],
   },
-  webpack: (config, { isServer }) => {
-    /**
-     * Critical: prevents " ⨯ ./node_modules/canvas/build/Release/canvas.node
-     * Module parse failed: Unexpected character '�' (1:0)" error
-     */
-    config.resolve.alias.canvas = false;
-
-    if (isServer) {
-      config.ignoreWarnings = [{ module: /opentelemetry/ }];
-    }
-
-    return config;
+  turbopack: {
+    // prevents "Module parse failed" on canvas.node (an optional pdfjs dependency)
+    resolveAlias: { canvas: "./empty-module.js" },
   },
   serverExternalPackages: [
     "pino",
@@ -46,9 +37,6 @@ const nextConfig = {
     "@aws-sdk/s3-request-presigner",
     "@react-pdf/renderer",
   ],
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
 };
 
 const hasSentry = !!(
@@ -63,7 +51,6 @@ export default hasSentry
       project: process.env.SENTRY_PROJECT,
       silent: true,
       widenClientFileUpload: true,
-      hideSourceMaps: true,
-      disableLogger: true,
+      sourcemaps: { deleteSourcemapsAfterUpload: true },
     })
   : bundleAnalyzer(nextConfig);
