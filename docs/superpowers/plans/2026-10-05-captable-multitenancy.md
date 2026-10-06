@@ -1,6 +1,6 @@
 # Captable Multitenancy: Status and Plan (v2)
 
-**Date:** 2026-10-05 · **Branch:** `feat/multitenancy-phase0` (34 commits ahead of `main`, not pushed) · **Tests:** 344 passing · **Production build:** passes
+**Date:** 2026-10-05 · **Branch:** merged to `main` (PRs #1–#9) · **Tests:** 355 passing · **Production build:** passes
 
 **Replaces:** the v1 plan (same path, see git history). v1 mixed a plan with a log and its code samples went stale; this version is status plus remaining work only.
 
@@ -91,7 +91,7 @@ Router coverage: 37 files on `withTenant`, 19 on `withAccessControl`, 9 `withAut
 | `25d3c41`, `69a381e`, `4dcfc0e`, `5d81356` | Phase 3: per-company stakeholder email; bucket relation; signed upload size limits; REST cookie writes, header and page hygiene; leaking reads closed; `template.resendLink`; serializable last-admin check; cancelled envelopes stop handing out the document |
 | `855d303` | review fixes: role management ADMIN-only (no self-granting); REST role checks; link-minting reads need a permission |
 
-Test count by step: 13, 88, 115, 127, 131, 155, 159, 178, 193, 255, 273, 297, 317, 324, 343, 344, 349.
+Test count by step: 13, 88, 115, 127, 131, 155, 159, 178, 193, 255, 273, 297, 317, 324, 343, 344, 349, 355.
 
 ## 5. Open findings (ranked)
 
@@ -109,8 +109,8 @@ Test count by step: 13, 88, 115, 127, 131, 155, 159, 178, 193, 255, 273, 297, 31
 | F11 | Reads that leaked protected data closed (billing subscription, contacts, document preview). **Done** (`4dcfc0e`); other cap-table reads stay open by design | Done | 3 |
 | F12 | `template.resendLink` mints a fresh link for the current signer. **Done** (`4dcfc0e`); no throttle yet; data-room recipient `expiresAt` is still stored but not enforced | Done | 3 |
 | F13 | Last-admin race fixed with serializable transactions and one retry (`4dcfc0e`); the race was reproduced before the fix. **Done** | Done | 3 |
-| F14 | The content type of an upload is now signed (`content-type` joins `content-length` in the signed headers) and both upload paths send the type they declared. **Done** in code; still to verify with one real upload against the storage backend (R2, S3 or MinIO must refuse a different Content-Type) | Done (verify) | 4 |
-| F15 | Smaller follow-ups: `uploadFile` returns the wrong size so e-sign documents record 0; `resendLink` has no throttle (add a `singletonKey`); REST duplicate stakeholder returns 500 instead of 409; cookie-authenticated REST writes rely on SameSite=Lax (consider an Origin check); `Bucket.company` cascade should be `Restrict` once tests stop deleting companies; every activation toggle is audited as "activated"; `investor-details` is an exported server action that returns stakeholders to its caller | Low | 4 |
+| F14 | The content type of an upload is now signed (`content-type` joins `content-length` in the signed headers) and both upload paths send the type they declared. Merged (#8); still to verify with one real upload against the storage backend (R2, S3 or MinIO must refuse a different Content-Type) | Done (verify) | 4 |
+| F15 | Smaller follow-ups, merged (#9): e-sign size recorded correctly, `resendLink` throttled, REST duplicate stakeholder returns 409, same-origin check on cookie-authenticated REST writes, activation toggles audited correctly, `investor-details` no longer an exported server action. **Deferred:** `Bucket.company` cascade → `Restrict` once tests stop deleting companies | Done (1 deferred) | 4 |
 | F10 | Keeping Captable's own tenancy is a fork of a Hub capability with no recorded decision (register D7) | Medium | 2 |
 
 ## 6. Remaining plan
