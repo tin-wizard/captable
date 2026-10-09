@@ -16,7 +16,7 @@ const VerifyEmail = ({ token }: { token: string }) => {
   const [success, setSuccess] = useState<string | undefined>("");
 
   const { mutateAsync } = api.auth.verifyEmail.useMutation({
-    onSuccess: async ({ message }) => {
+    onSuccess: ({ message }) => {
       setLoading(false);
       setSuccess(message);
     },
@@ -42,7 +42,7 @@ const VerifyEmail = ({ token }: { token: string }) => {
       setLoading(false);
       setError("Something went wrong! Please try again.");
     }
-  }, [token, success, error]);
+  }, [token, success, error, mutateAsync]);
 
   useEffect(() => {
     void onSubmit();
@@ -50,7 +50,7 @@ const VerifyEmail = ({ token }: { token: string }) => {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-cyan-100">
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-navy-50 via-white to-ember-50">
         <div className="grid w-full max-w-md grid-cols-1 gap-5 rounded-xl border bg-white p-10 shadow">
           <div className="flex flex-col gap-y-2 text-center">
             <h1 className="text-2xl font-semibold tracking-tight">
@@ -63,13 +63,13 @@ const VerifyEmail = ({ token }: { token: string }) => {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-cyan-100">
+    <div className="flex h-screen items-center justify-center bg-gradient-to-br from-navy-50 via-white to-ember-50">
       <div className="grid w-full max-w-md grid-cols-1 gap-5 rounded-xl border bg-white p-10 shadow">
         <div className="flex flex-col gap-y-2 text-center">
           {success ? (
             <>
-              <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-teal-100">
-                <span className="text-teal-500">
+              <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-navy-100">
+                <span className="text-navy-500">
                   <RiMailCheckLine className="h-6 w-auto" />
                 </span>
               </div>

@@ -89,7 +89,6 @@ const DataRoomPage = async (props: {
 
   return (
     <SharePageLayout
-      medium="dataRoom"
       company={{
         name: company.name,
         logo: company.logo,

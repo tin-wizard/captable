@@ -9,8 +9,8 @@ import {
 
 import Tldr from "@/components/common/tldr";
 import { Card } from "@/components/ui/card";
-import { type EquityPlanMutationType } from "@/trpc/routers/equity-plan/schema";
-import { type ShareClassMutationType } from "@/trpc/routers/share-class/schema";
+import type { EquityPlanMutationType } from "@/trpc/routers/equity-plan/schema";
+import type { ShareClassMutationType } from "@/trpc/routers/share-class/schema";
 import { RiEqualizer2Line } from "@remixicon/react";
 import EquityPlanModal from "./modal";
 const formatter = new Intl.NumberFormat("en-US");
@@ -49,7 +49,7 @@ const EquityPlanTable = ({
             <TableHead>Cancellation behavior</TableHead>
             <TableHead>Board approval date</TableHead>
             <TableHead>Plan effective date</TableHead>
-            <TableHead></TableHead>
+            <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -80,14 +80,7 @@ const EquityPlanTable = ({
                   equityPlan={plan}
                   shareClasses={shareClasses}
                   subtitle={
-                    <Tldr
-                      message="Equity plans are used to distribute ownership of your company using stock options, RSUs, and other instruments among employees and stakeholders."
-                      cta={{
-                        label: "Learn more",
-                        // TODO - this link should be updated to the correct URL
-                        href: "https://captable.inc/help",
-                      }}
-                    />
+                    <Tldr message="Equity plans are used to distribute ownership of your company using stock options, RSUs, and other instruments among employees and stakeholders." />
                   }
                   trigger={
                     <RiEqualizer2Line className="h-5 w-5 cursor-pointer text-gray-500 hover:text-gray-700" />

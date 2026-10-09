@@ -9,7 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-import { CaptableLogo } from "@/components/common/logo";
+import { BrandLogo } from "@/components/common/logo";
 import { cn } from "@/lib/utils";
 import type { DialogProps } from "@radix-ui/react-dialog";
 
@@ -59,7 +59,7 @@ const Modal = ({
             <div className="">
               <DialogHeader>
                 <div className="flex justify-center">
-                  <CaptableLogo className="mb-3 h-10 w-10 rounded" />
+                  <BrandLogo className="mb-3 h-10 w-10 rounded" />
                 </div>
                 <DialogTitle className="mb-4 text-center">{title}</DialogTitle>
                 {subtitle && (

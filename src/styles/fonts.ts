@@ -1,12 +1,16 @@
-import { Roboto_Mono } from "next/font/google";
-import localFont from "next/font/local";
+import { Inter, Inter_Tight, Roboto_Mono } from "next/font/google";
 
-export const satoshi = localFont({
-  src: "./fonts/Satoshi-Variable.woff2",
-  variable: "--font-satoshi",
-  weight: "300 900",
+// TIN's typefaces (tin.info): Inter for text, Inter Tight for headings
+export const inter = Inter({
+  subsets: ["latin"],
   display: "swap",
-  style: "normal",
+  variable: "--font-inter",
+});
+
+export const interTight = Inter_Tight({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter-tight",
 });
 
 export const robotoMono = Roboto_Mono({

@@ -85,7 +85,7 @@ const UpdatesEditor = ({
       },
       content: [
         {
-          text: "Here's a quick update on what's been happening at Captable, Inc. this month. We're excited to share that we've hit a major milestone! Our team has been hard at work and we're proud to announce that we've successfully launched our new product feature.",
+          text: "Here's a quick update on what's been happening at our company this month. We're excited to share that we've hit a major milestone! Our team has been hard at work and we're proud to announce that we've successfully launched our new product feature.",
           type: "text",
           styles: {},
         },
@@ -158,7 +158,7 @@ const UpdatesEditor = ({
       },
       content: [
         {
-          text: "The Captable, Inc. Team",
+          text: "The Team",
           type: "text",
           styles: {},
         },

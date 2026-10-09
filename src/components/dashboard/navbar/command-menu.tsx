@@ -53,10 +53,6 @@ const Pages: CommandOption[] = [
           <Tldr
             message="Manage stakeholders by adding them. 
           Categorize, assign roles, and maintain contact info for investors, partners, and clients."
-            cta={{
-              label: "Learn more",
-              href: "https://captable.inc/help",
-            }}
           />
         ),
       });
@@ -95,14 +91,7 @@ const Pages: CommandOption[] = [
         title: "Create an equity plan",
         shareClasses: [],
         subtitle: (
-          <Tldr
-            message="Equity plans are used to distribute ownership of your company using stock options, RSUs, and other instruments among employees and stakeholders."
-            cta={{
-              label: "Learn more",
-              // TODO - this link should be updated to the correct URL
-              href: "https://captable.inc/help",
-            }}
-          />
+          <Tldr message="Equity plans are used to distribute ownership of your company using stock options, RSUs, and other instruments among employees and stakeholders." />
         ),
       });
     },
@@ -118,14 +107,7 @@ const Pages: CommandOption[] = [
         title: "Create a share class",
         shareClasses: [],
         subtitle: (
-          <Tldr
-            message="A share class on a cap table represents a distinct category of shares with specific rights and characteristics, such as voting preferences or priorities. Eg. Common and Preferred shares, Class A, B, etc, ESOs and RSUs, etc."
-            cta={{
-              label: "Learn more",
-              // TODO - this link should be updated to the correct URL
-              href: "https://captable.inc/help",
-            }}
-          />
+          <Tldr message="A share class on a cap table represents a distinct category of shares with specific rights and characteristics, such as voting preferences or priorities. Eg. Common and Preferred shares, Class A, B, etc, ESOs and RSUs, etc." />
         ),
       });
     },
@@ -252,12 +234,12 @@ export function CommandMenu({ companyPublicId }: CommandMenuProps) {
                 <div
                   className={cn(
                     "rounded-lg p-0.5",
-                    page.id === "ai" ? "bg-teal-100" : "bg-gray-200",
+                    page.id === "ai" ? "bg-navy-100" : "bg-gray-200",
                   )}
                 >
                   {page.id === "ai" ? (
                     <page.icon
-                      className="h-4 w-4 p-0.5 text-teal-600"
+                      className="h-4 w-4 p-0.5 text-navy-600"
                       aria-hidden="true"
                     />
                   ) : (

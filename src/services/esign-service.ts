@@ -4,6 +4,7 @@ import {
   eSignNotificationEmailJob,
 } from "@/jobs/esign-email";
 import { type TEsignPdfSchema, eSignPdfJob } from "@/jobs/esign-pdf";
+import { constants } from "@/lib/constants";
 import { EsignAudit } from "@/server/audit";
 import type { TEsignAuditSchema } from "@/server/audit/schema";
 import type { TPrismaOrTransaction } from "@/server/db";
@@ -120,7 +121,7 @@ export class EsignService {
       {
         ...options,
         sender: {
-          name: options.sender.name ?? "Captable",
+          name: options.sender.name ?? constants.title,
           email: options.sender.email ?? "Unknown email",
         },
       },

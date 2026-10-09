@@ -43,7 +43,8 @@ export const MemberInviteEmail = ({
             </Text>
             <Text className="text-[14px] leading-[24px] text-black">
               <strong>{invitedBy}</strong> has invited you to join{" "}
-              <strong>{companyName}</strong> on <strong>Captable, Inc.</strong>.
+              <strong>{companyName}</strong> on{" "}
+              <strong>{constants.title}</strong>.
             </Text>
 
             <Section className="mb-[32px] mt-[32px]">
@@ -81,7 +82,7 @@ export const MemberInviteEmail = ({
 MemberInviteEmail.PreviewProps = {
   invitedBy: "joker",
   companyName: "Batmobile",
-  inviteLink: "https://captable.inc/...",
+  inviteLink: "https://dealroom.tin.info/...",
 } as MemberInviteEmailProps;
 
 export default MemberInviteEmail;

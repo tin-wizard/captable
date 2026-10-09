@@ -1,6 +1,7 @@
 import { dayjsExt } from "@/common/dayjs";
 import EsignEmail from "@/emails/EsignEmail";
 import { env } from "@/env";
+import { constants } from "@/lib/constants";
 import { EsignAudit } from "@/server/audit";
 import { db } from "@/server/db";
 import { sendMail } from "@/server/mailer";
@@ -102,7 +103,7 @@ export const eSignNotificationEmailWorker = defineWorker(
       subject: "eSign Document Request",
       html,
       headers: {
-        "X-From-Name": sender?.name || "Captable",
+        "X-From-Name": sender?.name || constants.title,
       },
     });
   },

@@ -99,7 +99,7 @@ const TeamMemberUploader = ({ setOpen }: TeamMemberUploaderType) => {
           target="_blank"
           rel="noopener noreferrer"
           href={""}
-          className="text-teal-700 underline"
+          className="text-navy-700 underline"
         >
           Learn more
         </Link>{" "}

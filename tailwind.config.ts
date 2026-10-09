@@ -21,9 +21,36 @@ const config = {
     extend: {
       fontFamily: {
         mono: ["var(--font-roboto-mono)", "monospace"],
-        sans: ["var(--font-satoshi)", "system-ui", "sans-serif"],
+        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        display: ["var(--font-inter-tight)", "var(--font-inter)", "sans-serif"],
       },
       colors: {
+        // TIN-inspired scales (tin.info navy and orange, shifted slightly)
+        navy: {
+          50: "#f3f6fb",
+          100: "#e4eaf4",
+          200: "#c8d4e7",
+          300: "#9cafd0",
+          400: "#6b86b4",
+          500: "#3b63ad",
+          600: "#213d6d",
+          700: "#172d55",
+          800: "#0d203f",
+          900: "#07142b",
+          950: "#040c1c",
+        },
+        ember: {
+          50: "#fff6f0",
+          100: "#ffe2cf",
+          200: "#ffc29c",
+          300: "#ff9d69",
+          400: "#f8814a",
+          500: "#ef6a30",
+          600: "#d65520",
+          700: "#b2441a",
+          800: "#8c3718",
+          900: "#722f17",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

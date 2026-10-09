@@ -1,5 +1,6 @@
 import EmptyState from "@/components/common/empty-state";
 import { Button } from "@/components/ui/button";
+import { constants } from "@/lib/constants";
 import { RiArrowRightLine, RiPieChartFill } from "@remixicon/react";
 import Link from "next/link";
 
@@ -12,10 +13,10 @@ const EmptyOverview = ({ firstName, publicCompanyId }: EmptyOverviewProps) => {
   return (
     <EmptyState
       icon={<RiPieChartFill />}
-      title={`Welcome to Captable, Inc. ${firstName && `, ${firstName}`} 👋`}
+      title={`Welcome to ${constants.title}${firstName && `, ${firstName}`} 👋`}
       subtitle={
         <span className="text-muted-foreground">
-          We will get you setup with your Captable in no time.
+          We will get your cap table set up in no time.
         </span>
       }
     >

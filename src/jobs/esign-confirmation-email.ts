@@ -1,4 +1,5 @@
 import ESignConfirmationEmail from "@/emails/EsignConfirmationEmail";
+import { constants } from "@/lib/constants";
 import { sendMail } from "@/server/mailer";
 import { render } from "@react-email/components";
 import { z } from "zod";
@@ -54,7 +55,7 @@ export const eSignConfirmationEmailWorker = defineWorker(
       ],
 
       headers: {
-        "X-From-Name": payload.senderName || "Captable",
+        "X-From-Name": payload.senderName || constants.title,
       },
     });
   },

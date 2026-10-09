@@ -53,10 +53,6 @@ const OptionsPage = async () => {
               <Tldr
                 message="Manage stock options by adding them. 
              Add approval dates, notes, grantId for the stakeholders. "
-                cta={{
-                  label: "Learn more",
-                  href: "https://captable.inc/help/stakeholder-options",
-                }}
               />
             }
             equityPlans={equityPlans.data}

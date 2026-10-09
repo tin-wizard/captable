@@ -107,7 +107,6 @@ const PublicUpdatePage = async (props: {
 
   return (
     <SharePageLayout
-      medium="updates"
       company={{
         name: company.name,
         logo: company.logo,

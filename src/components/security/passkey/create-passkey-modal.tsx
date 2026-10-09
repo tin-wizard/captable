@@ -145,7 +145,7 @@ const PasskeyModal = ({ title, subtitle, trigger }: PasskeyModalType) => {
             )}
           />
 
-          <Alert className="bg-teal-50">
+          <Alert className="bg-navy-50">
             <AlertDescription>
               By clicking continue, you&apos;ll be prompted to add the first
               available authenticator on your system. This will enhance your

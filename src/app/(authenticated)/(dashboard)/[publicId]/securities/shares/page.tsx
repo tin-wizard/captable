@@ -9,7 +9,7 @@ import type { Metadata } from "next";
 import { IssueShareButton } from "./issue-share-button";
 
 export const metadata: Metadata = {
-  title: "Captable | Shares",
+  title: "Shares",
 };
 
 const SharesPage = async () => {

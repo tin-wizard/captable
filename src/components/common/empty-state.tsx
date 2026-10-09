@@ -41,10 +41,10 @@ const EmptyState = ({
             <div
               className={cn(
                 "mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full",
-                error ? "bg-rose-100" : "bg-teal-100",
+                error ? "bg-rose-100" : "bg-navy-100",
               )}
             >
-              <span className={cn(error ? "text-rose-500" : "text-teal-500")}>
+              <span className={cn(error ? "text-rose-500" : "text-navy-500")}>
                 {icon}
               </span>
             </div>

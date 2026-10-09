@@ -7,6 +7,7 @@ import { RiArrowRightLine } from "@remixicon/react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 
+import { constants } from "@/lib/constants";
 import { api } from "@/trpc/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSession } from "next-auth/react";
@@ -45,7 +46,7 @@ export function VerifyMemberForm({ memberId, token }: VerifyMemberFormProps) {
     },
   });
 
-  async function onSubmit(values: TypeZodAcceptMemberMutationSchema) {
+  function onSubmit(values: TypeZodAcceptMemberMutationSchema) {
     acceptMember.mutate(values);
   }
 
@@ -55,7 +56,7 @@ export function VerifyMemberForm({ memberId, token }: VerifyMemberFormProps) {
       <div className="flex flex-col gap-y-4">
         <div className="flex flex-col gap-y-2 text-center">
           <h1 className="text-3xl font-semibold">
-            Welcome to our Captable, Inc.! 👋
+            Welcome to {constants.title}! 👋
           </h1>
           <p className="text-muted-foreground">
             Enter your information to complete onboarding

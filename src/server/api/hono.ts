@@ -1,4 +1,5 @@
 import { env } from "@/env";
+import { constants } from "@/lib/constants";
 import { handleError, handleZodError } from "@/server/api/error";
 import type { TPrisma } from "@/server/db";
 import type { tenantDb } from "@/server/tenant-db";
@@ -38,7 +39,7 @@ export function PublicAPI() {
     openapi: "3.1.0",
     info: {
       version: "v1",
-      title: "Captable, Inc. API (v1)",
+      title: `${constants.title} API (v1)`,
     },
     servers: [{ url: `${env.NEXTAUTH_URL}` }],
   }));
