@@ -247,6 +247,10 @@ export const authOptions: NextAuthOptions = {
           },
         }).catch(() => null);
 
+        if (!verification?.verified) {
+          throw new Error("Passkey verification failed.");
+        }
+
         //@TODO (Add audits for verification.verified event)
 
         await db.passkey.update({
@@ -255,7 +259,7 @@ export const authOptions: NextAuthOptions = {
           },
           data: {
             lastUsedAt: new Date(),
-            counter: verification?.authenticationInfo.newCounter,
+            counter: verification.authenticationInfo.newCounter,
           },
         });
 
