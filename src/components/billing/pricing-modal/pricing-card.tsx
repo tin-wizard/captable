@@ -62,7 +62,7 @@ export function PricingCard({
       </CardHeader>
       <CardFooter>
         <Button
-          className={cn(!active && "bg-teal-500 hover:bg-teal-500/80")}
+          className={cn(!active && "bg-navy-500 hover:bg-navy-500/80")}
           {...(active && { variant: "destructive" })}
           onClick={async () => {
             if (handleClick) {

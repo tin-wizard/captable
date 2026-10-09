@@ -42,9 +42,9 @@ const ActivityCard = async ({ className, publicId }: Props) => {
                       <>
                         <div>
                           <div className="relative px-1">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 ring-8 ring-white">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-100 ring-8 ring-white">
                               <RiAccountCircleFill
-                                className="h-5 w-5 text-teal-500"
+                                className="h-5 w-5 text-navy-500"
                                 aria-hidden="true"
                               />
                             </div>

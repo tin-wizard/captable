@@ -3,7 +3,6 @@ import { Card } from "@/components/ui/card";
 import Link from "next/link";
 
 type SharePageLayoutProps = {
-  medium: string;
   company: {
     name: string;
     logo: string | null;
@@ -15,10 +14,9 @@ type SharePageLayoutProps = {
 export const SharePageLayout = ({
   company,
   title,
-  medium,
   children,
 }: SharePageLayoutProps) => (
-  <div className="flex min-h-screen justify-center bg-gradient-to-br from-indigo-50 via-white to-cyan-100 px-5 pb-5 pt-12">
+  <div className="flex min-h-screen justify-center bg-gradient-to-br from-navy-50 via-white to-ember-50 px-5 pb-5 pt-12">
     <div className="mx-auto flex w-[1080px] max-w-sm flex-col sm:max-w-4xl">
       <div className="mb-16 flex items-center gap-3">
         <Avatar className="h-12 w-12 rounded">
@@ -36,12 +34,12 @@ export const SharePageLayout = ({
         <p>
           Powered by{" "}
           <Link
-            href={`https://captable.inc?utm_source=${company.name}&utm_medium=${medium}&utm_campaign=powered_by`}
+            href="https://tin.info"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-bold text-teal-500 hover:underline"
+            className="font-bold text-navy-500 hover:underline"
           >
-            Captable, Inc.
+            TIN
           </Link>
         </p>
       </div>

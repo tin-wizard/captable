@@ -27,7 +27,7 @@ const AccessTokenPage = async () => {
               Create an access token to get access to the API.{" "}
               <Link
                 href="/docs/access-tokens"
-                className="hover:underline text-teal-600"
+                className="hover:underline text-navy-600"
                 target="_blank"
               >
                 Learn more

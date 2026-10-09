@@ -32,14 +32,7 @@ const EquityPlanPage = async () => {
           title="Create an equity plan"
           shareClasses={shareClasses}
           subtitle={
-            <Tldr
-              message="Equity plans are used to distribute ownership of your company using stock options, RSUs, and other instruments among employees and stakeholders."
-              cta={{
-                label: "Learn more",
-                // TODO - this link should be updated to the correct URL
-                href: "https://captable.inc/help",
-              }}
-            />
+            <Tldr message="Equity plans are used to distribute ownership of your company using stock options, RSUs, and other instruments among employees and stakeholders." />
           }
         />
       </EmptyState>
@@ -62,14 +55,7 @@ const EquityPlanPage = async () => {
             shareClasses={shareClasses}
             title="Create an equity plan"
             subtitle={
-              <Tldr
-                message="Equity plans are used to distribute ownership of your company using stock options, RSUs, and other instruments among employees and stakeholders."
-                cta={{
-                  label: "Learn more",
-                  // TODO - this link should be updated to the correct URL
-                  href: "https://captable.inc/help",
-                }}
-              />
+              <Tldr message="Equity plans are used to distribute ownership of your company using stock options, RSUs, and other instruments among employees and stakeholders." />
             }
           />
         </div>

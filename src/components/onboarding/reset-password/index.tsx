@@ -1,6 +1,6 @@
 "use client";
 
-import { CaptableLogo } from "@/components/common/logo";
+import { BrandLogo } from "@/components/common/logo";
 import { PasswordInput } from "@/components/ui/password-input";
 import { api } from "@/trpc/react";
 import { ZPasswordSchema } from "@/trpc/routers/auth/schema";
@@ -67,10 +67,10 @@ export const ResetPasswordForm = ({ token }: ResetPasswordFormProps) => {
   };
 
   return (
-    <div className="flex h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-cyan-100">
+    <div className="flex h-screen items-center justify-center bg-gradient-to-br from-navy-50 via-white to-ember-50">
       <div className="grid w-full max-w-md grid-cols-1 gap-5 rounded-xl border bg-white p-10 shadow">
         <div className="flex flex-col gap-y-2 text-center">
-          <CaptableLogo className="mb-1 h-10 w-auto" />
+          <BrandLogo className="mb-1 h-10 w-auto" />
           <h1 className="text-2xl font-semibold tracking-tight">
             Reset your password
           </h1>

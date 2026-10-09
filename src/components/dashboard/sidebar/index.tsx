@@ -34,7 +34,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
-import { CaptableLogo } from "@/components/common/logo";
+import { BrandLogo } from "@/components/common/logo";
 import { usePathname } from "next/navigation";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -214,7 +214,7 @@ export function SideBar({ className, publicId, companies }: SideBarProps) {
       <div className={cn("pb-12", className)}>
         <div className="fixed gap-y-4 py-4">
           <div className="flex items-center px-1 py-2">
-            <CaptableLogo className="h-7 w-auto" />
+            <BrandLogo className="h-7 w-auto" />
 
             <CompanySwitcher companies={companies} publicId={publicId} />
           </div>

@@ -4,6 +4,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 
 import { env } from "@/env";
+import { constants } from "@/lib/constants";
 import { type SendMailOptions, createTransport } from "nodemailer";
 
 const getTransport = () => {
@@ -15,7 +16,7 @@ const getTransport = () => {
 type RecordType = Record<string, string | undefined>;
 
 export const sendMail = (options: Omit<SendMailOptions, "from">) => {
-  let from = `Captable <${env.EMAIL_FROM}>`;
+  let from = `${constants.title} <${env.EMAIL_FROM}>`;
   const headers = (options.headers || {}) as RecordType;
 
   const senderName = headers["X-From-Name"];

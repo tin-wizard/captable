@@ -33,10 +33,6 @@ export default function StakeholderDropdown() {
                     <Tldr
                       message="Manage stakeholders by adding them. 
               Categorize, assign roles, and maintain contact info for investors, partners, and clients."
-                      cta={{
-                        label: "Learn more",
-                        href: "https://captable.inc/help",
-                      }}
                     />
                   ),
                 });
@@ -61,10 +57,6 @@ export default function StakeholderDropdown() {
                     <Tldr
                       message="Manage stakeholders by adding them. 
               Categorize, assign roles, and maintain contact info for investors, partners, and clients."
-                      cta={{
-                        label: "Learn more",
-                        href: "https://captable.inc/help",
-                      }}
                     />
                   ),
                 });

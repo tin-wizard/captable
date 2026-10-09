@@ -1,3 +1,4 @@
+import { constants } from "@/lib/constants";
 import { ApiReference } from "@scalar/nextjs-api-reference";
 
 const config = {
@@ -5,8 +6,8 @@ const config = {
     url: "/api/v1/schema",
   },
   metaData: {
-    title: "Captable API Docs",
-    description: "Captable API Docs",
+    title: `${constants.title} API Docs`,
+    description: `${constants.title} API Docs`,
   },
 };
 

@@ -147,14 +147,7 @@ export const GeneralDetails = ({ shareClasses = [] }: GeneralDetailsProps) => {
                               type: "create",
                               title: "Create a share class",
                               subtitle: (
-                                <Tldr
-                                  message="A share class on a cap table represents a distinct category of shares with specific rights and characteristics, such as voting preferences or priorities. Eg. Common and Preferred shares, Class A, B, etc, ESOs and RSUs, etc."
-                                  cta={{
-                                    label: "Learn more",
-                                    // TODO - this link should be updated to the correct URL
-                                    href: "https://captable.inc/help",
-                                  }}
-                                />
+                                <Tldr message="A share class on a cap table represents a distinct category of shares with specific rights and characteristics, such as voting preferences or priorities. Eg. Common and Preferred shares, Class A, B, etc, ESOs and RSUs, etc." />
                               ),
                             });
                           }}

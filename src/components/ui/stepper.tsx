@@ -139,7 +139,7 @@ function StepList() {
       <div
         className={cn(
           "absolute left-4 top-4 -ml-1 mt-0.5 h-full w-0.5 group-last:hidden",
-          stepId < currentStep ? "bg-teal-500" : "bg-gray-300",
+          stepId < currentStep ? "bg-ember-500" : "bg-gray-300",
         )}
         aria-hidden="true"
       />
@@ -148,10 +148,10 @@ function StepList() {
           <span
             className={cn(
               "relative z-10 flex h-6 w-6 items-center justify-center rounded-full ",
-              currentStep === stepId && "border-2 border-teal-500 bg-white",
+              currentStep === stepId && "border-2 border-ember-500 bg-white",
               stepId > currentStep &&
                 "border-2 border-gray-300 bg-white group-hover:border-gray-400",
-              stepId < currentStep && "bg-teal-500 group-hover:bg-teal-600",
+              stepId < currentStep && "bg-ember-500 group-hover:bg-ember-600",
             )}
           >
             {stepId < currentStep ? (
@@ -160,7 +160,7 @@ function StepList() {
               <span
                 className={cn(
                   "h-2.5 w-2.5 rounded-full",
-                  currentStep === stepId && "bg-teal-500",
+                  currentStep === stepId && "bg-ember-500",
                   stepId > currentStep &&
                     "bg-transparent group-hover:bg-gray-300",
                 )}
@@ -172,7 +172,7 @@ function StepList() {
           <span
             className={cn(
               "text-sm font-medium",
-              currentStep === stepId && "text-teal-500",
+              currentStep === stepId && "text-ember-500",
               stepId > currentStep && "text-gray-500",
             )}
           >

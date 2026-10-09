@@ -109,7 +109,7 @@ const SignInForm = ({ isGoogleAuthEnabled }: LoginFormProps) => {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-cyan-100">
+    <div className="flex h-screen items-center justify-center bg-gradient-to-br from-navy-50 via-white to-ember-50">
       <div className="grid w-full max-w-md grid-cols-1 gap-5 rounded-xl border bg-white p-10 shadow">
         <AuthFormHeader page="signin" />
         <>

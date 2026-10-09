@@ -1,12 +1,13 @@
 import SignInForm from "@/components/onboarding/signin";
 import { IS_GOOGLE_AUTH_ENABLED } from "@/constants/auth";
+import { constants } from "@/lib/constants";
 import { getServerComponentAuthSession } from "@/server/auth";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Login",
-  description: "Login to Captable, Inc.",
+  description: `Log in to ${constants.title}`,
 };
 
 export default async function SignIn() {
