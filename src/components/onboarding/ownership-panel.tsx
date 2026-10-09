@@ -108,122 +108,125 @@ export function OwnershipPanel() {
     <section className="relative flex items-center gap-5 overflow-hidden bg-navy-800 px-6 py-6 text-white sm:gap-8 sm:px-10 sm:py-8 lg:w-[52%] lg:flex-col lg:items-stretch lg:justify-center lg:gap-10 lg:px-14 lg:py-12">
       <span aria-hidden="true" className="ownership-glow" />
 
-      <div className="relative min-w-0 flex-1 lg:flex-none">
-        <h2 className="max-w-md text-lg font-semibold leading-tight tracking-tight text-white sm:text-2xl lg:text-[32px]">
-          See who owns what, at every round.
-        </h2>
-        <div
-          className="mt-3 flex flex-wrap gap-1.5 sm:mt-4"
-          role="group"
-          aria-label="Funding round"
-        >
-          {ROUNDS.map((r, i) => (
-            <button
-              key={r.name}
-              type="button"
-              aria-pressed={round === i}
-              onClick={() => setRound(i)}
-              className={cn(
-                "relative overflow-hidden rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember-400",
-                round === i
-                  ? "border-ember-500/60 bg-ember-500/20 text-white"
-                  : "border-white/15 bg-white/5 text-navy-200 hover:text-white",
-              )}
-            >
-              {r.name}
-              {round === i && !reduceMotion && (
-                <span
-                  key={round}
-                  aria-hidden="true"
-                  className="ownership-progress"
-                  style={{ animationDuration: `${MOVE_MS + HOLD_MS}ms` }}
-                />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <figure
-        className="relative m-0 flex shrink-0 items-center gap-6 lg:gap-9"
-        aria-label="Example ownership by funding round"
-      >
-        <div
-          className="relative size-24 shrink-0 sm:size-44 lg:size-[230px]"
-          data-dim={hot !== null ? "true" : undefined}
-        >
-          <svg
-            viewBox="0 0 230 230"
-            className="size-full -rotate-90"
-            aria-hidden="true"
+      {/* one centered column on desktop; on phones the children sit in the row */}
+      <div className="contents lg:relative lg:mx-auto lg:flex lg:w-full lg:max-w-[540px] lg:flex-col lg:gap-10">
+        <div className="relative min-w-0 flex-1 lg:flex-none">
+          <h2 className="max-w-md text-lg font-semibold leading-tight tracking-tight text-white sm:text-2xl lg:text-[32px]">
+            See who owns what, at every round.
+          </h2>
+          <div
+            className="mt-3 flex flex-wrap gap-1.5 sm:mt-4"
+            role="group"
+            aria-label="Funding round"
           >
-            <circle
-              cx="115"
-              cy="115"
-              r={RADIUS}
-              fill="none"
-              stroke="rgba(255,255,255,0.07)"
-              strokeWidth="26"
-            />
-            {HOLDERS.map((h, i) => (
+            {ROUNDS.map((r, i) => (
+              <button
+                key={r.name}
+                type="button"
+                aria-pressed={round === i}
+                onClick={() => setRound(i)}
+                className={cn(
+                  "relative overflow-hidden rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember-400",
+                  round === i
+                    ? "border-ember-500/60 bg-ember-500/20 text-white"
+                    : "border-white/15 bg-white/5 text-navy-200 hover:text-white",
+                )}
+              >
+                {r.name}
+                {round === i && !reduceMotion && (
+                  <span
+                    key={round}
+                    aria-hidden="true"
+                    className="ownership-progress"
+                    style={{ animationDuration: `${MOVE_MS + HOLD_MS}ms` }}
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <figure
+          className="relative m-0 flex shrink-0 items-center gap-6 lg:gap-9"
+          aria-label="Example ownership by funding round"
+        >
+          <div
+            className="relative size-24 shrink-0 sm:size-44 lg:size-[230px]"
+            data-dim={hot !== null ? "true" : undefined}
+          >
+            <svg
+              viewBox="0 0 230 230"
+              className="size-full -rotate-90"
+              aria-hidden="true"
+            >
               <circle
-                key={h.name}
-                ref={(el) => {
-                  segRefs.current[i] = el;
-                }}
-                className="ownership-seg"
-                data-hot={hot === i ? "true" : undefined}
                 cx="115"
                 cy="115"
                 r={RADIUS}
                 fill="none"
-                stroke={h.color}
-                strokeDasharray={`0 ${CIRCUMFERENCE}`}
+                stroke="rgba(255,255,255,0.07)"
+                strokeWidth="26"
               />
-            ))}
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span
-              ref={totalRef}
-              className="text-lg font-semibold tracking-tight sm:text-2xl lg:text-3xl"
-            >
-              0%
-            </span>
-            <span className="mt-0.5 hidden font-mono text-[11px] text-navy-300 sm:block lg:text-xs">
-              fully diluted
-            </span>
-          </div>
-        </div>
-
-        <ul className="m-0 hidden min-w-[220px] list-none gap-1.5 p-0 sm:grid">
-          {HOLDERS.map((h, i) => (
-            <li
-              key={h.name}
-              ref={(el) => {
-                rowRefs.current[i] = el;
-              }}
-              className="ownership-row grid grid-cols-[12px_1fr_auto] items-center gap-2.5 rounded-md px-1.5 py-1 text-sm text-navy-100 transition-colors hover:bg-white/5 hover:text-white"
-              style={{ animationDelay: `${150 + i * 110}ms` }}
-              onMouseEnter={() => setHot(i)}
-              onMouseLeave={() => setHot(null)}
-            >
+              {HOLDERS.map((h, i) => (
+                <circle
+                  key={h.name}
+                  ref={(el) => {
+                    segRefs.current[i] = el;
+                  }}
+                  className="ownership-seg"
+                  data-hot={hot === i ? "true" : undefined}
+                  cx="115"
+                  cy="115"
+                  r={RADIUS}
+                  fill="none"
+                  stroke={h.color}
+                  strokeDasharray={`0 ${CIRCUMFERENCE}`}
+                />
+              ))}
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span
-                className="size-3 rounded-[3px]"
-                style={{ background: h.color }}
-              />
-              <span>{h.name}</span>
-              <span
-                ref={(el) => {
-                  pctRefs.current[i] = el;
-                }}
-                className="font-mono text-[13px] font-medium tabular-nums text-white"
+                ref={totalRef}
+                className="text-lg font-semibold tracking-tight sm:text-2xl lg:text-3xl"
               >
-                0.0%
+                0%
               </span>
-            </li>
-          ))}
-        </ul>
-      </figure>
+              <span className="mt-0.5 hidden font-mono text-[11px] text-navy-300 sm:block lg:text-xs">
+                fully diluted
+              </span>
+            </div>
+          </div>
+
+          <ul className="m-0 hidden min-w-[220px] list-none gap-1.5 p-0 sm:grid">
+            {HOLDERS.map((h, i) => (
+              <li
+                key={h.name}
+                ref={(el) => {
+                  rowRefs.current[i] = el;
+                }}
+                className="ownership-row grid grid-cols-[12px_1fr_auto] items-center gap-2.5 rounded-md px-1.5 py-1 text-sm text-navy-100 transition-colors hover:bg-white/5 hover:text-white"
+                style={{ animationDelay: `${150 + i * 110}ms` }}
+                onMouseEnter={() => setHot(i)}
+                onMouseLeave={() => setHot(null)}
+              >
+                <span
+                  className="size-3 rounded-[3px]"
+                  style={{ background: h.color }}
+                />
+                <span>{h.name}</span>
+                <span
+                  ref={(el) => {
+                    pctRefs.current[i] = el;
+                  }}
+                  className="font-mono text-[13px] font-medium tabular-nums text-white"
+                >
+                  0.0%
+                </span>
+              </li>
+            ))}
+          </ul>
+        </figure>
+      </div>
     </section>
   );
 }
