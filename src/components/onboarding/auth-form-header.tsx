@@ -1,5 +1,4 @@
 import { BrandLogo } from "@/components/common/logo";
-import { constants } from "@/lib/constants";
 
 interface LoginFormHeaderProps {
   page?: string;
@@ -13,9 +12,7 @@ export function AuthFormHeader({ page }: LoginFormHeaderProps) {
       </div>
 
       <h1 className="mb-2 text-2xl font-semibold tracking-tight">
-        {page === "signup"
-          ? `Sign up to ${constants.title}`
-          : `Log in to ${constants.title}`}
+        {page === "signup" ? "Sign up" : "Log in"}
       </h1>
     </div>
   );
