@@ -2,7 +2,7 @@ import { getServerComponentAuthSession } from "@/server/auth";
 import { tenantOrigin } from "@/server/domains/config";
 import { getRequestHost } from "@/server/domains/request-host";
 import { headers } from "next/headers";
-import { permanentRedirect, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
 export default async function AuthenticatedLayout({
   children,
@@ -13,7 +13,8 @@ export default async function AuthenticatedLayout({
   const host = await getRequestHost();
   // before the session check, so a logged-out alias visitor lands on the primary host
   if (host.kind === "alias") {
-    permanentRedirect(`${tenantOrigin(host.redirectHost)}${path}`);
+    // temporary: a cached 308 would loop after a rename back (A→B→A)
+    redirect(`${tenantOrigin(host.redirectHost)}${path}`);
   }
 
   const session = await getServerComponentAuthSession();

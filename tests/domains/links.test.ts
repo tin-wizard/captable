@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-import { env } from "@/env";
 import { db } from "@/server/db";
 import {
   assignPlatformSubdomain,
@@ -72,14 +71,14 @@ describe("companyUrl", () => {
     expect(await companyUrl(db, a.companyId, "/p")).toMatch(
       /^https:\/\/lk-a\..+\/p$/,
     ));
-  it("falls back to the base url without a primary", async () =>
+  it("falls back to the canonical origin without a primary", async () =>
     expect(await companyUrl(db, b.companyId, "/p")).toBe(
-      `${env.NEXT_PUBLIC_BASE_URL}/p`,
+      "https://dealroom.tin.info/p",
     ));
-  it("falls back to the base url when the flag is off", async () => {
+  it("falls back to the canonical origin when the flag is off", async () => {
     state.enabled = false;
     expect(await companyUrl(db, a.companyId, "/p")).toBe(
-      `${env.NEXT_PUBLIC_BASE_URL}/p`,
+      "https://dealroom.tin.info/p",
     );
   });
   it("userUrl is canonical", () =>

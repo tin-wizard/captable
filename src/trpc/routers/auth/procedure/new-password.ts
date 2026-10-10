@@ -1,4 +1,5 @@
 import { Audit } from "@/server/audit";
+import { bumpSessionVersion } from "@/server/auth";
 import { getPasswordResetTokenByToken } from "@/server/password-reset-token";
 import { getUserByEmail } from "@/server/user";
 import { withoutAuth } from "@/trpc/api/trpc";
@@ -64,6 +65,9 @@ export const newPasswordProcedure = withoutAuth
     await ctx.db.passwordResetToken.delete({
       where: { id: existingToken.id },
     });
+
+    // revoke every session (canonical and company hosts) after a reset
+    await bumpSessionVersion(user.id);
 
     return {
       success: true,

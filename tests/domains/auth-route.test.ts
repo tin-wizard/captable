@@ -94,9 +94,30 @@ describe("/api/auth on a company host", () => {
     expect(await r.json()).toEqual({ csrfToken: "" });
   });
 
+  it("session and csrf are not cacheable", async () => {
+    for (const action of ["session", "csrf"]) {
+      const r = await call(GET, "GET", [action]);
+      expect(r.headers.get("cache-control")).toBe("no-store");
+    }
+  });
+
   it("signin/google and providers return 404", async () => {
     expect((await call(POST, "POST", ["signin", "google"])).status).toBe(404);
     expect((await call(GET, "GET", ["providers"])).status).toBe(404);
+    expect(nextAuthHandler).not.toHaveBeenCalled();
+  });
+});
+
+describe("/api/auth on alias and unknown hosts", () => {
+  it("returns 404 without delegating", async () => {
+    for (const h of [
+      { kind: "alias", redirectHost: HOST },
+      { kind: "unknown" },
+    ] as RequestHost[]) {
+      host = h;
+      expect((await call(GET, "GET", ["session"])).status).toBe(404);
+      expect((await call(POST, "POST", ["signin", "google"])).status).toBe(404);
+    }
     expect(nextAuthHandler).not.toHaveBeenCalled();
   });
 });

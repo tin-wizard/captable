@@ -108,6 +108,10 @@ describe("tenantAuthRedirect", () => {
     expect(
       tenantAuthRedirect("/reset-password/tok", new URLSearchParams()),
     ).toBe("canonical:/reset-password/tok"));
+  it("logout goes to canonical", () =>
+    expect(tenantAuthRedirect("/logout", new URLSearchParams())).toBe(
+      "canonical:/logout",
+    ));
   it("ordinary pages are untouched", () =>
     expect(
       tenantAuthRedirect("/abc/stakeholders", new URLSearchParams()),

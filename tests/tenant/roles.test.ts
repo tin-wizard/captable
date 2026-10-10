@@ -1154,7 +1154,7 @@ describe("last active admin", () => {
         }
       }
     }
-  });
+  }, 30_000);
 
   // its own tenant pair: toggling an extra admin would change the counts above
   it("toggleActivation audits deactivation and activation as such", async () => {

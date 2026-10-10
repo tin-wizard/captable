@@ -1,4 +1,3 @@
-import { env } from "@/env";
 import type { TPrismaOrTransaction } from "@/server/db";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
@@ -26,7 +25,7 @@ export async function companyUrl(
   const host = domainConfig().enabled
     ? await primaryHostname(db, companyId)
     : null;
-  return `${host ? tenantOrigin(host) : env.NEXT_PUBLIC_BASE_URL}${path}`;
+  return `${host ? tenantOrigin(host) : domainConfig().canonicalOrigin}${path}`;
 }
 
 export const userUrl = (path: string) =>

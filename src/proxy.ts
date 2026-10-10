@@ -25,6 +25,7 @@ const CANONICAL_ONLY = [
   "/verify-member",
   "/onboarding",
   "/company/new",
+  "/logout",
 ];
 
 export function isSameOrigin(
