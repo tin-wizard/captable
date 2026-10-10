@@ -49,6 +49,7 @@ const anon = appRouter.createCaller({
   requestIp: "127.0.0.1",
   userAgent: "vitest",
   headers: new Headers(),
+  host: { kind: "canonical" },
 });
 
 const code = (p: Promise<unknown>) =>

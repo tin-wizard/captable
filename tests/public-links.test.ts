@@ -164,6 +164,7 @@ describe("e-sign procedures", () => {
     requestIp: "127.0.0.1",
     userAgent: "vitest",
     headers: new Headers(),
+    host: { kind: "canonical" },
   });
   const signInput = (token: string) => ({ token, data: {} });
 
