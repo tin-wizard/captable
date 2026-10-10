@@ -59,3 +59,7 @@ yarn-error.log*
 # Sentry Config File
 .env.sentry-build-plugin
 notes.md
+# e2e
+playwright-report/
+test-results/
+e2e/.seed.json

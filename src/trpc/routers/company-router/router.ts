@@ -47,7 +47,8 @@ export const companyRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         const { company } = input;
-        const { incorporationDate, ...rest } = company;
+        // subdomain is only assigned at creation (renames go through domain.rename)
+        const { incorporationDate, subdomain: _subdomain, ...rest } = company;
         const { requestIp, userAgent, session } = ctx;
         const db = ctx.tenant.db;
         const { user } = session;

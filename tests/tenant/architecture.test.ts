@@ -1,6 +1,10 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { PARENT_SCOPED } from "@/server/tenant-db";
+import {
+  TENANT_HOST_PUBLIC_PROCEDURES,
+  TENANT_HOST_USER_PROCEDURES,
+} from "@/trpc/api/trpc";
 import { describe, expect, it } from "vitest";
 
 // Static scan (no DB). Guards the tenant architecture from regressing.
@@ -21,6 +25,8 @@ const ALLOWLIST_TENANTLESS: Record<string, string> = {
     "invitee has no active membership until accepting",
   [`${R}security-router/procedures/update-password.tsx`]:
     "user-level password change",
+  [`${R}domain-router/router.ts`]:
+    "label availability is a global lookup; rename runs the registry in a raw-db transaction with companyId from ctx.tenant",
   [`${R}billing-router/procedures/get-products.ts`]:
     "global billing catalogue; BillingCustomer is global on purpose",
 };
@@ -333,5 +339,18 @@ describe("tenant architecture guard", () => {
       ),
     ).toBe(true);
     expect(violatesG("export const registerRoutes = (api) => {}")).toBe(false);
+  });
+});
+
+describe("company-host procedure allowlists", () => {
+  it("are exactly the reviewed procedures", () => {
+    expect([...TENANT_HOST_USER_PROCEDURES].sort()).toEqual([
+      "billing.getProducts",
+      "bucket.presignPublicUpload",
+    ]);
+    expect([...TENANT_HOST_PUBLIC_PROCEDURES].sort()).toEqual([
+      "template.getSigningFields",
+      "template.sign",
+    ]);
   });
 });

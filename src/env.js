@@ -47,6 +47,9 @@ export const env = createEnv({
     NEXTAUTH_SECRET_PREVIOUS: z.string().min(32).optional(),
     // "1" rejects public links without exp (turn on 30 days after deploy)
     PUBLIC_LINK_REQUIRE_EXPIRY: z.enum(["0", "1"]).optional(),
+    // company subdomains ({label}.<TENANT_BASE_DOMAIN>); "1" turns them on
+    DOMAINS_ENABLED: z.enum(["0", "1"]).default("0"),
+    TENANT_BASE_DOMAIN: z.string().optional(),
     EMAIL_SERVER: z.string().optional(),
     EMAIL_FROM: z.string(),
 
@@ -103,6 +106,8 @@ export const env = createEnv({
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     NEXTAUTH_SECRET_PREVIOUS: process.env.NEXTAUTH_SECRET_PREVIOUS,
     PUBLIC_LINK_REQUIRE_EXPIRY: process.env.PUBLIC_LINK_REQUIRE_EXPIRY,
+    DOMAINS_ENABLED: process.env.DOMAINS_ENABLED,
+    TENANT_BASE_DOMAIN: process.env.TENANT_BASE_DOMAIN,
     EMAIL_SERVER: process.env.EMAIL_SERVER,
     EMAIL_FROM: process.env.EMAIL_FROM,
 

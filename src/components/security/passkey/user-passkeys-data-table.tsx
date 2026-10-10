@@ -25,6 +25,10 @@ import {
 import { dayjsExt } from "@/common/dayjs";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
+import {
+  type PageResettable,
+  resetPageOn,
+} from "@/components/ui/data-table/reset-page";
 import { api } from "@/trpc/react";
 import { RiMore2Fill } from "@remixicon/react";
 import { useRouter } from "next/navigation";
@@ -230,8 +234,12 @@ const PasskeyTable = ({ passkey }: PasskeyType) => {
     columns: columns,
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
+    autoResetPageIndex: false,
+    onSortingChange: resetPageOn(setSorting, (): PageResettable => table),
+    onColumnFiltersChange: resetPageOn(
+      setColumnFilters,
+      (): PageResettable => table,
+    ),
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),

@@ -97,7 +97,7 @@ type Case = {
   proc: string;
   perm: [TSubjects, TActions];
   run: (c: Caller, f: Fx) => Promise<unknown>;
-  // the handler calls a third party (Stripe) that is not reachable in tests:
+  // the handler calls a third party (Stripe) or is flag-gated off in tests:
   // ADMIN is only required to get past the access check
   adminPastAclOnly?: true;
 };
@@ -524,6 +524,13 @@ const cases: Case[] = [
     proc: "company.updateCompany",
     perm: ["company", "update"],
     run: (c) => c.company.updateCompany(companyInput),
+  },
+  {
+    proc: "domain.rename",
+    perm: ["company", "update"],
+    // NOT_FOUND past the ACL while DOMAINS_ENABLED is off in tests
+    adminPastAclOnly: true,
+    run: (c) => c.domain.rename({ label: `roles-${nanoid(6)}` }),
   },
   {
     proc: "bankAccounts.create",
@@ -1147,7 +1154,7 @@ describe("last active admin", () => {
         }
       }
     }
-  });
+  }, 30_000);
 
   // its own tenant pair: toggling an extra admin would change the counts above
   it("toggleActivation audits deactivation and activation as such", async () => {

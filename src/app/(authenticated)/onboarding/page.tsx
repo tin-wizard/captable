@@ -13,7 +13,7 @@ const OnboardingPage = async () => {
   const user = session.user;
 
   if (user.isOnboarded) {
-    redirect("/dashboard");
+    redirect("/");
   }
 
   return (

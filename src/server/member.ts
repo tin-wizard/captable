@@ -88,3 +88,11 @@ export async function revokeExistingInviteTokens({
     },
   });
 }
+
+export async function isActiveMember(userId: string, companyId: string) {
+  const member = await db.member.findFirst({
+    where: { userId, companyId, status: "ACTIVE", isOnboarded: true },
+    select: { id: true },
+  });
+  return !!member;
+}

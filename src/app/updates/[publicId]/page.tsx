@@ -5,6 +5,7 @@ import UpdateRenderer from "@/components/update/renderer";
 import { type JWTVerifyResult, decode } from "@/lib/jwt";
 import { UpdateStatusEnum } from "@/prisma/enums";
 import { db } from "@/server/db";
+import { assertHostOwns } from "@/server/domains/links";
 import { render } from "@react-email/components";
 import { RiLock2Line } from "@remixicon/react";
 import { notFound } from "next/navigation";
@@ -73,6 +74,8 @@ const PublicUpdatePage = async (props: {
   if (!update) {
     return notFound();
   }
+
+  await assertHostOwns(update.companyId);
 
   const canRenderInPublic =
     update.status === UpdateStatusEnum.PUBLIC && update.public;

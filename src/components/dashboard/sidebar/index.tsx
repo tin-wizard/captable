@@ -202,9 +202,16 @@ interface SideBarProps {
   className?: string;
   publicId: string;
   companies: TGetCompanyList;
+  /** set only on a company host */
+  canonicalOrigin: string | null;
 }
 
-export function SideBar({ className, publicId, companies }: SideBarProps) {
+export function SideBar({
+  className,
+  publicId,
+  companies,
+  canonicalOrigin,
+}: SideBarProps) {
   const currentPath = usePathname();
 
   const basePath = `/${publicId}`;
@@ -216,7 +223,11 @@ export function SideBar({ className, publicId, companies }: SideBarProps) {
           <div className="flex items-center px-1 py-2">
             <BrandLogo className="h-7 w-auto" />
 
-            <CompanySwitcher companies={companies} publicId={publicId} />
+            <CompanySwitcher
+              companies={companies}
+              publicId={publicId}
+              canonicalOrigin={canonicalOrigin}
+            />
           </div>
 
           <div className="overflow-auto py-2">

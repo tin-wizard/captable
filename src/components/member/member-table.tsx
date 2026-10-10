@@ -31,6 +31,10 @@ import { api } from "@/trpc/react";
 
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 
+import {
+  type PageResettable,
+  resetPageOn,
+} from "@/components/ui/data-table/reset-page";
 import { getRoleId } from "@/lib/rbac/access-control-utils";
 import type { RouterOutputs } from "@/trpc/shared";
 import { RiMore2Fill } from "@remixicon/react";
@@ -294,9 +298,13 @@ const MemberTable = ({ members, roles }: MembersType) => {
     data: members,
     columns: columns,
     enableRowSelection: true,
+    autoResetPageIndex: false,
     onRowSelectionChange: setRowSelection,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
+    onSortingChange: resetPageOn(setSorting, (): PageResettable => table),
+    onColumnFiltersChange: resetPageOn(
+      setColumnFilters,
+      (): PageResettable => table,
+    ),
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),

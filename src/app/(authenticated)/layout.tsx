@@ -1,4 +1,7 @@
 import { getServerComponentAuthSession } from "@/server/auth";
+import { tenantOrigin } from "@/server/domains/config";
+import { getRequestHost } from "@/server/domains/request-host";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 export default async function AuthenticatedLayout({
@@ -6,10 +9,18 @@ export default async function AuthenticatedLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const path = (await headers()).get("x-dr-path") ?? "/";
+  const host = await getRequestHost();
+  // before the session check, so a logged-out alias visitor lands on the primary host
+  if (host.kind === "alias") {
+    // temporary: a cached 308 would loop after a rename back (A→B→A)
+    redirect(`${tenantOrigin(host.redirectHost)}${path}`);
+  }
+
   const session = await getServerComponentAuthSession();
 
   if (!session) {
-    redirect("/login");
+    redirect(`/login?callbackUrl=${encodeURIComponent(path)}`);
   }
   return <>{children}</>;
 }

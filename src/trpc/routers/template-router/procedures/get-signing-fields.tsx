@@ -10,64 +10,68 @@ export const getSigningFieldsProcedure = withoutAuth
       input.token,
     );
 
-    const { bucket, fields, status } = await ctx.db.$transaction(async (tx) => {
-      const recipient = await tx.esignRecipient.findFirstOrThrow({
-        where: {
-          id: recipientId,
-          templateId,
-          status: "SENT",
-        },
-        select: {
-          templateId: true,
-        },
-      });
-
-      const { bucket, status } = await tx.template.findFirstOrThrow({
-        where: {
-          id: recipient.templateId,
-          status: {
-            notIn: ["COMPLETE", "DRAFT"],
+    const { bucket, fields, status, companyId } = await ctx.db.$transaction(
+      async (tx) => {
+        const recipient = await tx.esignRecipient.findFirstOrThrow({
+          where: {
+            id: recipientId,
+            templateId,
+            status: "SENT",
           },
-        },
-        select: {
-          bucket: {
-            select: {
-              key: true,
+          select: {
+            templateId: true,
+          },
+        });
+
+        const { bucket, status, companyId } =
+          await tx.template.findFirstOrThrow({
+            where: {
+              id: recipient.templateId,
+              status: {
+                notIn: ["COMPLETE", "DRAFT"],
+              },
             },
+            select: {
+              bucket: {
+                select: {
+                  key: true,
+                },
+              },
+              status: true,
+              companyId: true,
+            },
+          });
+
+        const fields = await tx.templateField.findMany({
+          where: {
+            templateId: recipient.templateId,
           },
-          status: true,
-        },
-      });
+          select: {
+            id: true,
+            name: true,
+            width: true,
+            height: true,
+            top: true,
+            left: true,
+            required: true,
+            defaultValue: true,
+            readOnly: true,
+            type: true,
+            viewportHeight: true,
+            viewportWidth: true,
+            page: true,
+            recipientId: true,
+            prefilledValue: true,
+            meta: true,
+          },
+          orderBy: {
+            top: "asc",
+          },
+        });
 
-      const fields = await tx.templateField.findMany({
-        where: {
-          templateId: recipient.templateId,
-        },
-        select: {
-          id: true,
-          name: true,
-          width: true,
-          height: true,
-          top: true,
-          left: true,
-          required: true,
-          defaultValue: true,
-          readOnly: true,
-          type: true,
-          viewportHeight: true,
-          viewportWidth: true,
-          page: true,
-          recipientId: true,
-          prefilledValue: true,
-          meta: true,
-        },
-        orderBy: {
-          top: "asc",
-        },
-      });
-
-      return { bucket, fields, status };
-    });
+        return { bucket, fields, status, companyId };
+      },
+    );
 
     // a cancelled envelope stays "Cancelled" for the signer, but must not keep
     // handing out its fields or a signed URL for the document
@@ -78,6 +82,7 @@ export const getSigningFieldsProcedure = withoutAuth
         url: "",
         recipientId,
         templateId,
+        companyId,
         status,
         signableFields: [],
       };
@@ -91,6 +96,7 @@ export const getSigningFieldsProcedure = withoutAuth
       url,
       recipientId,
       templateId,
+      companyId,
       status,
       signableFields: fields.filter((item) => item.recipientId === recipientId),
     };

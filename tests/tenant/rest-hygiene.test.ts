@@ -2,8 +2,8 @@ import { createSecureHash } from "@/lib/crypto";
 import api from "@/server/api";
 import { db } from "@/server/db";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { type Tenant, seedTwoTenants } from "../helpers/seed";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { type Tenant, seedTwoTenants, sessionCookie } from "../helpers/seed";
 import {
   type AIds,
   type BIds,
@@ -20,7 +20,6 @@ let aIds: AIds;
 let bIds: BIds;
 
 beforeAll(async () => {
-  process.env.NEXTAUTH_URL ||= "http://localhost:3000";
   ({ a, b } = await seedTwoTenants());
   aIds = await seedTenantA(a);
   bIds = await seedTenantB(b);
@@ -37,22 +36,15 @@ async function cookie(
   body?: unknown,
   extra: Record<string, string> = {},
 ) {
-  const spy = vi
-    .spyOn(globalThis, "fetch")
-    .mockResolvedValue(new Response(JSON.stringify(a.session)));
-  try {
-    return await api.request(`/api/v1${path}`, {
-      method,
-      headers: {
-        cookie: "next-auth.session-token=x",
-        ...(body !== undefined && { "content-type": "application/json" }),
-        ...extra,
-      },
-      ...(body !== undefined && { body: JSON.stringify(body) }),
-    });
-  } finally {
-    spy.mockRestore();
-  }
+  return api.request(`/api/v1${path}`, {
+    method,
+    headers: {
+      cookie: await sessionCookie(a.session),
+      ...(body !== undefined && { "content-type": "application/json" }),
+      ...extra,
+    },
+    ...(body !== undefined && { body: JSON.stringify(body) }),
+  });
 }
 
 describe("REST cookie auth with a body and no Authorization header", () => {

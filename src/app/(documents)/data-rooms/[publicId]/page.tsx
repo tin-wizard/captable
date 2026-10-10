@@ -2,6 +2,7 @@ import DataRoomFileExplorer from "@/components/documents/data-room/explorer";
 import { SharePageLayout } from "@/components/share/page-layout";
 import { type JWTVerifyResult, decode } from "@/lib/jwt";
 import { db } from "@/server/db";
+import { assertHostOwns } from "@/server/domains/links";
 import { RiFolder3Fill as FolderIcon } from "@remixicon/react";
 import { notFound } from "next/navigation";
 
@@ -67,6 +68,8 @@ const DataRoomPage = async (props: {
   if (dataRoomId !== dataRoom.id || dataRoom?.companyId !== companyId) {
     return notFound();
   }
+
+  await assertHostOwns(dataRoom.companyId);
 
   const company = dataRoom.company;
   const documents = dataRoom.documents.map((doc) => doc.document.bucket);

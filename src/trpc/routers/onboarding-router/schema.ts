@@ -54,6 +54,7 @@ export const ZodCompanyMutationSchema = z.object({
       })
       .default("US"),
     logo: z.string().min(1).optional(),
+    subdomain: z.string().optional(),
   }),
 });
 

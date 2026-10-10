@@ -18,7 +18,7 @@ import {
 
 import { Checkbox } from "@/components/ui/checkbox";
 
-import { type RouterOutputs } from "@/trpc/shared";
+import type { RouterOutputs } from "@/trpc/shared";
 
 import { dayjsExt } from "@/common/dayjs";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,10 @@ import { SortButton } from "@/components/ui/data-table/data-table-buttons";
 import { DataTableContent } from "@/components/ui/data-table/data-table-content";
 import { DataTableHeader } from "@/components/ui/data-table/data-table-header";
 import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
+import {
+  type PageResettable,
+  resetPageOn,
+} from "@/components/ui/data-table/reset-page";
 import { AuditTableToolbar } from "./audit-table-toolbar";
 
 type Audit = RouterOutputs["audit"]["getAudits"]["data"];
@@ -120,8 +124,12 @@ export function AuditTable({ audits }: AuditTableProps) {
     columns: columns,
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
+    autoResetPageIndex: false,
+    onSortingChange: resetPageOn(setSorting, (): PageResettable => table),
+    onColumnFiltersChange: resetPageOn(
+      setColumnFilters,
+      (): PageResettable => table,
+    ),
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),

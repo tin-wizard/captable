@@ -10,6 +10,7 @@ import { companyRouter } from "../routers/company-router/router";
 import { dataRoomRouter } from "../routers/data-room-router/router";
 import { documentRouter } from "../routers/document-router/router";
 import { documentShareRouter } from "../routers/document-share-router/router";
+import { domainRouter } from "../routers/domain-router/router";
 import { equityPlanRouter } from "../routers/equity-plan/router";
 import { memberRouter } from "../routers/member-router/router";
 import { onboardingRouter } from "../routers/onboarding-router/router";
@@ -33,6 +34,7 @@ export const appRouter = createTRPCRouter({
   audit: auditRouter,
   company: companyRouter,
   document: documentRouter,
+  domain: domainRouter,
   documentShare: documentShareRouter,
   onboarding: onboardingRouter,
   shareClass: shareClassRouter,

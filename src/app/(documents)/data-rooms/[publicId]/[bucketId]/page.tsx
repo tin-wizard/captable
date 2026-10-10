@@ -2,6 +2,7 @@ import FilePreview from "@/components/file/preview";
 import { SharePageLayout } from "@/components/share/page-layout";
 import { type JWTVerifyResult, decode } from "@/lib/jwt";
 import { db } from "@/server/db";
+import { assertHostOwns } from "@/server/domains/links";
 import { getPresignedGetUrl } from "@/server/file-uploads";
 import { RiFolder3Fill as FolderIcon } from "@remixicon/react";
 import Link from "next/link";
@@ -77,6 +78,8 @@ const DataRoomPage = async (props: {
   ) {
     return notFound();
   }
+
+  await assertHostOwns(dataRoom.companyId);
 
   const file = dataRoomFile?.document.bucket;
 

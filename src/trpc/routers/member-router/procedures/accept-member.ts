@@ -1,4 +1,5 @@
 import { Audit } from "@/server/audit";
+import { companyHomeUrl } from "@/server/domains/links";
 import { checkVerificationToken } from "@/server/member";
 import { withAuth } from "@/trpc/api/trpc";
 import { TRPCError } from "@trpc/server";
@@ -17,7 +18,7 @@ export const acceptMemberProcedure = withAuth
       throw new TRPCError({ code: "FORBIDDEN", message: "invalid invite" });
     }
 
-    const { publicId } = await ctx.db.$transaction(async (trx) => {
+    const { publicId, companyId } = await ctx.db.$transaction(async (trx) => {
       await trx.verificationToken.delete({
         where: {
           token: input.token,
@@ -76,8 +77,15 @@ export const acceptMemberProcedure = withAuth
         trx,
       );
 
-      return { publicId: member.company.publicId };
+      return {
+        publicId: member.company.publicId,
+        companyId: member.company.id,
+      };
     });
 
-    return { success: true, publicId };
+    return {
+      success: true,
+      publicId,
+      url: await companyHomeUrl(ctx.db, companyId, publicId),
+    };
   });

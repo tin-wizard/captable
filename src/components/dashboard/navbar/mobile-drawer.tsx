@@ -3,14 +3,20 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { RiMenuLine } from "@remixicon/react";
 import { SideBar } from "../sidebar";
 
-import { type TGetCompanyList } from "@/server/company";
+import type { TGetCompanyList } from "@/server/company";
 
 interface SideBarProps {
   publicId: string;
   companies: TGetCompanyList;
+  /** set only on a company host */
+  canonicalOrigin: string | null;
 }
 
-export function MobileDrawer({ publicId, companies }: SideBarProps) {
+export function MobileDrawer({
+  publicId,
+  companies,
+  canonicalOrigin,
+}: SideBarProps) {
   return (
     <div>
       <Sheet>
@@ -25,7 +31,11 @@ export function MobileDrawer({ publicId, companies }: SideBarProps) {
         </SheetTrigger>
         <SheetContent side="left" className="px-0">
           <div className="flex flex-col">
-            <SideBar publicId={publicId} companies={companies} />
+            <SideBar
+              publicId={publicId}
+              companies={companies}
+              canonicalOrigin={canonicalOrigin}
+            />
           </div>
         </SheetContent>
       </Sheet>

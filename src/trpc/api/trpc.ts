@@ -17,6 +17,7 @@ import { RBAC, type addPolicyOption } from "@/lib/rbac";
 import { getPermissionsForRole } from "@/lib/rbac/access-control";
 import { checkMembership, getServerAuthSession } from "@/server/auth";
 import { db } from "@/server/db";
+import { getRequestHost } from "@/server/domains/request-host";
 import { tenantDb } from "@/server/tenant-db";
 import * as Sentry from "@sentry/nextjs";
 
@@ -44,6 +45,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
     session,
     requestIp: getIp(opts.headers),
     userAgent: getUserAgent(opts.headers),
+    host: await getRequestHost(),
     ...opts,
   };
 };
@@ -185,7 +187,7 @@ export const createTRPCRouter = t.router;
 
 const sentryMiddleware = t.middleware(
   Sentry.trpcMiddleware({
-    attachRpcInput: true,
+    attachRpcInput: false,
   }),
 );
 
@@ -211,6 +213,26 @@ const authMiddleware = isSentryEnabled
   ? pipedSentryMiddleware
   : enforceAuthMiddleware;
 
+// The only bare withAuth / withoutAuth procedures callable on a company host.
+// Widening either set needs a reviewed change to tests/tenant/architecture.test.ts.
+export const TENANT_HOST_USER_PROCEDURES = new Set([
+  "bucket.presignPublicUpload",
+  "billing.getProducts",
+]);
+export const TENANT_HOST_PUBLIC_PROCEDURES = new Set([
+  "template.sign",
+  "template.getSigningFields",
+]);
+
+// A missing host counts as non-canonical: fail closed, never default it.
+const canonicalHostOnly = (allowed: Set<string>) =>
+  t.middleware(({ ctx, path, next }) => {
+    if (ctx.host?.kind !== "canonical" && !allowed.has(path)) {
+      throw new TRPCError({ code: "FORBIDDEN" });
+    }
+    return next();
+  });
+
 /**
  * Public (unauthenticated) procedure
  *
@@ -218,7 +240,9 @@ const authMiddleware = isSentryEnabled
  * guarantee that a user querying is authorized, but you can still access user session data if they
  * are logged in.
  */
-export const withoutAuth = t.procedure;
+export const withoutAuth = t.procedure.use(
+  canonicalHostOnly(TENANT_HOST_PUBLIC_PROCEDURES),
+);
 
 /**
  * Protected (authenticated) procedure
@@ -228,7 +252,9 @@ export const withoutAuth = t.procedure;
  *
  * @see https://trpc.io/docs/procedures
  */
-export const withAuth = t.procedure.use(authMiddleware);
+export const withAuth = t.procedure
+  .use(canonicalHostOnly(TENANT_HOST_USER_PROCEDURES))
+  .use(authMiddleware);
 
 const tenantMiddleware = authMiddleware.unstable_pipe(async ({ ctx, next }) =>
   next({ ctx: await withTenantTrpcContext(ctx) }),

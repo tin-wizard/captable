@@ -17,9 +17,14 @@ import Link from "next/link";
 
 type UserDropdownProps = {
   companyPublicId: string;
+  /** null when company domains are off */
+  canonicalHost: string | null;
 };
 
-export function UserDropdown({ companyPublicId }: UserDropdownProps) {
+export function UserDropdown({
+  companyPublicId,
+  canonicalHost,
+}: UserDropdownProps) {
   const { data } = useSession();
   const name = data?.user.name;
   const email = data?.user.email;
@@ -67,6 +72,15 @@ export function UserDropdown({ companyPublicId }: UserDropdownProps) {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={async () => {
+            if (canonicalHost && window.location.hostname !== canonicalHost) {
+              // company host: global sign-out runs server-side, then on canonical
+              const form = document.createElement("form");
+              form.method = "post";
+              form.action = "/auth/signout";
+              document.body.append(form);
+              form.submit();
+              return;
+            }
             await signOut();
           }}
         >

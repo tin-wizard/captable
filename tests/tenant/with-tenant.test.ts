@@ -39,6 +39,7 @@ const callAs = (session: Session) =>
     requestIp: "127.0.0.1",
     userAgent: "vitest",
     headers: new Headers(),
+    host: { kind: "canonical" },
   });
 
 beforeAll(async () => {

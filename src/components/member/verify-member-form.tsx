@@ -11,7 +11,6 @@ import { constants } from "@/lib/constants";
 import { api } from "@/trpc/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import {
   Form,
@@ -29,11 +28,10 @@ interface VerifyMemberFormProps {
 
 export function VerifyMemberForm({ memberId, token }: VerifyMemberFormProps) {
   const { update } = useSession();
-  const router = useRouter();
   const acceptMember = api.member.acceptMember.useMutation({
-    onSuccess: async ({ publicId }) => {
+    onSuccess: async ({ url }) => {
       await update();
-      router.push(`/${publicId}`);
+      window.location.assign(url);
     },
   });
   const form = useForm<TypeZodAcceptMemberMutationSchema>({

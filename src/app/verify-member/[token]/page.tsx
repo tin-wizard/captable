@@ -1,8 +1,7 @@
 import { VerifyMemberForm } from "@/components/member/verify-member-form";
-import { authOptions } from "@/server/auth";
+import { getServerAuthSession } from "@/server/auth";
 import { checkVerificationToken } from "@/server/member";
 import type { Metadata } from "next";
-import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
@@ -18,7 +17,7 @@ export default async function VerifyMember(props: {
 }) {
   const { token } = await props.params;
   const searchParams = await props.searchParams;
-  const session = await getServerSession(authOptions);
+  const session = await getServerAuthSession();
 
   const passwordResetToken = searchParams.passwordResetToken;
   const email = searchParams.email;
