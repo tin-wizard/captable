@@ -5,14 +5,13 @@ import { loggerLink, unstable_httpBatchStreamLink } from "@trpc/client";
 import { createTRPCReact } from "@trpc/react-query";
 import { useState } from "react";
 
-import { type AppRouter } from "@/trpc/api/root";
+import type { AppRouter } from "@/trpc/api/root";
 import { getUrl, transformer } from "./shared";
 
 export const api = createTRPCReact<AppRouter>();
 
 export function TRPCReactProvider(props: {
   children: React.ReactNode;
-  cookies: string;
 }) {
   const [queryClient] = useState(() => new QueryClient());
 
@@ -29,7 +28,6 @@ export function TRPCReactProvider(props: {
           url: getUrl(),
           headers() {
             return {
-              cookie: props.cookies,
               "x-trpc-source": "react",
             };
           },

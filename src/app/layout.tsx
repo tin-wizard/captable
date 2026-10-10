@@ -9,7 +9,6 @@ import { inter, interTight, robotoMono } from "@/styles/fonts";
 import "@/styles/globals.css";
 import { TRPCReactProvider } from "@/trpc/react";
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
@@ -40,7 +39,7 @@ export default async function RootLayout({
       <body className="min-h-screen">
         <ProgressBarProvider>
           <NextAuthProvider session={session}>
-            <TRPCReactProvider cookies={(await cookies()).toString()}>
+            <TRPCReactProvider>
               <main>{children}</main>
               <Toaster richColors />
               {nodeEnv === "development" && <ScreenSize />}
