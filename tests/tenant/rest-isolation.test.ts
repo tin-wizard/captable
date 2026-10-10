@@ -3,7 +3,7 @@ import api from "@/server/api";
 import { db } from "@/server/db";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { type Tenant, seedTwoTenants } from "../helpers/seed";
+import { type Tenant, seedTwoTenants, sessionCookie } from "../helpers/seed";
 import {
   type AIds,
   type BIds,
@@ -298,18 +298,17 @@ describe("REST bearer: token and membership state", () => {
 });
 
 describe("REST session cookie", () => {
-  // session-token.ts fetches the session from NEXTAUTH_URL; stub that fetch
+  // a real NextAuth JWT, decoded in-process; fetch must never be called
   const withSession = async (path: string, body: object = a.session) => {
-    process.env.NEXTAUTH_URL ||= "http://localhost:3000";
-    const spy = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(new Response(JSON.stringify(body)));
+    const spy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
+      throw new Error("no hairpin");
+    });
     try {
       return await api.request(`/api/v1${path}`, {
         // the route's header schema demands an Authorization header even on
         // the cookie path; a non-token value makes bearer auth fail if reached
         headers: {
-          cookie: "next-auth.session-token=x",
+          cookie: await sessionCookie(body),
           Authorization: "Bearer cookie",
         },
       });
@@ -333,8 +332,7 @@ describe("REST session cookie", () => {
     expect(status).toBe(401);
   });
 
-  // next-auth answers 200 with {} for an undecodable cookie; that must never
-  // authenticate anybody (an undefined Prisma filter would match any member)
+  // a token without claims (no sub/member) must never authenticate anybody (an undefined Prisma filter would match any member)
   it.each([
     ["no companyId in the path", "/companies"],
     ["a company path", "/${A}/stakeholders?limit=50"],

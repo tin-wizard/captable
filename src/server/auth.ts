@@ -25,6 +25,7 @@ import {
   tenantCookieName,
 } from "@/server/domains/tenant-session";
 import { verifyAuthenticationResponse } from "@simplewebauthn/server";
+import type { JWT } from "next-auth/jwt";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { cookies } from "next/headers";
@@ -72,7 +73,61 @@ declare module "next-auth/jwt" {
  *
  * @see https://next-auth.js.org/configuration/options
  */
+const useSecureCookies = env.NEXTAUTH_URL?.startsWith("https") ?? false;
+// __Host- (not __Secure-): a *.tin.info sibling cannot set or replace these
+const cookiePrefix = useSecureCookies ? "__Host-" : "";
+const cookieBase = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  path: "/",
+  secure: useSecureCookies,
+};
+
+export const SESSION_COOKIE = `${cookiePrefix}next-auth.session-token`;
+
+export function sessionFromToken(token: JWT): Session {
+  return {
+    expires:
+      typeof token.exp === "number"
+        ? new Date(token.exp * 1000).toISOString()
+        : "",
+    sv: token.sv,
+    user: {
+      id: token.sub ?? "",
+      isOnboarded: token.isOnboarded,
+      companyId: token.companyId,
+      memberId: token.memberId,
+      companyPublicId: token.companyPublicId,
+      status: token.status,
+      name: token.name,
+      email: token.email,
+      image: token.picture ?? "",
+    },
+  };
+}
+
 export const authOptions: NextAuthOptions = {
+  useSecureCookies,
+  cookies: {
+    sessionToken: { name: SESSION_COOKIE, options: cookieBase },
+    callbackUrl: {
+      name: `${cookiePrefix}next-auth.callback-url`,
+      options: cookieBase,
+    },
+    csrfToken: {
+      name: `${cookiePrefix}next-auth.csrf-token`,
+      options: cookieBase,
+    },
+    pkceCodeVerifier: {
+      name: `${cookiePrefix}next-auth.pkce.code_verifier`,
+      options: { ...cookieBase, maxAge: 900 },
+    },
+    state: {
+      name: `${cookiePrefix}next-auth.state`,
+      options: { ...cookieBase, maxAge: 900 },
+    },
+    nonce: { name: `${cookiePrefix}next-auth.nonce`, options: cookieBase },
+  },
   events: {
     async linkAccount({ user }) {
       await db.user.update({
@@ -94,20 +149,7 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     session({ session, token }) {
-      session.user.isOnboarded = token.isOnboarded;
-      session.user.companyId = token.companyId;
-      session.user.memberId = token.memberId;
-      session.user.companyPublicId = token.companyPublicId;
-      session.user.status = token.status;
-      session.user.name = token.name;
-      session.user.email = token.email;
-      session.user.image = token.picture ?? "";
-
-      if (token.sub) {
-        session.user.id = token.sub;
-      }
-      session.sv = token.sv;
-      return session;
+      return { ...sessionFromToken(token), expires: session.expires };
     },
 
     async jwt({ token, trigger }) {

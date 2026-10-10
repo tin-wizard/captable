@@ -1,9 +1,17 @@
+import { env } from "@/env";
 import { getPermissions } from "@/lib/rbac/access-control";
+import {
+  SESSION_COOKIE,
+  isSessionVersionCurrent,
+  sessionFromToken,
+} from "@/server/auth";
+import { domainConfig } from "@/server/domains/config";
 import { tenantDb } from "@/server/tenant-db";
 import type { Context } from "hono";
-import { getCookie } from "hono/cookie";
 import { createMiddleware } from "hono/factory";
+import { parse } from "hono/utils/cookie";
 import type { Session } from "next-auth";
+import { decode } from "next-auth/jwt";
 import { ApiError } from "../error";
 
 export const sessionCookieAuthMiddleware = () =>
@@ -13,16 +21,16 @@ export const sessionCookieAuthMiddleware = () =>
   });
 
 export async function authenticateWithSessionCookie(c: Context) {
-  const authUrl = process.env.NEXTAUTH_URL;
-  if (!authUrl || !getCookie(c, determineCookieName(authUrl))) {
+  const cookieHeader = c.req.header("cookie") ?? "";
+  if (!parse(cookieHeader, SESSION_COOKIE)[SESSION_COOKIE]) {
     throw unauthorized();
   }
 
   // outside the try: a cross-site write is 403, not a failed login
-  assertSameOriginWrite(c, authUrl);
+  assertSameOriginWrite(c);
 
   try {
-    await validateSessionCookie(authUrl, c);
+    await validateSessionCookie(cookieHeader, c);
   } catch (_error) {
     throw unauthorized();
   }
@@ -42,10 +50,10 @@ const SAFE_METHODS = ["GET", "HEAD", "OPTIONS"];
 // non-browser client, which cannot hold the victim's cookie, and is allowed.
 // The request's own origin is accepted too: a cross-site page can set neither
 // Host nor Origin on the victim's request, so they match only same-origin.
-function assertSameOriginWrite(c: Context, authUrl: string) {
+function assertSameOriginWrite(c: Context) {
   if (SAFE_METHODS.includes(c.req.method)) return;
   const origin = c.req.header("origin");
-  const allowed = [new URL(authUrl).origin, new URL(c.req.url).origin];
+  const allowed = [domainConfig().canonicalOrigin, new URL(c.req.url).origin];
   if (
     c.req.header("sec-fetch-site") === "cross-site" ||
     (origin !== undefined && !allowed.includes(origin))
@@ -57,15 +65,21 @@ function assertSameOriginWrite(c: Context, authUrl: string) {
   }
 }
 
-function determineCookieName(authUrl: string): string {
-  return authUrl.startsWith("https://")
-    ? "__Secure-next-auth.session-token"
-    : "next-auth.session-token";
+// In-process decode of the canonical NextAuth JWT (no self-HTTP hairpin).
+// Only the __Host- name is read, so a sibling-set __Secure- cookie is ignored.
+export async function sessionFromCookieHeader(
+  cookieHeader: string,
+): Promise<Session | null> {
+  const raw = parse(cookieHeader, SESSION_COOKIE)[SESSION_COOKIE];
+  if (!raw) return null;
+  const token = await decode({ token: raw, secret: env.NEXTAUTH_SECRET });
+  if (!token?.sub) return null;
+  if (!(await isSessionVersionCurrent(token.sub, token.sv))) return null;
+  return sessionFromToken(token);
 }
 
-async function validateSessionCookie(authUrl: string, c: Context) {
-  const session = await fetchSessionFromAuthUrl(authUrl, c);
-  // next-auth answers 200 with {} for a missing or undecodable cookie
+async function validateSessionCookie(cookieHeader: string, c: Context) {
+  const session = await sessionFromCookieHeader(cookieHeader);
   if (!session?.user?.id || !session.user.memberId) {
     throw new Error("Not authenticated");
   }
@@ -90,27 +104,4 @@ async function validateSessionCookie(authUrl: string, c: Context) {
   c.set("session", { membership: val.membership });
   // the verified member row's company (equal to the path companyId when present)
   c.set("tenantDb", tenantDb(db, val.membership.companyId));
-}
-
-async function fetchSessionFromAuthUrl(
-  authUrl: string,
-  c: Context,
-): Promise<Session> {
-  const newUrl = new URL("/api/auth/session", authUrl).toString();
-
-  const response = await fetch(
-    new Request(newUrl, {
-      method: "GET",
-      // only the cookie: the original body and its content headers must not reach a GET
-      headers: { cookie: c.req.header("cookie") ?? "" },
-    }),
-  );
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch session from auth service");
-  }
-
-  return data as Session;
 }

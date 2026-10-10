@@ -1,8 +1,10 @@
 import { generatePublicId } from "@/common/id";
+import { SESSION_COOKIE } from "@/server/auth";
 import { db } from "@/server/db";
 import { appRouter } from "@/trpc/api/root";
 import { nanoid } from "nanoid";
 import type { Session } from "next-auth";
+import { type JWT, encode } from "next-auth/jwt";
 
 export type Tenant = {
   companyId: string;
@@ -84,4 +86,25 @@ export function callerFor(t: Tenant) {
     userAgent: "vitest",
     headers: new Headers(),
   });
+}
+
+// Cookie header carrying a real NextAuth JWT for the given session's claims
+// (sv 0 = a freshly seeded user), as the REST cookie middleware decodes it.
+export async function sessionCookie(s: Partial<Session>) {
+  const u = s.user;
+  const jwt = await encode({
+    token: {
+      sub: u?.id,
+      companyId: u?.companyId,
+      memberId: u?.memberId,
+      companyPublicId: u?.companyPublicId,
+      isOnboarded: u?.isOnboarded,
+      status: u?.status,
+      name: u?.name,
+      email: u?.email,
+      sv: 0,
+    } as JWT,
+    secret: process.env.NEXTAUTH_SECRET as string,
+  });
+  return `${SESSION_COOKIE}=${jwt}`;
 }

@@ -2,8 +2,8 @@ import { createSecureHash } from "@/lib/crypto";
 import api from "@/server/api";
 import { db } from "@/server/db";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { type Tenant, seedTwoTenants } from "../helpers/seed";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { type Tenant, seedTwoTenants, sessionCookie } from "../helpers/seed";
 import {
   type AIds,
   type BIds,
@@ -58,7 +58,6 @@ async function call(
 
 // cookie-authenticated helper for GET and DELETE (writes with a body are covered in rest-hygiene.test.ts)
 async function withSession(path: string, method: "GET" | "DELETE") {
-  process.env.NEXTAUTH_URL ||= "http://localhost:3000";
   const session = {
     ...a.session,
     user: {
@@ -67,20 +66,13 @@ async function withSession(path: string, method: "GET" | "DELETE") {
       memberId: noRoleInB.memberId,
     },
   };
-  const spy = vi
-    .spyOn(globalThis, "fetch")
-    .mockResolvedValue(new Response(JSON.stringify(session)));
-  try {
-    return await api.request(`/api/v1${path}`, {
-      method,
-      headers: {
-        cookie: "next-auth.session-token=x",
-        Authorization: "Bearer cookie",
-      },
-    });
-  } finally {
-    spy.mockRestore();
-  }
+  return api.request(`/api/v1${path}`, {
+    method,
+    headers: {
+      cookie: await sessionCookie(session),
+      Authorization: "Bearer cookie",
+    },
+  });
 }
 
 const stakeholderBody = (name: string) => ({

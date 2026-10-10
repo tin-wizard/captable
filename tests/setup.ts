@@ -18,6 +18,8 @@ assertLocalTestDb(process.env.TEST_DATABASE_URL);
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 process.env.SKIP_ENV_VALIDATION = "1";
 process.env.NEXTAUTH_SECRET ??= "test-secret-test-secret-test-secret-test";
+// set here, not per file: src/env.js captures it on first import (https => __Host- cookies)
+process.env.NEXTAUTH_URL ??= "https://dealroom.tin.info";
 
 // React's `cache` only exists in the server-components build of react
 vi.mock("react", async (importOriginal) => ({
