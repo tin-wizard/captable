@@ -1,13 +1,18 @@
 import { db } from "@/server/db";
 import { isUserLevelPath, layoutRedirect } from "@/server/domains/redirects";
+import {
+  assignPlatformSubdomain,
+  primaryHostnameForPublicId,
+} from "@/server/domains/registry";
 import type { RequestHost } from "@/server/domains/request-host";
 import { isActiveMember } from "@/server/member";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { type Tenant, cleanupTenants, seedTwoTenants } from "../helpers/seed";
 
+const flag = vi.hoisted(() => ({ enabled: true }));
 vi.mock("@/server/domains/config", () => ({
   domainConfig: () => ({
-    enabled: true,
+    enabled: flag.enabled,
     canonicalHost: "dealroom.tin.info",
     canonicalOrigin: "https://dealroom.tin.info",
     baseDomain: "dealroom.tin.info",
@@ -165,5 +170,55 @@ describe("isActiveMember", () => {
       data: { status: "INACTIVE" },
     });
     expect(await isActiveMember(a.userId, b.companyId)).toBe(false);
+  });
+});
+
+describe("flag off", () => {
+  let a: Tenant;
+  let b: Tenant;
+  beforeAll(async () => {
+    ({ a, b } = await seedTwoTenants());
+    await db.$transaction((tx) =>
+      assignPlatformSubdomain(tx, {
+        companyId: a.companyId,
+        label: `redir-${a.companyId.slice(-6)}`,
+        createdById: a.userId,
+      }),
+    );
+  });
+  afterAll(async () => {
+    flag.enabled = true;
+    await cleanupTenants(a, b);
+  });
+
+  it("with the flag on the same company resolves to its primary", async () => {
+    flag.enabled = true;
+    const route = await primaryHostnameForPublicId(
+      a.session.user.companyPublicId,
+    );
+    expect(route?.hostname).toMatch(/^redir-.*\.dealroom\.tin\.info$/);
+  });
+
+  it("a company with an ACTIVE primary resolves to no host, without a registry query, and stays on canonical", async () => {
+    flag.enabled = false;
+    // not restored (restoring breaks the Prisma delegate); later tests never reach companyDomain
+    const spy = vi.spyOn(db.companyDomain, "findFirst");
+    const publicId = a.session.user.companyPublicId;
+    const route = await primaryHostnameForPublicId(publicId);
+    expect(route).toEqual({ companyId: a.companyId, hostname: null });
+    expect(spy).not.toHaveBeenCalled();
+    expect(
+      layoutRedirect({
+        host: canonical,
+        path: `/${publicId}/stakeholders`,
+        routePublicId: publicId,
+        routeCompanyPrimaryHost: route?.hostname ?? null,
+      }),
+    ).toBeNull();
+  });
+
+  it("an unknown publicId is still null (layout 404s)", async () => {
+    flag.enabled = false;
+    expect(await primaryHostnameForPublicId("no-such-public-id")).toBeNull();
   });
 });

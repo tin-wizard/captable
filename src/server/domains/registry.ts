@@ -163,7 +163,10 @@ export async function primaryHostnameForPublicId(publicId: string) {
   return company
     ? {
         companyId: company.id,
-        hostname: await primaryHostname(globalDb, company.id),
+        // flag off: no registry lookups, so the flag stays a clean rollback
+        hostname: domainConfig().enabled
+          ? await primaryHostname(globalDb, company.id)
+          : null,
       }
     : null;
 }

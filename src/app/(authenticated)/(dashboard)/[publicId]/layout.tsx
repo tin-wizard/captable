@@ -27,6 +27,7 @@ const DashboardLayout = async (props: DashboardLayoutProps) => {
 
   const { children } = props;
 
+  const { enabled, canonicalOrigin: canonical } = domainConfig();
   const path = (await headers()).get("x-dr-path") ?? `/${publicId}`;
   const route = await primaryHostnameForPublicId(publicId);
   if (!route) notFound();
@@ -37,14 +38,13 @@ const DashboardLayout = async (props: DashboardLayoutProps) => {
     host,
     path,
     routePublicId: publicId,
-    routeCompanyPrimaryHost: route.hostname,
+    routeCompanyPrimaryHost: enabled ? route.hostname : null,
   });
   if (decision && "redirect" in decision) redirect(decision.redirect);
   if (decision) notFound();
 
   const { user } = await withServerComponentSession();
 
-  const { enabled, canonicalOrigin: canonical } = domainConfig();
   // flag off keeps today's bounce; on, user-level pages serve any company the user belongs to
   if (enabled && host.kind === "canonical" && isUserLevelPath(path)) {
     if (!(await isActiveMember(user.id, route.companyId))) notFound();

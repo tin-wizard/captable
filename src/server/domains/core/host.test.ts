@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { classifyHost, normalizeHost, safeNextPath } from "./host";
+import {
+  classifyHost,
+  companySwitchUrl,
+  normalizeHost,
+  safeNextPath,
+} from "./host";
 
 const cfg = {
   canonicalHost: "dealroom.tin.info",
@@ -82,4 +87,27 @@ describe("safeNextPath", () => {
     [undefined, "/"],
     ["", "/"],
   ])("%s -> %s", (a, b) => expect(safeNextPath(a)).toBe(b));
+});
+
+describe("companySwitchUrl", () => {
+  const canon = "https://dealroom.tin.info";
+  it.each<[string, string | null, string]>([
+    // company host, target has no primary: go via canonical, not this host
+    ["/pubB", canon, "https://dealroom.tin.info/pubB"],
+    // company host, target has a primary: absolute URL kept
+    [
+      "https://b.dealroom.tin.info/pubB",
+      canon,
+      "https://b.dealroom.tin.info/pubB",
+    ],
+    // canonical (null): unchanged
+    ["/pubB", null, "/pubB"],
+    [
+      "https://b.dealroom.tin.info/pubB",
+      null,
+      "https://b.dealroom.tin.info/pubB",
+    ],
+  ])("%s from %s -> %s", (url, origin, out) =>
+    expect(companySwitchUrl(url, origin)).toBe(out),
+  );
 });

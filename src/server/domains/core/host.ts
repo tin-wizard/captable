@@ -53,3 +53,9 @@ export function safeNextPath(next: string | null | undefined): string {
     return "/";
   }
 }
+
+// A company without a primary host has a relative home URL; from a company host that
+// would resolve on the wrong host (404), so send it to the canonical origin instead.
+export function companySwitchUrl(url: string, canonicalOrigin: string | null) {
+  return canonicalOrigin && url.startsWith("/") ? canonicalOrigin + url : url;
+}

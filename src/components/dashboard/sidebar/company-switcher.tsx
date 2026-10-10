@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 
 import type { TGetCompanyList } from "@/server/company";
+import { companySwitchUrl } from "@/server/domains/core/host";
 import { api } from "@/trpc/react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { RiAddCircleLine } from "@remixicon/react";
@@ -64,7 +65,9 @@ export function CompanySwitcher({
             const nonDynamicSegment = routeSegments.slice(1).join("/");
 
             window.location.assign(
-              `${member.url}/${nonDynamicSegment ? nonDynamicSegment : ""}`,
+              `${companySwitchUrl(member.url, canonicalOrigin)}/${
+                nonDynamicSegment ? nonDynamicSegment : ""
+              }`,
             );
           }
         }
