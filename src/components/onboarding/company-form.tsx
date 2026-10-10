@@ -34,7 +34,7 @@ import { api } from "@/trpc/react";
 import type { RouterOutputs } from "@/trpc/shared";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import Loading from "../common/loading";
 import { LinearCombobox } from "../ui/combobox";
@@ -88,11 +88,67 @@ export const CompanyForm = ({ type, data }: CompanyFormProps) => {
     },
   });
 
-  const onBoardingMutation = api.onboarding.onboard.useMutation({
-    onSuccess: async ({ publicId }) => {
-      await update();
+  const hasAddress = type === "onboarding" || type === "create";
+  const name = form.watch("company.name");
+  const subdomain = form.watch("company.subdomain") ?? "";
+  const [addressEdited, setAddressEdited] = useState(false);
+  const [debouncedName, setDebouncedName] = useState(name);
+  const [debouncedLabel, setDebouncedLabel] = useState(subdomain);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedName(name), 300);
+    return () => clearTimeout(t);
+  }, [name]);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedLabel(subdomain), 300);
+    return () => clearTimeout(t);
+  }, [subdomain]);
 
-      router.push(`/${publicId}`);
+  const suggest = api.domain.suggest.useQuery(
+    { name: debouncedName },
+    { enabled: hasAddress && debouncedName.length > 0 },
+  );
+  const addressEnabled = hasAddress && suggest.data?.enabled === true;
+  const baseDomain = suggest.data?.baseDomain;
+  const availability = api.domain.checkAvailability.useQuery(
+    { label: debouncedLabel },
+    { enabled: addressEnabled && debouncedLabel.length > 0 },
+  );
+
+  useEffect(() => {
+    if (addressEnabled && !addressEdited && suggest.data?.label) {
+      form.setValue("company.subdomain", suggest.data.label);
+    }
+  }, [addressEnabled, addressEdited, suggest.data?.label, form.setValue]);
+
+  const addressStatus = (() => {
+    const r = availability.data;
+    // wait for the debounce to settle so a stale answer is never shown
+    if (!r || debouncedLabel !== subdomain || !subdomain) return null;
+    if (r.available) return "Available";
+    if (r.reason === "reserved") return "This name is reserved";
+    if (r.reason === "format")
+      return "Use 3-40 lowercase letters, numbers or hyphens";
+    return r.suggestion
+      ? `Already taken, try ${r.suggestion}`
+      : "Already taken";
+  })();
+
+  const onBoardingMutation = api.onboarding.onboard.useMutation({
+    onSuccess: async (res) => {
+      if (!res.success) {
+        if (res.field === "subdomain") {
+          setAddressEdited(true);
+          form.setError("company.subdomain", { message: res.message });
+          if (res.suggestion)
+            form.setValue("company.subdomain", res.suggestion);
+        } else {
+          toast.error(res.message);
+        }
+        return;
+      }
+      await update();
+      // the company lives on its own origin now: a full navigation, not router.push
+      window.location.assign(res.url);
     },
   });
 
@@ -274,6 +330,38 @@ export const CompanyForm = ({ type, data }: CompanyFormProps) => {
                   </FormItem>
                 )}
               />
+
+              {addressEnabled && (
+                <FormField
+                  control={form.control}
+                  name="company.subdomain"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company address</FormLabel>
+                      <div className="flex items-center gap-x-1">
+                        <FormControl>
+                          <Input
+                            {...field}
+                            value={field.value ?? ""}
+                            onChange={(e) => {
+                              setAddressEdited(true);
+                              form.clearErrors("company.subdomain");
+                              field.onChange(e.target.value.toLowerCase());
+                            }}
+                          />
+                        </FormControl>
+                        <span className="text-sm text-gray-700 whitespace-nowrap">
+                          .{baseDomain}
+                        </span>
+                      </div>
+                      {addressStatus && (
+                        <p className="text-xs font-light">{addressStatus}</p>
+                      )}
+                      <FormMessage className="text-xs font-light" />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
