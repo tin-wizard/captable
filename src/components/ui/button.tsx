@@ -54,6 +54,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       disabled,
       loading,
       loadingText,
+      // accepted for API compatibility but not implemented: keep it off the DOM
+      asChild: _asChild,
       ...props
     },
     ref,
