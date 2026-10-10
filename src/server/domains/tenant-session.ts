@@ -1,5 +1,5 @@
 import { env } from "@/env";
-import { decode, encode } from "next-auth/jwt";
+import { type JWT, decode, encode } from "next-auth/jwt";
 import { domainConfig } from "./config";
 
 export const TENANT_SESSION_SECONDS = 12 * 60 * 60;
@@ -22,7 +22,8 @@ export type TenantClaims = {
 
 export function mintTenantSession(c: TenantClaims) {
   return encode({
-    token: c,
+    // The tenant token deliberately uses its own claim set, not the app JWT shape.
+    token: c as unknown as JWT,
     secret: env.NEXTAUTH_SECRET,
     salt: salt(c.hst),
     maxAge: TENANT_SESSION_SECONDS,
@@ -39,7 +40,7 @@ export async function readTenantSession(
       token,
       secret: env.NEXTAUTH_SECRET,
       salt: salt(host),
-    })) as TenantClaims | null;
+    })) as unknown as TenantClaims | null;
     return c && c.hst === host && c.sub && c.cid && c.mid ? c : null;
   } catch {
     return null;

@@ -32,7 +32,9 @@ describe("session version", () => {
 
   it("update() cannot revive a revoked token", async () => {
     await bumpSessionVersion(b.userId);
-    const jwt = authOptions.callbacks?.jwt as (p: unknown) => Promise<{
+    const jwt = authOptions.callbacks?.jwt as unknown as (
+      p: unknown,
+    ) => Promise<{
       sv?: number;
     }>;
     const token = await jwt({

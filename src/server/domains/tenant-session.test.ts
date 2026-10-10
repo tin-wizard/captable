@@ -1,4 +1,4 @@
-import { encode } from "next-auth/jwt";
+import { type JWT, encode } from "next-auth/jwt";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   TENANT_SESSION_SECONDS,
@@ -17,7 +17,9 @@ const claims = {
 const secret = process.env.NEXTAUTH_SECRET as string;
 
 describe("tenant session", () => {
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it("round-trips on its own host", async () => {
     const t = await mintTenantSession(claims);
@@ -47,7 +49,8 @@ describe("tenant session", () => {
   it("rejects a token whose hst does not match the host it decodes on", async () => {
     const host = "konnect.dealroom.tin.info";
     const t = await encode({
-      token: claims,
+      // Tenant claims are not the app JWT shape.
+      token: claims as unknown as JWT,
       secret,
       salt: `dr-tenant:${host}`,
     });
@@ -56,7 +59,7 @@ describe("tenant session", () => {
   it("rejects a token missing required claims", async () => {
     const { mid: _mid, ...partial } = claims;
     const t = await encode({
-      token: partial,
+      token: partial as unknown as JWT,
       secret,
       salt: `dr-tenant:${claims.hst}`,
     });
