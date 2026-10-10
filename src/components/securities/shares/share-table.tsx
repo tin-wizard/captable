@@ -30,6 +30,10 @@ import { openFileOnTab } from "@/common/uploads";
 import { Button } from "@/components/ui/button";
 import { SortButton } from "@/components/ui/data-table/data-table-buttons";
 import {
+  type PageResettable,
+  resetPageOn,
+} from "@/components/ui/data-table/reset-page";
+import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -355,8 +359,12 @@ const ShareTable = ({ shares }: SharesType) => {
     columns: columns,
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
+    autoResetPageIndex: false,
+    onSortingChange: resetPageOn(setSorting, (): PageResettable => table),
+    onColumnFiltersChange: resetPageOn(
+      setColumnFilters,
+      (): PageResettable => table,
+    ),
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),

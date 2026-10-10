@@ -9,6 +9,10 @@ import { SortButton } from "@/components/ui/data-table/data-table-buttons";
 import { DataTableContent } from "@/components/ui/data-table/data-table-content";
 import { DataTableHeader } from "@/components/ui/data-table/data-table-header";
 import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
+import {
+  type PageResettable,
+  resetPageOn,
+} from "@/components/ui/data-table/reset-page";
 import type { RouterOutputs } from "@/trpc/shared";
 import { RiMore2Fill } from "@remixicon/react";
 import {
@@ -231,8 +235,12 @@ const StakeholderTable = ({ stakeholders }: StakeholderTableType) => {
     columns: columns,
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
+    autoResetPageIndex: false,
+    onSortingChange: resetPageOn(setSorting, (): PageResettable => table),
+    onColumnFiltersChange: resetPageOn(
+      setColumnFilters,
+      (): PageResettable => table,
+    ),
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
