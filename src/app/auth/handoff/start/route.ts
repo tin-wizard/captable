@@ -17,6 +17,8 @@ export const dynamic = "force-dynamic";
 
 // Company host: bounce to the canonical host to pick up the login session.
 export async function GET(request: NextRequest) {
+  // flag off: no registry lookups, no handoff, no new redirects
+  if (!domainConfig().enabled) return notFound();
   const host = await getRequestHost();
   const { canonicalOrigin } = domainConfig();
   if (host.kind === "alias")

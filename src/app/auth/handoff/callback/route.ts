@@ -1,4 +1,5 @@
 import { db } from "@/server/db";
+import { domainConfig } from "@/server/domains/config";
 import { safeNextPath } from "@/server/domains/core/host";
 import {
   consumeHandoff,
@@ -20,6 +21,8 @@ export const dynamic = "force-dynamic";
 
 // Company host: redeem the one-time code for a host-bound session cookie.
 export async function GET(request: NextRequest) {
+  // flag off: no registry lookups, no handoff, no new redirects
+  if (!domainConfig().enabled) return notFound();
   const host = await getRequestHost();
   if (host.kind !== "tenant") return notFound();
   const params = request.nextUrl.searchParams;

@@ -16,6 +16,8 @@ export const dynamic = "force-dynamic";
 
 // Canonical host: turn the login session into a one-time code for a company host.
 export async function GET(request: NextRequest) {
+  // flag off: no registry lookups, no handoff, no new redirects
+  if (!domainConfig().enabled) return notFound();
   if ((await getRequestHost()).kind !== "canonical") return notFound();
   const { canonicalOrigin } = domainConfig();
   const { pathname, search, searchParams } = request.nextUrl;

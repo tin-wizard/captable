@@ -23,6 +23,11 @@ let a: Tenant;
 let host: RequestHost;
 let session: Session | null;
 
+let enabled = true;
+vi.mock("@/server/domains/config", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/server/domains/config")>();
+  return { ...mod, domainConfig: () => ({ ...mod.domainConfig(), enabled }) };
+});
 vi.mock("@/server/domains/request-host", () => ({
   getRequestHost: async () => host,
 }));
@@ -48,6 +53,7 @@ afterAll(async () => {
 });
 beforeEach(() => {
   session = a.session;
+  enabled = true;
 });
 
 const tenant = (): RequestHost => ({
@@ -213,5 +219,30 @@ describe("handoff routes", () => {
     expect(r.status).toBe(303);
     expect(loc(r)).toBe("/auth/handoff/start?next=/&r=1");
     expect(r.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("flag off: issue is 404 and creates no AuthHandoff row (start and callback too)", async () => {
+    enabled = false;
+    host = { kind: "canonical" };
+    const before = await db.authHandoff.count({ where: { userId: a.userId } });
+    const r = await issue(
+      req(`${CANON}/auth/handoff/issue?host=${HOST}&s=x&n=abcdefgh&r=0`),
+    );
+    expect(r.status).toBe(404);
+    expect(loc(r)).toBe("");
+    expect(await db.authHandoff.count({ where: { userId: a.userId } })).toBe(
+      before,
+    );
+    host = tenant();
+    expect(
+      (await start(req(`https://${HOST}/auth/handoff/start`))).status,
+    ).toBe(404);
+    expect(
+      (
+        await callback(
+          req(`https://${HOST}/auth/handoff/callback?code=x&n=abcdefgh`),
+        )
+      ).status,
+    ).toBe(404);
   });
 });
