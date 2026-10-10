@@ -15,11 +15,10 @@ import { createTRPCReact } from "@trpc/react-query";
 import { useState } from "react";
 
 import type { AppRouter } from "@/trpc/api/root";
+import { clearReloadFlag, reloadIfSessionGone } from "./session-expiry";
 import { getUrl, transformer } from "./shared";
 
 export const api = createTRPCReact<AppRouter>();
-
-const RELOAD_FLAG = "dr-unauthorized-reload";
 
 export function TRPCReactProvider(props: {
   children: React.ReactNode;
@@ -34,17 +33,15 @@ export function TRPCReactProvider(props: {
         !canonicalHost ||
         window.location.hostname === canonicalHost ||
         !(error instanceof TRPCClientError) ||
-        error.data?.code !== "UNAUTHORIZED" ||
-        sessionStorage.getItem(RELOAD_FLAG)
+        error.data?.code !== "UNAUTHORIZED"
       )
         return;
-      sessionStorage.setItem(RELOAD_FLAG, "1");
-      window.location.reload();
+      void reloadIfSessionGone();
     };
     return new QueryClient({
       queryCache: new QueryCache({
         onError,
-        onSuccess: () => sessionStorage.removeItem(RELOAD_FLAG),
+        onSuccess: () => clearReloadFlag(),
       }),
       mutationCache: new MutationCache({ onError }),
     });
