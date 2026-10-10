@@ -1,7 +1,16 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { loggerLink, unstable_httpBatchStreamLink } from "@trpc/client";
+import {
+  MutationCache,
+  QueryCache,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
+import {
+  TRPCClientError,
+  loggerLink,
+  unstable_httpBatchStreamLink,
+} from "@trpc/client";
 import { createTRPCReact } from "@trpc/react-query";
 import { useState } from "react";
 
@@ -10,10 +19,36 @@ import { getUrl, transformer } from "./shared";
 
 export const api = createTRPCReact<AppRouter>();
 
+const RELOAD_FLAG = "dr-unauthorized-reload";
+
 export function TRPCReactProvider(props: {
   children: React.ReactNode;
+  /** null when company domains are off */
+  canonicalHost: string | null;
 }) {
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(() => {
+    const { canonicalHost } = props;
+    // Company host session expired: reload once so the server re-runs the handoff.
+    const onError = (error: unknown) => {
+      if (
+        !canonicalHost ||
+        window.location.hostname === canonicalHost ||
+        !(error instanceof TRPCClientError) ||
+        error.data?.code !== "UNAUTHORIZED" ||
+        sessionStorage.getItem(RELOAD_FLAG)
+      )
+        return;
+      sessionStorage.setItem(RELOAD_FLAG, "1");
+      window.location.reload();
+    };
+    return new QueryClient({
+      queryCache: new QueryCache({
+        onError,
+        onSuccess: () => sessionStorage.removeItem(RELOAD_FLAG),
+      }),
+      mutationCache: new MutationCache({ onError }),
+    });
+  });
 
   const [trpcClient] = useState(() =>
     api.createClient({

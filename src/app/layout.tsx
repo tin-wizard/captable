@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { NextAuthProvider } from "@/providers/next-auth";
 import { ProgressBarProvider } from "@/providers/progress-bar";
 import { getServerComponentAuthSession } from "@/server/auth";
+import { domainConfig } from "@/server/domains/config";
 import { inter, interTight, robotoMono } from "@/styles/fonts";
 import "@/styles/globals.css";
 import { TRPCReactProvider } from "@/trpc/react";
@@ -27,6 +28,7 @@ export default async function RootLayout({
 }) {
   const session = await getServerComponentAuthSession();
   const nodeEnv = process.env.NODE_ENV;
+  const { enabled, canonicalHost } = domainConfig();
 
   return (
     <html
@@ -39,7 +41,7 @@ export default async function RootLayout({
       <body className="min-h-screen">
         <ProgressBarProvider>
           <NextAuthProvider session={session}>
-            <TRPCReactProvider>
+            <TRPCReactProvider canonicalHost={enabled ? canonicalHost : null}>
               <main>{children}</main>
               <Toaster richColors />
               {nodeEnv === "development" && <ScreenSize />}
