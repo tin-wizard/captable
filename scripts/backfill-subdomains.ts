@@ -26,6 +26,7 @@ export async function backfillSubdomains(opts: {
     select: { id: true, name: true, publicId: true },
   });
   const rows: Row[] = [];
+  const reserved = new Set<string>(); // dry run only: labels chosen but not persisted
 
   for (const c of companies) {
     const base = { companyId: c.id, name: c.name };
@@ -38,14 +39,18 @@ export async function backfillSubdomains(opts: {
         rows.push({ ...base, label: null, action: "skipped-has-domain" });
         continue;
       }
-      let label = await suggestAvailableLabel(db, c.name, c.publicId);
+      let label = await suggestAvailableLabel(db, c.name, c.publicId, {
+        readonly: !opts.apply,
+        extraTaken: reserved,
+      });
       if (!label) throw new Error("no label available");
       if (!opts.apply) {
+        reserved.add(label);
         rows.push({ ...base, label, action: "would-assign" });
         continue;
       }
       const admin = await db.member.findFirst({
-        where: { companyId: c.id, role: "ADMIN" },
+        where: { companyId: c.id, role: "ADMIN", status: "ACTIVE" },
         orderBy: { createdAt: "asc" },
         select: { userId: true },
       });
@@ -78,11 +83,18 @@ async function main() {
     console.error("DATABASE_URL is not set; refusing to run.");
     process.exit(1);
   }
-  const url = new URL(process.env.DATABASE_URL);
-  console.log(`Database host: ${url.host}${url.pathname}`);
+  try {
+    const url = new URL(process.env.DATABASE_URL);
+    console.log(`Database host: ${url.host}${url.pathname}`);
+  } catch {
+    console.error("DATABASE_URL is not a valid URL; refusing to run.");
+    process.exit(1);
+  }
   const apply = process.argv.includes("--apply");
   console.log(apply ? "Mode: APPLY" : "Mode: dry run (pass --apply to write)");
-  console.table(await backfillSubdomains({ apply }));
+  const rows = await backfillSubdomains({ apply });
+  console.table(rows);
+  if (rows.some((r) => r.action === "failed")) process.exitCode = 1;
   await db.$disconnect();
 }
 

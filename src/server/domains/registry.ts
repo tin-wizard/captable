@@ -58,8 +58,11 @@ export async function suggestAvailableLabel(
   _db: TPrismaOrTransaction,
   companyName: string,
   fallbackSeed?: string,
+  // readonly: never write (dry runs); expired aliases count as free instead of being released.
+  // extraTaken: labels already chosen but not yet persisted.
+  opts: { readonly?: boolean; extraTaken?: Set<string> } = {},
 ) {
-  await releaseExpiredAliases();
+  if (!opts.readonly) await releaseExpiredAliases();
   const base = suggestLabel(companyName);
   const suffix = domainConfig().baseDomain.length + 1;
   // nextAvailableLabel truncates long bases before adding "-N"; match that shorter prefix
@@ -67,11 +70,22 @@ export async function suggestAvailableLabel(
   const taken = new Set(
     (
       await globalDb.companyDomain.findMany({
-        where: { hostname: { startsWith: prefix }, status: LIVE },
+        where: {
+          hostname: { startsWith: prefix },
+          ...(opts.readonly
+            ? {
+                OR: [
+                  { status: "ACTIVE" },
+                  { status: "ALIAS", aliasExpiresAt: { gt: new Date() } },
+                ],
+              }
+            : { status: LIVE }),
+        },
         select: { hostname: true },
       })
     ).map((d) => d.hostname.slice(0, -suffix)),
   );
+  for (const l of opts.extraTaken ?? []) taken.add(l);
   return (
     nextAvailableLabel(base, (l) => taken.has(l)) ??
     (fallbackSeed

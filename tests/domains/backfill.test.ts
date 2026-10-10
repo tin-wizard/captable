@@ -60,10 +60,32 @@ describe("backfillSubdomains", () => {
     await db.company.deleteMany({ where: { id: { in: ids } } });
   });
 
-  it("dry run creates no rows", async () => {
+  it("dry run creates no rows and previews the exact labels apply will assign", async () => {
     const res = await backfillSubdomains({ apply: false, companyIds: ids });
-    expect(res.map((r) => r.action)).toEqual(["would-assign", "would-assign"]);
+    expect(res.map((r) => [r.label, r.action])).toEqual([
+      [`acme-${run}`, "would-assign"],
+      [`acme-${run}-2`, "would-assign"],
+    ]);
     expect(await primaries()).toHaveLength(0);
+  });
+
+  it("dry run does not release expired aliases", async () => {
+    const host = `old-${run}.dealroom.tin.info`;
+    await db.companyDomain.create({
+      data: {
+        companyId: older.id,
+        hostname: host,
+        kind: "PLATFORM",
+        status: "ALIAS",
+        aliasExpiresAt: new Date(Date.now() - 1000),
+      },
+    });
+    await backfillSubdomains({ apply: false, companyIds: ids });
+    const row = await db.companyDomain.findFirstOrThrow({
+      where: { hostname: host },
+    });
+    expect(row.status).toBe("ALIAS");
+    expect(row.releasedAt).toBeNull();
   });
 
   it("apply assigns one primary per company, oldest gets the plain label", async () => {
