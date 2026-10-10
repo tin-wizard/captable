@@ -11,7 +11,7 @@ export type Tenant = {
   session: Session;
 };
 
-async function seedTenant(label: string): Promise<Tenant> {
+export async function seedTenant(label: string): Promise<Tenant> {
   const user = await db.user.create({
     data: {
       name: `${label} admin`,
