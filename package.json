@@ -28,6 +28,7 @@
     "email:preview": "email preview ./src/emails",
     "copy:pdfjs": "node scripts/copy-pdfjs-worker.cjs",
     "knip": "knip",
+    "backfill:subdomains": "tsx scripts/backfill-subdomains.ts",
     "test": "TEST_DATABASE_URL=${TEST_DATABASE_URL:-postgres://captable:password@localhost:54331/captable_test} vitest run"
   },
   "dependencies": {

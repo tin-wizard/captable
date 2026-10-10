@@ -89,7 +89,7 @@ async function insertPrimary(
     companyId,
     label,
     createdById,
-  }: { companyId: string; label: string; createdById: string },
+  }: { companyId: string; label: string; createdById: string | null },
 ) {
   const reason = validateLabel(label);
   if (reason) throw new InvalidLabelError(reason);
