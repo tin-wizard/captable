@@ -21,9 +21,10 @@ import {
   seedTwoTenants,
 } from "../helpers/seed";
 
+const flag = vi.hoisted(() => ({ enabled: true }));
 vi.mock("@/server/domains/config", () => ({
   domainConfig: () => ({
-    enabled: true,
+    enabled: flag.enabled,
     canonicalHost: "dealroom.tin.info",
     baseDomain: "dealroom.tin.info",
     scheme: "https",
@@ -221,5 +222,40 @@ describe("domain router", () => {
     expect((await c.domain.current()).hostname).toBe(
       `${labels.a}.dealroom.tin.info`,
     );
+  });
+
+  it("flag off: no registry access, rename NOT_FOUND, current disabled", async () => {
+    flag.enabled = false;
+    const spies = (
+      ["count", "findMany", "findFirst", "updateMany"] as const
+    ).map((m) => vi.spyOn(db.companyDomain, m));
+    try {
+      const c = tenantCaller(a, labels.a, "p");
+      expect(
+        await callerFor(a).domain.checkAvailability({ label: labels.b }),
+      ).toEqual({
+        available: false,
+        reason: null,
+        suggestion: null,
+      });
+      expect(await c.domain.checkRename({ label: labels.b })).toMatchObject({
+        available: false,
+      });
+      expect(
+        await callerFor(a).domain.suggest({ name: "Botski" }),
+      ).toMatchObject({ label: null, enabled: false });
+      expect(await c.domain.current()).toEqual({
+        enabled: false,
+        hostname: null,
+        aliases: [],
+      });
+      await expect(
+        c.domain.rename({ label: labels.newA }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      for (const s of spies) expect(s).not.toHaveBeenCalled();
+    } finally {
+      for (const s of spies) s.mockRestore();
+      flag.enabled = true;
+    }
   });
 });

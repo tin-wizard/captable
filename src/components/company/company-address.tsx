@@ -37,7 +37,18 @@ export const CompanyAddress = () => {
     onSuccess: ({ url }) => window.location.assign(url),
     onError: (e) => {
       setOpen(false);
-      toast.error(e.message || "Could not change the address.");
+      let msg = "Could not change the address.";
+      try {
+        if (e.data?.code === "CONFLICT") {
+          const { suggestion } = JSON.parse(e.message);
+          msg = `That address was just taken.${
+            suggestion ? ` Try ${suggestion}.` : ""
+          }`;
+        } else if (e.data?.code === "BAD_REQUEST" && e.message in REASONS) {
+          msg = REASONS[e.message as keyof typeof REASONS];
+        }
+      } catch {}
+      toast.error(msg);
     },
   });
 
@@ -50,11 +61,13 @@ export const CompanyAddress = () => {
     ? null
     : !settled
       ? "Checking..."
-      : available
-        ? "Available"
-        : `${REASONS[check.data?.reason ?? "taken"]}${
-            check.data?.suggestion ? ` Try ${check.data.suggestion}.` : ""
-          }`;
+      : check.isError
+        ? "Could not check the address."
+        : available
+          ? "Available"
+          : `${REASONS[check.data?.reason ?? "taken"]}${
+              check.data?.suggestion ? ` Try ${check.data.suggestion}.` : ""
+            }`;
 
   return (
     <div className="mt-10 max-w-xl space-y-4 border-t pt-8">

@@ -25,6 +25,8 @@ async function availability(
   label: string,
   ownCompanyId?: string,
 ) {
+  if (!domainConfig().enabled)
+    return { available: false, reason: null, suggestion: null };
   const reason = validateLabel(label);
   if (reason) return { available: false, reason, suggestion: null };
   // the company's own live alias can be claimed back
@@ -71,6 +73,8 @@ export const domainRouter = createTRPCRouter({
     ),
 
   current: withTenant.query(async ({ ctx }) => {
+    if (!domainConfig().enabled)
+      return { enabled: false, hostname: null, aliases: [] };
     const { companyId } = ctx.tenant;
     const rows = await ctx.tenant.db.companyDomain.findMany({
       where: {
@@ -88,7 +92,7 @@ export const domainRouter = createTRPCRouter({
       orderBy: { createdAt: "asc" },
     });
     return {
-      enabled: domainConfig().enabled,
+      enabled: true,
       hostname: rows.find((r) => r.isPrimary)?.hostname ?? null,
       aliases: rows
         .filter((r) => !r.isPrimary && r.aliasExpiresAt)
