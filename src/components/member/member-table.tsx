@@ -294,9 +294,19 @@ const MemberTable = ({ members, roles }: MembersType) => {
     data: members,
     columns: columns,
     enableRowSelection: true,
+    // The built-in auto reset queues a state update during the first render,
+    // which React 19 reports as an update on an unmounted component; reset
+    // the page from the user's sort/filter actions instead.
+    autoResetPageIndex: false,
     onRowSelectionChange: setRowSelection,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
+    onSortingChange: (updater) => {
+      setSorting(updater);
+      table.setPageIndex(0);
+    },
+    onColumnFiltersChange: (updater) => {
+      setColumnFilters(updater);
+      table.setPageIndex(0);
+    },
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
