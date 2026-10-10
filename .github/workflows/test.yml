@@ -182,6 +182,10 @@ jobs:
       - name: 🧪 E2E
         run: pnpm e2e
 
+      - name: 🔐 Caddy logs
+        if: failure()
+        run: docker logs caddy > caddy.log 2>&1 || true
+
       - name: 📎 Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
@@ -191,4 +195,5 @@ jobs:
             playwright-report/
             test-results/
             app.log
+            caddy.log
           retention-days: 7

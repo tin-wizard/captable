@@ -12,6 +12,17 @@ if (existsSync(seedFile)) {
   }
 }
 
+// the full spec creates data: only local (.test) and staging, never production
+{
+  const h = new URL(process.env.E2E_ROOT ?? "https://dealroom.test").hostname;
+  const allowed = h.endsWith(".test") || h === "dealroom-staging.tin.info";
+  if (!allowed && process.env.E2E_SMOKE !== "1") {
+    throw new Error(
+      `refusing to run the full e2e spec against ${h}; use E2E_SMOKE=1`,
+    );
+  }
+}
+
 const staging =
   !!process.env.E2E_ROOT && !process.env.E2E_ROOT.endsWith(".test");
 

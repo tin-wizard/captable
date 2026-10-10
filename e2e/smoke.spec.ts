@@ -8,6 +8,16 @@ const ROOT = process.env.E2E_ROOT as string;
 const BASE = new URL(ROOT).hostname;
 const RUN = process.env.E2E_RUN ?? Date.now().toString(36);
 
+for (const k of [
+  "E2E_ROOT",
+  "E2E_SMOKE_EMAIL",
+  "E2E_SMOKE_PASSWORD",
+  "E2E_OUTSIDER_EMAIL",
+  "E2E_OUTSIDER_PASSWORD",
+]) {
+  if (!process.env[k]) throw new Error(`smoke.spec.ts needs ${k}`);
+}
+
 test("smoke: create a company and land on its subdomain", async ({
   browser,
 }) => {

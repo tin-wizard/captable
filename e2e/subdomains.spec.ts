@@ -5,6 +5,7 @@ const ROOT = process.env.E2E_ROOT ?? "https://dealroom.test";
 const BASE = new URL(ROOT).hostname; // also the tenant base domain
 const RUN = process.env.E2E_RUN ?? Date.now().toString(36); // unique per run so staging can rerun
 const host = (label: string) => `https://${label}.${BASE}`;
+const esc = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const PASSWORD = process.env.E2E_PASSWORD ?? "E2e-password-1!";
 // the upload needs a real bucket with CORS for the company host (staging); CI has none
 const UPLOAD = process.env.E2E_UPLOAD === "1";
@@ -59,7 +60,7 @@ async function adminWithCompany(browser: Browser, label: string, name: string) {
   const page = await ctx.newPage();
   await login(page, "admin@e2e.test");
   await createCompany(page, name, label);
-  await page.waitForURL(new RegExp(`^${host(label)}/[^/]+`));
+  await page.waitForURL(new RegExp(`^${esc(host(label))}/[^/]+`));
   return { ctx, page, url: page.url() };
 }
 
@@ -73,7 +74,7 @@ test("mandatory: company creation provisions a working, isolated subdomain", asy
   await login(page, "admin@e2e.test"); // step 1
 
   await createCompany(page, `Botski ${RUN}`, botski); // steps 2-4
-  await page.waitForURL(new RegExp(`^${host(botski)}/[^/]+`)); // step 5
+  await page.waitForURL(new RegExp(`^${esc(host(botski))}/[^/]+`)); // step 5
   await expect(page.getByText(`Botski ${RUN}`).first()).toBeVisible(); // step 6
   const botskiUrl = page.url();
 
@@ -100,7 +101,7 @@ test("mandatory: company creation provisions a working, isolated subdomain", asy
   await expect(op.getByText(`Botski ${RUN}`)).toHaveCount(0);
 
   await createCompany(page, `Konnect ${RUN}`, konnect); // step 8
-  await page.waitForURL(new RegExp(`^${host(konnect)}/`));
+  await page.waitForURL(new RegExp(`^${esc(host(konnect))}/`));
   await page.goto(botskiUrl); // Botski unaffected
   await expect(page.getByText(`Botski ${RUN}`).first()).toBeVisible();
 
@@ -110,7 +111,7 @@ test("mandatory: company creation provisions a working, isolated subdomain", asy
   expect(legacy, "E2E_LEGACY_PUBLIC_ID (run e2e/seed.ts)").toBeTruthy();
   await page.goto(`${ROOT}/${legacy}/stakeholders`);
   await expect(page).toHaveURL(
-    new RegExp(`^${host(legacyLabel)}/${legacy}/stakeholders`),
+    new RegExp(`^${esc(host(legacyLabel))}/${legacy}/stakeholders`),
   );
   await expect(page.getByText("Legacy Co").first()).toBeVisible();
 
@@ -120,7 +121,7 @@ test("mandatory: company creation provisions a working, isolated subdomain", asy
   await fp.goto(`${botskiUrl}/stakeholders`);
   await fp.waitForURL(/\/login/);
   await submitLogin(fp, "admin@e2e.test");
-  await fp.waitForURL(new RegExp(`^${botskiUrl}/stakeholders`));
+  await fp.waitForURL(new RegExp(`^${esc(botskiUrl)}/stakeholders`));
 });
 
 test("mandatory: no per-company infrastructure", async ({ page }) => {
@@ -138,7 +139,7 @@ test("two tabs: each tab keeps its own company after reloading both", async ({
   const first = await adminWithCompany(browser, a, `TabsA ${RUN}`);
   const p2 = await first.ctx.newPage();
   await createCompany(p2, `TabsB ${RUN}`, b);
-  await p2.waitForURL(new RegExp(`^${host(b)}/`));
+  await p2.waitForURL(new RegExp(`^${esc(host(b))}/`));
   const second = p2.url();
 
   await first.page.reload();
@@ -157,7 +158,7 @@ test("sign-out on one company host signs out every host", async ({
   const first = await adminWithCompany(browser, a, `OutA ${RUN}`);
   const p2 = await first.ctx.newPage();
   await createCompany(p2, `OutB ${RUN}`, b);
-  await p2.waitForURL(new RegExp(`^${host(b)}/`));
+  await p2.waitForURL(new RegExp(`^${esc(host(b))}/`));
 
   // what the user menu's "Sign out" does on a company host
   await p2.evaluate(() => {
@@ -197,8 +198,20 @@ test("a tenant session cookie is not accepted on the canonical host", async ({
     const r = await fetch("/api/trpc/company.getCompany");
     return { status: r.status, body: await r.text() };
   });
-  expect(res.status).not.toBe(200);
+  expect(res.status === 401 || res.body.includes("UNAUTHORIZED")).toBeTruthy();
   expect(res.body).not.toContain(`Cookie ${RUN}`);
+
+  // positive control: a normal canonical session can call the same endpoint
+  const ctrl = await browser.newContext();
+  const cp = await ctrl.newPage();
+  await login(cp, "admin@e2e.test");
+  await cp.goto(`${ROOT}/login`);
+  const ok = await cp.evaluate(async () => {
+    const r = await fetch("/api/trpc/company.getCompany");
+    return { status: r.status, body: await r.text() };
+  });
+  expect(ok.status).toBe(200);
+  expect(ok.body).toContain('"name"');
 });
 
 test("alias: the old company URL follows a rename, logged out", async ({
@@ -213,7 +226,7 @@ test("alias: the old company URL follows a rename, logged out", async ({
   await expect(page.getByText("Available")).toBeVisible();
   await page.getByRole("button", { name: "Change", exact: true }).click();
   await page.getByRole("button", { name: "Change address" }).click();
-  await page.waitForURL(new RegExp(`^${host(renamed)}/`));
+  await page.waitForURL(new RegExp(`^${esc(host(renamed))}/`));
 
   const fresh = await browser.newContext();
   const fp = await fresh.newPage();
@@ -221,5 +234,5 @@ test("alias: the old company URL follows a rename, logged out", async ({
   await fp.goto(`${host(old)}${publicPath}`);
   await fp.waitForURL(/\/login/);
   await submitLogin(fp, "admin@e2e.test");
-  await fp.waitForURL(new RegExp(`^${host(renamed)}${publicPath}`));
+  await fp.waitForURL(new RegExp(`^${esc(host(renamed))}${esc(publicPath)}`));
 });
