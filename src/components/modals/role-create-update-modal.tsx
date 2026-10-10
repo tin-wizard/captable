@@ -11,7 +11,6 @@ import {
 } from "@/trpc/routers/rbac-router/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import type { ComponentProps } from "react";
 import { useForm, useFormContext, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { popModal, pushModal } from ".";
@@ -197,26 +196,6 @@ function RoleForm(props: FormProps) {
     </Form>
   );
 }
-
-interface RoleCreateUpdateModalActionProps extends ComponentProps<"button"> {}
-
-export const RoleCreateUpdateModalAction = (
-  props: RoleCreateUpdateModalActionProps,
-) => {
-  return (
-    <Button
-      {...props}
-      onClick={() => {
-        pushModal("RoleCreateUpdate", {
-          title: "Create a role",
-          type: "create",
-        });
-      }}
-    >
-      Create a role
-    </Button>
-  );
-};
 
 interface PermissionCheckBoxProps {
   action: TActions;
