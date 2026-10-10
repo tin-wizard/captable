@@ -1,4 +1,5 @@
 import { db } from "@/server/db";
+import { LABEL_MAX } from "@/server/domains/core/subdomain";
 import {
   DomainTakenError,
   InvalidLabelError,
@@ -10,6 +11,7 @@ import {
   resolveHostname,
   suggestAvailableLabel,
 } from "@/server/domains/registry";
+import { tenantDb } from "@/server/tenant-db";
 import {
   afterAll,
   beforeAll,
@@ -179,6 +181,29 @@ describe("registry", () => {
 
   it("suggests the next free label", async () => {
     expect(await suggestAvailableLabel(db, "Race")).toBe("race-2");
+  });
+
+  it("suggestions skip taken -N labels of bases truncated to fit LABEL_MAX", async () => {
+    const base = "q".repeat(LABEL_MAX);
+    const short = "q".repeat(LABEL_MAX - 2);
+    await db.companyDomain.createMany({
+      data: [base, `${short}-2`].map((l) => ({
+        companyId: b.companyId,
+        hostname: `${l}.dealroom.tin.info`,
+        kind: "PLATFORM" as const,
+        status: "ALIAS" as const,
+        aliasExpiresAt: new Date(Date.now() + 864e5),
+      })),
+    });
+    expect(await suggestAvailableLabel(db, base)).toBe(`${short}-3`);
+  });
+
+  it("uniqueness checks see other companies' hostnames through a tenant-scoped client", async () => {
+    const scoped = tenantDb(db, a.companyId);
+    // "reg-a" now belongs to b; "race" to b or c, never a
+    expect(await isLabelAvailable(scoped, "reg-a")).toBe(false);
+    expect(await isLabelAvailable(scoped, "race")).toBe(false);
+    expect(await suggestAvailableLabel(scoped, "Race")).toBe("race-2");
   });
 
   it("falls back to company-<seed> when company..company-99 are taken", async () => {

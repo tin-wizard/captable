@@ -2,6 +2,7 @@ import { type TPrismaOrTransaction, db as globalDb } from "@/server/db";
 import { Prisma } from "@prisma/client";
 import { domainConfig } from "./config";
 import {
+  LABEL_MAX,
   nextAvailableLabel,
   suggestLabel,
   validateLabel,
@@ -25,12 +26,11 @@ export const hostnameFor = (label: string) =>
 
 const LIVE = { not: "RELEASED" } as const;
 
+// Hostnames are global: uniqueness reads/releases always use the unscoped db,
+// never the caller's (possibly tenant-scoped) client. Release is idempotent.
 // Expired aliases are released lazily, right before anyone can claim their hostname.
-async function releaseExpiredAliases(
-  tx: TPrismaOrTransaction,
-  hostname?: string,
-) {
-  await tx.companyDomain.updateMany({
+async function releaseExpiredAliases(hostname?: string) {
+  await globalDb.companyDomain.updateMany({
     where: {
       status: "ALIAS",
       aliasExpiresAt: { lt: new Date() },
@@ -41,13 +41,13 @@ async function releaseExpiredAliases(
 }
 
 export async function isLabelAvailable(
-  db: TPrismaOrTransaction,
+  _db: TPrismaOrTransaction,
   label: string,
 ) {
   if (validateLabel(label)) return false;
-  await releaseExpiredAliases(db, hostnameFor(label));
+  await releaseExpiredAliases(hostnameFor(label));
   return (
-    (await db.companyDomain.count({
+    (await globalDb.companyDomain.count({
       where: { hostname: hostnameFor(label), status: LIVE },
     })) === 0
   );
@@ -55,17 +55,19 @@ export async function isLabelAvailable(
 
 // `fallbackSeed` (e.g. a publicId) guarantees an answer when every `base-N` is taken.
 export async function suggestAvailableLabel(
-  db: TPrismaOrTransaction,
+  _db: TPrismaOrTransaction,
   companyName: string,
   fallbackSeed?: string,
 ) {
-  await releaseExpiredAliases(db);
+  await releaseExpiredAliases();
   const base = suggestLabel(companyName);
   const suffix = domainConfig().baseDomain.length + 1;
+  // nextAvailableLabel truncates long bases before adding "-N"; match that shorter prefix
+  const prefix = base.slice(0, LABEL_MAX - 3).replace(/-+$/, "");
   const taken = new Set(
     (
-      await db.companyDomain.findMany({
-        where: { hostname: { startsWith: base }, status: LIVE },
+      await globalDb.companyDomain.findMany({
+        where: { hostname: { startsWith: prefix }, status: LIVE },
         select: { hostname: true },
       })
     ).map((d) => d.hostname.slice(0, -suffix)),
@@ -92,7 +94,7 @@ async function insertPrimary(
   const reason = validateLabel(label);
   if (reason) throw new InvalidLabelError(reason);
   const hostname = hostnameFor(label);
-  await releaseExpiredAliases(tx, hostname);
+  await releaseExpiredAliases(hostname);
   try {
     await tx.companyDomain.create({
       data: {
