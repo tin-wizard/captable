@@ -15,20 +15,25 @@ import { api } from "@/trpc/react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { RiAddCircleLine } from "@remixicon/react";
 import { useSession } from "next-auth/react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 interface CompanySwitcherProps {
   companies: TGetCompanyList;
   publicId: string;
+  /** set only on a company host */
+  canonicalOrigin: string | null;
 }
 
 const createCompanyValue = "cap-co-create-company";
 
-export function CompanySwitcher({ companies, publicId }: CompanySwitcherProps) {
+export function CompanySwitcher({
+  companies,
+  publicId,
+  canonicalOrigin,
+}: CompanySwitcherProps) {
   const value = useState(() => publicId)[0];
   const { update } = useSession();
-  const router = useRouter();
 
   const pathname = usePathname();
 
@@ -39,7 +44,8 @@ export function CompanySwitcher({ companies, publicId }: CompanySwitcherProps) {
       value={value}
       onValueChange={async (newValue) => {
         if (newValue === createCompanyValue) {
-          router.push("/company/new");
+          window.location.assign(`${canonicalOrigin ?? ""}/company/new`);
+          return;
         }
 
         if (newValue !== value) {
@@ -48,14 +54,17 @@ export function CompanySwitcher({ companies, publicId }: CompanySwitcherProps) {
           );
 
           if (member) {
-            await switchCompany.mutateAsync({ id: member.id });
-            await update();
+            // company host: switchCompany is denied there; the handoff's issue step updates lastAccessed
+            if (!canonicalOrigin) {
+              await switchCompany.mutateAsync({ id: member.id });
+              await update();
+            }
 
             const routeSegments = pathname.split("/").filter(Boolean);
             const nonDynamicSegment = routeSegments.slice(1).join("/");
 
-            router.push(
-              `/${newValue}/${nonDynamicSegment ? nonDynamicSegment : ""}`,
+            window.location.assign(
+              `${member.url}/${nonDynamicSegment ? nonDynamicSegment : ""}`,
             );
           }
         }

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
+import { safeNextPath } from "@/server/domains/core/host";
 import { api } from "@/trpc/react";
 import { ZCurrentPasswordSchema } from "@/trpc/routers/auth/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,7 +22,7 @@ import {
 } from "@simplewebauthn/browser";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -39,7 +40,9 @@ interface LoginFormProps {
 }
 
 const SignInForm = ({ isGoogleAuthEnabled }: LoginFormProps) => {
-  const router = useRouter();
+  const next = safeNextPath(useSearchParams().get("callbackUrl"));
+  // deep links and the handoff's issue step resume after login
+  const callbackUrl = next === "/" ? "/onboarding" : next;
   const [isPasskeyLoading, setIsPasskeyLoading] = useState<boolean>(false);
 
   const { mutateAsync: createPasskeySigninOptions } =
@@ -60,7 +63,7 @@ const SignInForm = ({ isGoogleAuthEnabled }: LoginFormProps) => {
     const result = await signIn("credentials", {
       email,
       password,
-      callbackUrl: "/onboarding",
+      callbackUrl,
     });
 
     if (result?.error) {
@@ -84,14 +87,15 @@ const SignInForm = ({ isGoogleAuthEnabled }: LoginFormProps) => {
 
         const result = await signIn("webauthn", {
           credential: JSON.stringify(credential),
-          callbackUrl: "/onboarding",
+          callbackUrl,
           redirect: false,
         });
 
         if (!result?.url) {
           toast.error("Unauthorized error, invalid credentials.");
         } else {
-          router.push(result.url);
+          // may be a route handler (/auth/handoff/issue) that redirects cross-origin
+          window.location.assign(result.url);
         }
       }
     } catch (_err) {
@@ -106,7 +110,7 @@ const SignInForm = ({ isGoogleAuthEnabled }: LoginFormProps) => {
   };
 
   async function signInWithGoogle() {
-    await signIn("google", { callbackUrl: "/onboarding" });
+    await signIn("google", { callbackUrl });
   }
 
   return (

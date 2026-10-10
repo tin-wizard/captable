@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { companyHomeUrl } from "./domains/links";
 
 export const getCompanyList = async (userId: string) => {
   const data = await db.member.findMany({
@@ -19,7 +20,12 @@ export const getCompanyList = async (userId: string) => {
     },
   });
 
-  return data;
+  return Promise.all(
+    data.map(async (m) => ({
+      ...m,
+      url: await companyHomeUrl(db, m.company.id, m.company.publicId),
+    })),
+  );
 };
 
 export type TGetCompanyList = Awaited<ReturnType<typeof getCompanyList>>;
