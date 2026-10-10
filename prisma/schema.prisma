@@ -65,6 +65,8 @@ model User {
   identityProvider String?
 
   accessTokens AccessToken[]
+
+  sessionVersion Int @default(0)
 }
 
 enum CredentialDeviceTypeEnum {
@@ -161,6 +163,7 @@ model Company {
   customRoles      CustomRole[]
 
   BankAccount BankAccount[]
+  domains     CompanyDomain[]
 
   @@unique([publicId])
 }
@@ -1154,4 +1157,50 @@ model AccessToken {
 
   @@index([userId])
   @@index([typeEnum, clientId])
+}
+
+enum DomainKind {
+  PLATFORM
+  CUSTOM
+}
+
+enum DomainStatus {
+  ACTIVE
+  ALIAS
+  RELEASED
+}
+
+// Partial unique indexes live in migration 20261012000000_company_domains; delete any generated DROP of them.
+model CompanyDomain {
+  id             String       @id @default(cuid())
+  companyId      String
+  hostname       String
+  kind           DomainKind
+  status         DomainStatus
+  isPrimary      Boolean      @default(false)
+  aliasExpiresAt DateTime?
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  releasedAt     DateTime?
+  company        Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([hostname])
+}
+
+model AuthHandoff {
+  id         String    @id @default(cuid())
+  codeHash   String    @unique
+  stateHash  String
+  userId     String
+  companyId  String
+  memberId   String
+  targetHost String
+  next       String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([expiresAt])
 }
