@@ -25,6 +25,8 @@ const ALLOWLIST_TENANTLESS: Record<string, string> = {
     "invitee has no active membership until accepting",
   [`${R}security-router/procedures/update-password.tsx`]:
     "user-level password change",
+  [`${R}domain-router/router.ts`]:
+    "label availability is a global lookup by design",
   [`${R}billing-router/procedures/get-products.ts`]:
     "global billing catalogue; BillingCustomer is global on purpose",
 };

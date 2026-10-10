@@ -1,3 +1,4 @@
+import { CompanyAddress } from "@/components/company/company-address";
 import { CompanyForm } from "@/components/onboarding/company-form";
 import { UnAuthorizedState } from "@/components/ui/un-authorized-state";
 import { serverAccessControl } from "@/lib/rbac/access-control";
@@ -19,7 +20,12 @@ const CompanySettingsPage = async () => {
     return <UnAuthorizedState />;
   }
 
-  return <CompanyForm data={data} type="edit" />;
+  return (
+    <>
+      <CompanyForm data={data} type="edit" />
+      <CompanyAddress />
+    </>
+  );
 };
 
 export default CompanySettingsPage;
