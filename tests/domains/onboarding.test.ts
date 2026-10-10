@@ -131,6 +131,19 @@ describe("onboarding with subdomain", () => {
     expect(await db.company.count()).toBe(before);
   });
 
+  it("rejects a reserved subdomain and creates no company", async () => {
+    const before = await db.company.count();
+    const r = await caller(existing).onboarding.onboard(
+      payload(`Reserved ${run}`, "admin"),
+    );
+    expect(r).toMatchObject({
+      success: false,
+      field: "subdomain",
+      suggestion: null,
+    });
+    expect(await db.company.count()).toBe(before);
+  });
+
   it("updateCompany ignores a subdomain in the payload", async () => {
     const label = `upd-${run}`;
     const r = await caller(existing).onboarding.onboard(

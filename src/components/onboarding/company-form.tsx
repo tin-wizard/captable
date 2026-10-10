@@ -105,9 +105,17 @@ export const CompanyForm = ({ type, data }: CompanyFormProps) => {
 
   const suggest = api.domain.suggest.useQuery(
     { name: debouncedName },
-    { enabled: hasAddress && debouncedName.length > 0 },
+    {
+      enabled: hasAddress && debouncedName.length > 0,
+      keepPreviousData: true,
+    },
   );
-  const addressEnabled = hasAddress && suggest.data?.enabled === true;
+  // remember the first enabled answer so the field never unmounts while typing
+  const [seenEnabled, setSeenEnabled] = useState(false);
+  useEffect(() => {
+    if (suggest.data?.enabled) setSeenEnabled(true);
+  }, [suggest.data?.enabled]);
+  const addressEnabled = hasAddress && seenEnabled;
   const baseDomain = suggest.data?.baseDomain;
   const availability = api.domain.checkAvailability.useQuery(
     { label: debouncedLabel },

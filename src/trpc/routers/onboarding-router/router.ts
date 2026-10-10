@@ -92,11 +92,12 @@ export const onboardingRouter = createTRPCRouter({
 
             if (domainConfig().enabled) {
               const label =
-                subdomain ??
+                subdomain ||
                 (await suggestAvailableLabel(tx, companyData.name, publicId));
               const { hostname } = await assignPlatformSubdomain(tx, {
                 companyId: company.id,
-                label: label ?? "",
+                // publicId fallback seed guarantees a label
+                label: label as string,
                 createdById: user.id,
               });
               await Audit.create(
