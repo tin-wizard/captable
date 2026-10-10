@@ -17,9 +17,17 @@ import {
 } from "@/lib/types";
 import type { MemberStatusEnum } from "@/prisma/enums";
 import { type TPrismaOrTransaction, db } from "@/server/db";
+import { getRequestHost } from "@/server/domains/request-host";
+import {
+  TENANT_SESSION_SECONDS,
+  type TenantClaims,
+  readTenantSession,
+  tenantCookieName,
+} from "@/server/domains/tenant-session";
 import { verifyAuthenticationResponse } from "@simplewebauthn/server";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
+import { cookies } from "next/headers";
 import { cache } from "react";
 import { getUserByEmail, getUserById } from "./user";
 
@@ -35,6 +43,7 @@ export const JWT_SECRET = new TextEncoder().encode(env.NEXTAUTH_SECRET);
  */
 declare module "next-auth" {
   interface Session extends DefaultSession {
+    sv?: number;
     user: {
       id: string;
       isOnboarded: boolean;
@@ -54,6 +63,7 @@ declare module "next-auth/jwt" {
     isOnboarded: boolean;
     companyPublicId: string;
     status: MemberStatusEnum | "";
+    sv?: number;
   }
 }
 
@@ -69,6 +79,9 @@ export const authOptions: NextAuthOptions = {
         where: { id: user.id },
         data: { emailVerified: new Date() },
       });
+    },
+    async signOut({ token }) {
+      if (token?.sub) await bumpSessionVersion(token.sub);
     },
   },
   callbacks: {
@@ -93,10 +106,19 @@ export const authOptions: NextAuthOptions = {
       if (token.sub) {
         session.user.id = token.sub;
       }
+      session.sv = token.sv;
       return session;
     },
 
     async jwt({ token, trigger }) {
+      // Only at sign-in: an "update" must not refresh a revoked token's sv.
+      if (trigger === "signIn" || trigger === "signUp") {
+        const u = await db.user.findUnique({
+          where: { id: token.sub },
+          select: { sessionVersion: true },
+        });
+        token.sv = u?.sessionVersion ?? 0;
+      }
       if (trigger) {
         const member = await db.member.findFirst({
           where: {
@@ -298,7 +320,69 @@ export const authOptions: NextAuthOptions = {
  * @see https://next-auth.js.org/configuration/nextjs
  */
 
-export const getServerAuthSession = () => getServerSession(authOptions);
+export async function bumpSessionVersion(userId: string) {
+  await db.user.update({
+    where: { id: userId },
+    data: { sessionVersion: { increment: 1 } },
+  });
+}
+
+// undefined = pre-sessionVersion token (counts as 0); any other non-number is stale.
+export async function isSessionVersionCurrent(
+  userId: string,
+  sv: number | undefined,
+) {
+  const v = sv === undefined ? 0 : sv;
+  if (typeof v !== "number") return false;
+  const u = await db.user.findUnique({
+    where: { id: userId },
+    select: { sessionVersion: true },
+  });
+  return !!u && u.sessionVersion === v;
+}
+
+export function sessionFromTenantClaims(
+  c: TenantClaims,
+  expires: Date,
+): Session {
+  return {
+    expires: expires.toISOString(),
+    sv: c.sv,
+    user: {
+      id: c.sub,
+      companyId: c.cid,
+      memberId: c.mid,
+      companyPublicId: c.pid,
+      isOnboarded: true,
+      status: "ACTIVE",
+      name: c.name ?? null,
+      email: c.email ?? null,
+      image: c.picture ?? null,
+    },
+  };
+}
+
+export const getServerAuthSession = async (): Promise<Session | null> => {
+  const host = await getRequestHost();
+  if (host.kind === "canonical") {
+    const s = await getServerSession(authOptions);
+    if (!s?.user?.id) return s;
+    return (await isSessionVersionCurrent(s.user.id, s.sv)) ? s : null;
+  }
+  if (host.kind !== "tenant") return null;
+  const raw = (await cookies()).get(tenantCookieName())?.value;
+  const c = await readTenantSession(raw, host.hostname);
+  if (
+    !c ||
+    c.cid !== host.companyId ||
+    !(await isSessionVersionCurrent(c.sub, c.sv))
+  )
+    return null;
+  return sessionFromTenantClaims(
+    c,
+    new Date(Date.now() + TENANT_SESSION_SECONDS * 1000),
+  );
+};
 
 export const getServerComponentAuthSession = cache(() =>
   getServerAuthSession(),

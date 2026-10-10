@@ -1,3 +1,4 @@
+import { bumpSessionVersion } from "@/server/auth";
 import { db } from "@/server/db";
 import type { PasskeyAudit } from "@/trpc/routers/passkey-router/schema";
 import { Audit } from "../audit";
@@ -45,4 +46,5 @@ export const deletePasskey = async ({
       db,
     );
   });
+  await bumpSessionVersion(userId);
 };

@@ -1,4 +1,5 @@
 import { Audit } from "@/server/audit";
+import { bumpSessionVersion } from "@/server/auth";
 import { withAuth } from "@/trpc/api/trpc";
 import bcrypt from "bcryptjs";
 import { ZUpdatePasswordMutationSchema } from "../schema";
@@ -64,6 +65,7 @@ export const updatePasswordProcedure = withAuth
         tx,
       );
     });
+    await bumpSessionVersion(userId);
 
     return {
       success: true,
