@@ -1,9 +1,9 @@
-import { env } from "@/env";
 import { shareUpdateEmailJob } from "@/jobs/share-update-email";
 import { encode } from "@/lib/jwt";
 import { UpdateStatusEnum } from "@/prisma/enums";
 import { ShareRecipientSchema } from "@/schema/contacts";
 import { Audit } from "@/server/audit";
+import { companyUrl } from "@/server/domains/links";
 import { assertTenantOwns } from "@/server/tenant-guard";
 import { withAccessControl } from "@/trpc/api/trpc";
 import { z } from "zod";
@@ -41,7 +41,6 @@ export const shareUpdateProcedure = withAccessControl
     const company = update.company;
 
     const upsertManyRecipients = async () => {
-      const baseUrl = env.NEXT_PUBLIC_BASE_URL;
       const recipients = [...others, ...selectedContacts];
 
       for (const recipient of recipients) {
@@ -84,7 +83,11 @@ export const shareUpdateProcedure = withAccessControl
           recipientId: recipientRecord.id,
         });
 
-        const link = `${baseUrl}/updates/${update.publicId}?token=${token}`;
+        const link = await companyUrl(
+          db,
+          companyId,
+          `/updates/${update.publicId}?token=${token}`,
+        );
 
         await shareUpdateEmailJob.emit({
           senderName: `${senderName}`,

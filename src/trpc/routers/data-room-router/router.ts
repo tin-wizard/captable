@@ -1,9 +1,9 @@
 import { generatePublicId } from "@/common/id";
-import { env } from "@/env";
 import { shareDataRoomEmailJob } from "@/jobs/share-data-room-email";
 import { encode } from "@/lib/jwt";
 import { ShareRecipientSchema } from "@/schema/contacts";
 import { Audit } from "@/server/audit";
+import { companyUrl } from "@/server/domains/links";
 import { assertTenantOwns } from "@/server/tenant-guard";
 import { createTRPCRouter, withAccessControl } from "@/trpc/api/trpc";
 import type { DataRoom } from "@prisma/client";
@@ -271,7 +271,6 @@ export const dataRoomRouter = createTRPCRouter({
       const company = dataRoom.company;
 
       const upsertManyRecipients = async () => {
-        const baseUrl = env.NEXT_PUBLIC_BASE_URL;
         const recipients = [...others, ...selectedContacts];
 
         for (const recipient of recipients) {
@@ -316,7 +315,11 @@ export const dataRoomRouter = createTRPCRouter({
             recipientId: recipientRecord.id,
           });
 
-          const link = `${baseUrl}/data-rooms/${dataRoom.publicId}?token=${token}`;
+          const link = await companyUrl(
+            db,
+            companyId,
+            `/data-rooms/${dataRoom.publicId}?token=${token}`,
+          );
 
           await shareDataRoomEmailJob.emit({
             senderName: `${senderName}`,

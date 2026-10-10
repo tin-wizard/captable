@@ -3,6 +3,7 @@ import { PdfCanvas } from "@/components/template/pdf-canvas";
 import { SigningFields } from "@/components/template/signing-fields";
 import { TemplateSigningFieldProvider } from "@/providers/template-signing-field-provider";
 import { getServerComponentAuthSession } from "@/server/auth";
+import { assertHostOwns } from "@/server/domains/links";
 import { api } from "@/trpc/server";
 import type { Metadata } from "next";
 
@@ -32,6 +33,8 @@ export default async function SigningPage(props: SigningPageProps) {
       />
     );
   }
+
+  await assertHostOwns(signing.companyId);
 
   const { fields, url, signableFields, status: templateStatus } = signing;
 

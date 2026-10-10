@@ -1,9 +1,9 @@
 import { dayjsExt } from "@/common/dayjs";
 import EsignEmail from "@/emails/EsignEmail";
-import { env } from "@/env";
 import { constants } from "@/lib/constants";
 import { EsignAudit } from "@/server/audit";
 import { db } from "@/server/db";
+import { companyUrl } from "@/server/domains/links";
 import { sendMail } from "@/server/mailer";
 import { render } from "@react-email/components";
 import { z } from "zod";
@@ -58,8 +58,6 @@ export const eSignNotificationEmailWorker = defineWorker(
       ...rest
     } = job.data;
 
-    const baseUrl = env.NEXT_PUBLIC_BASE_URL;
-
     await db.$transaction(async (tx) => {
       const recipient = await tx.esignRecipient.update({
         where: {
@@ -91,7 +89,7 @@ export const eSignNotificationEmailWorker = defineWorker(
 
     const html = await render(
       EsignEmail({
-        signingLink: `${baseUrl}/esign/${token}`,
+        signingLink: await companyUrl(db, companyId, `/esign/${token}`),
         sender,
         documentName,
         ...rest,

@@ -28,6 +28,11 @@ export const getRecipientsProcedure = withAccessControl
 
     const { updateId } = input;
 
+    const { publicId } = await db.update.findFirstOrThrow({
+      where: { id: updateId, companyId },
+      select: { publicId: true },
+    });
+
     const data = await db.updateRecipient.findMany({
       where: {
         update: {
@@ -43,6 +48,7 @@ export const getRecipientsProcedure = withAccessControl
         token: await encode({
           updateId,
           companyId,
+          publicId, // the public page rejects tokens without it
           recipientId: recipient.id,
         }),
       })),

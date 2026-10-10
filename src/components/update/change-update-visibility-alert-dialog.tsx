@@ -9,7 +9,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { env } from "@/env";
 import { api } from "@/trpc/react";
 import { useRouter } from "next/navigation";
 import type React from "react";
@@ -35,7 +34,6 @@ export function ChangeUpdateVisibilityAlertDialog({
   trigger,
   dialogProps: { open, setOpen },
 }: ChangeUpdateVisibilityProps) {
-  const NEXT_PUBLIC_BASE_URL = env.NEXT_PUBLIC_BASE_URL;
   const router = useRouter();
   const [_copiedText, copy] = useCopyToClipboard();
   const [_copiedId, setCopiedId] = useState<string | null>(null);
@@ -47,7 +45,7 @@ export function ChangeUpdateVisibilityAlertDialog({
           if (message === "PUBLIC") {
             copyToClipboard(
               "",
-              `${NEXT_PUBLIC_BASE_URL}/updates/${updatePublicId}`,
+              `${window.location.origin}/updates/${updatePublicId}`,
             );
             toast.success(
               "Update is now public, link has been copied to your clipboard",

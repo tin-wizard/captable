@@ -3,7 +3,6 @@
 import ShareModal, {
   type ExtendedDataRoomRecipientType,
 } from "@/components/common/share-modal";
-import { env } from "@/env";
 import type { ShareContactType, ShareRecipientType } from "@/schema/contacts";
 import { api } from "@/trpc/react";
 import type { DataRoom } from "@prisma/client";
@@ -18,7 +17,7 @@ export const ShareDataRoomModal = ({
   dataRoom,
   contacts,
 }: ShareDataRoomModalProps) => {
-  const baseUrl = env.NEXT_PUBLIC_BASE_URL;
+  const baseUrl = window.location.origin;
 
   const { data, refetch: refetchRecipients } =
     api.dataRoom.getDataRoom.useQuery({
