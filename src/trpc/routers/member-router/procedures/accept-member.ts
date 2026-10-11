@@ -46,6 +46,7 @@ export const acceptMemberProcedure = withAuth
       const member = await trx.member.update({
         where: {
           id: input.memberId,
+          status: "PENDING",
         },
         data: {
           status: "ACTIVE",
