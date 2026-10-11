@@ -1,24 +1,26 @@
 import { encode } from "@/lib/jwt";
-import { withAccessControl, withTenant } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { z } from "zod";
 
-export const getUpdatesProcedure = withTenant.query(async ({ ctx }) => {
-  const { db, companyId } = ctx.tenant;
+export const getUpdatesProcedure = withAccessControl
+  .meta({ policies: { updates: { allow: ["read"] } } })
+  .query(async ({ ctx }) => {
+    const { db, companyId } = ctx.tenant;
 
-  const data = await db.update.findMany({
-    where: {
-      companyId,
-    },
-    include: {
-      recipients: true,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
+    const data = await db.update.findMany({
+      where: {
+        companyId,
+      },
+      include: {
+        recipients: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    return { data };
   });
-
-  return { data };
-});
 
 export const getRecipientsProcedure = withAccessControl
   .meta({ policies: { updates: { allow: ["read"] } } })

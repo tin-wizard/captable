@@ -101,7 +101,6 @@ export const TeamMemberModal = ({
     try {
       if (rest.isEditMode) {
         await updateMember.mutateAsync({
-          name,
           title,
           workEmail,
           memberId: rest.memberId,
@@ -132,8 +131,16 @@ export const TeamMemberModal = ({
               <FormItem>
                 <FormLabel>Full name</FormLabel>
                 <FormControl>
-                  <Input disabled={isSubmitting} {...field} />
+                  <Input
+                    disabled={isSubmitting || rest.isEditMode}
+                    {...field}
+                  />
                 </FormControl>
+                {rest.isEditMode && (
+                  <p className="text-xs text-muted-foreground">
+                    Members change their own name in their profile.
+                  </p>
+                )}
                 <FormMessage className="text-xs font-light" />
               </FormItem>
             )}

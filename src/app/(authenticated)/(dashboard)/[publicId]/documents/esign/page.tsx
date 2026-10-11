@@ -1,6 +1,8 @@
 import EmptyState from "@/components/common/empty-state";
 import { PageLayout } from "@/components/dashboard/page-layout";
 import { Card } from "@/components/ui/card";
+import { UnAuthorizedState } from "@/components/ui/un-authorized-state";
+import { serverAccessControl } from "@/lib/rbac/access-control";
 import { withServerComponentSession } from "@/server/auth";
 import { api } from "@/trpc/server";
 import { RiUploadCloudLine } from "@remixicon/react";
@@ -13,6 +15,10 @@ export const metadata: Metadata = {
 };
 
 const EsignDocumentPage = async () => {
+  const { allow } = await serverAccessControl();
+  if (!allow(true, ["templates", "read"])) {
+    return <UnAuthorizedState />;
+  }
   const session = await withServerComponentSession();
   const { documents } = await api.template.all.query();
 

@@ -18,7 +18,7 @@ export const updateMemberProcedure = withAccessControl
   })
   .mutation(
     async ({ ctx: { session, tenant, requestIp, userAgent }, input }) => {
-      const { memberId, name, roleId, ...rest } = input;
+      const { memberId, roleId, ...rest } = input;
       const { companyId } = tenant;
       const user = session.user;
 
@@ -71,11 +71,6 @@ export const updateMemberProcedure = withAccessControl
                     : { disconnect: true }),
                 },
               }),
-              user: {
-                update: {
-                  name,
-                },
-              },
             },
             select: {
               userId: true,

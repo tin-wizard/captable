@@ -19,6 +19,15 @@ export const acceptMemberProcedure = withAuth
     }
 
     const { publicId, companyId } = await ctx.db.$transaction(async (trx) => {
+      // a revoked or deactivated invite stays dead even with a live token
+      const pending = await trx.member.findFirst({
+        where: { id: input.memberId, status: "PENDING" },
+        select: { id: true },
+      });
+      if (!pending) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "invalid invite" });
+      }
+
       await trx.verificationToken.delete({
         where: {
           token: input.token,

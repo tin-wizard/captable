@@ -1,4 +1,6 @@
 import { logger } from "@/lib/logger";
+import { TRPCError } from "@trpc/server";
+import { getHTTPStatusCodeFromError } from "@trpc/server/http";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { StatusCode } from "hono/utils/http-status";
@@ -238,6 +240,20 @@ export function handleError(err: Error, c: Context): Response {
         },
       },
       { status: err.status },
+    );
+  }
+
+  // tenant guards are shared with tRPC and throw TRPCError
+  if (err instanceof TRPCError) {
+    const status = getHTTPStatusCodeFromError(err);
+    return c.json(
+      {
+        error: {
+          code: statusToCode(status as StatusCode),
+          message: err.message,
+        },
+      },
+      { status: status as 400 },
     );
   }
 
