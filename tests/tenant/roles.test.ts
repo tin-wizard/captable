@@ -1252,3 +1252,39 @@ describe("global identity is not editable from a company context", () => {
     extraUserIds.push(self.user.id);
   });
 });
+
+describe("invite and switch edge cases", () => {
+  it("an invite deactivated before acceptance can't be accepted", async () => {
+    const m = await seedMemberOf(tenants.a, "deactivated invitee", {
+      status: "INACTIVE",
+    });
+    const { token } = await db.verificationToken.create({
+      data: {
+        identifier: `${m.user.email}:${m.member.id}`,
+        token: `deactivated-${nanoid(16)}`,
+        expires: new Date("2100-01-01"),
+      },
+    });
+    expect(
+      await code(
+        callerFor(m.tenant).member.acceptMember({
+          memberId: m.member.id,
+          token,
+          name: "Invitee",
+          workEmail: "invitee@example.com",
+        }),
+      ),
+    ).toBe("FORBIDDEN");
+    const after = await db.member.findUniqueOrThrow({
+      where: { id: m.member.id },
+    });
+    expect(after.status).toBe("INACTIVE");
+    extraUserIds.push(m.user.id);
+  });
+
+  it("switchCompany refuses a membership that isn't the caller's", async () => {
+    expect(
+      await code(admin.company.switchCompany({ id: tenants.b.memberId })),
+    ).toBe("FORBIDDEN");
+  });
+});

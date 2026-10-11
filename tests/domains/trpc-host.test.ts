@@ -52,7 +52,9 @@ describe("company-host procedure rules", () => {
   });
   it("canonical keeps today's behaviour", async () => {
     await expect(
-      callerOn({ kind: "canonical" }, a).company.switchCompany({ id: "nope" }),
+      callerOn({ kind: "canonical" }, a).company.switchCompany({
+        id: a.memberId,
+      }),
     ).resolves.toEqual({ success: true });
   });
 });

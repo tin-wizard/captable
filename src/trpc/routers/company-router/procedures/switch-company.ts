@@ -1,4 +1,5 @@
 import { withAuth } from "@/trpc/api/trpc";
+import { TRPCError } from "@trpc/server";
 import { ZodSwitchCompanyMutationSchema } from "../schema";
 
 // Stays on withAuth + ctx.db: it reads the caller's own membership in
@@ -19,7 +20,7 @@ export const switchCompanyProcedure = withAuth
       });
 
       if (!member) {
-        return { success: true };
+        throw new TRPCError({ code: "FORBIDDEN" });
       }
 
       await tx.member.update({
