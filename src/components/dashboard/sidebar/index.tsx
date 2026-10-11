@@ -34,7 +34,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
-import { BrandLogo } from "@/components/common/logo";
 import { usePathname } from "next/navigation";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -220,9 +219,8 @@ export function SideBar({
     <ScrollArea className="h-screen px-3">
       <div className={cn("pb-12", className)}>
         <div className="fixed gap-y-4 py-4">
-          <div className="flex items-center px-1 py-2">
-            <BrandLogo className="h-7 w-auto" />
-
+          {/* the column is fixed, so it can't inherit the 16rem sidebar's width */}
+          <div className="w-[14.5rem] border-b border-gray-200 pb-3">
             <CompanySwitcher
               companies={companies}
               publicId={publicId}

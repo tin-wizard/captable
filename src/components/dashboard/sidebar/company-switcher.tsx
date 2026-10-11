@@ -6,7 +6,6 @@ import {
   SelectItem,
   SelectItemStyle,
   SelectSeparator,
-  SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 
@@ -14,7 +13,7 @@ import type { TGetCompanyList } from "@/server/company";
 import { companySwitchUrl } from "@/server/domains/core/host";
 import { api } from "@/trpc/react";
 import * as SelectPrimitive from "@radix-ui/react-select";
-import { RiAddCircleLine } from "@remixicon/react";
+import { RiAddCircleLine, RiExpandUpDownLine } from "@remixicon/react";
 import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -39,6 +38,9 @@ export function CompanySwitcher({
   const pathname = usePathname();
 
   const switchCompany = api.company.switchCompany.useMutation();
+  const currentName = companies.find(
+    (item) => item.company.publicId === publicId,
+  )?.company.name;
 
   return (
     <Select
@@ -73,9 +75,23 @@ export function CompanySwitcher({
         }
       }}
     >
-      <SelectTrigger className="text-md ml-3 h-8 w-[180px] rounded border-none bg-transparent text-left font-semibold">
-        <SelectValue />
-      </SelectTrigger>
+      <SelectPrimitive.Trigger
+        title={currentName}
+        className="group flex w-full items-center gap-x-2 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-gray-100"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block text-[11px] font-medium uppercase tracking-wider text-gray-500">
+            Workspace
+          </span>
+          <span className="line-clamp-2 break-words text-xl font-semibold leading-tight tracking-tight text-gray-900">
+            <SelectValue>{currentName}</SelectValue>
+          </span>
+        </span>
+        <RiExpandUpDownLine
+          className="h-4 w-4 shrink-0 text-gray-400 group-hover:text-gray-600"
+          aria-hidden
+        />
+      </SelectPrimitive.Trigger>
       <SelectContent>
         {companies.map((item) => (
           <SelectItem key={item.company.publicId} value={item.company.publicId}>
