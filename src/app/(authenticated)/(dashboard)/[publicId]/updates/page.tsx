@@ -1,7 +1,9 @@
 import EmptyState from "@/components/common/empty-state";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { UnAuthorizedState } from "@/components/ui/un-authorized-state";
 import UpdateTable from "@/components/update/update-table";
+import { serverAccessControl } from "@/lib/rbac/access-control";
 import { api } from "@/trpc/server";
 import { RiAddFill, RiMailSendLine } from "@remixicon/react";
 import type { Metadata } from "next";
@@ -18,6 +20,10 @@ const UpdatesPage = async (props: {
 
   const { publicId } = params;
 
+  const { allow } = await serverAccessControl();
+  if (!allow(true, ["updates", "read"])) {
+    return <UnAuthorizedState />;
+  }
   const updates = await api.update.get.query();
 
   if (updates.data.length === 0) {

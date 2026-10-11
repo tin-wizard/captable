@@ -958,6 +958,20 @@ describe("roles inside a tenant", () => {
     expect(await code(admin.update.getRecipients(input))).toBe("resolved");
   });
 
+  it("update.get needs updates:read", async () => {
+    expect(await code(noRole.update.get())).toBe("UNAUTHORIZED");
+    expect(await code(readOnlyCustom.update.get())).toBe("resolved");
+    expect(await code(admin.update.get())).toBe("resolved");
+  });
+
+  it("template.all and template.get need templates:read", async () => {
+    const input = { publicId: fx.templatePublicId, isDraftOnly: false };
+    expect(await code(noRole.template.all())).toBe("UNAUTHORIZED");
+    expect(await code(noRole.template.get(input))).toBe("UNAUTHORIZED");
+    expect(await code(readOnlyCustom.template.all())).toBe("resolved");
+    expect(await code(admin.template.get(input))).not.toBe("UNAUTHORIZED");
+  });
+
   it("billing.getSubscription needs billing:read", async () => {
     expect(await code(noRole.billing.getSubscription())).toBe("UNAUTHORIZED");
     expect(await code(admin.billing.getSubscription())).toBe("resolved");

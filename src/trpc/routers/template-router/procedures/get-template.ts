@@ -1,8 +1,9 @@
 import { getPresignedGetUrl } from "@/server/file-uploads";
-import { withTenant } from "@/trpc/api/trpc";
+import { withAccessControl } from "@/trpc/api/trpc";
 import { ZodGetTemplateQuerySchema } from "../schema";
 
-export const getTemplateProcedure = withTenant
+export const getTemplateProcedure = withAccessControl
+  .meta({ policies: { templates: { allow: ["read"] } } })
   .input(ZodGetTemplateQuerySchema)
   .query(async ({ ctx, input }) => {
     const { companyId } = ctx.tenant;

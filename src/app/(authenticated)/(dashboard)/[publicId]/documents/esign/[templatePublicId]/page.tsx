@@ -2,6 +2,8 @@ import { CanvasToolbar } from "@/components/template/canavs-toolbar";
 import { PdfCanvas } from "@/components/template/pdf-canvas";
 import { TemplateFieldForm } from "@/components/template/template-field-form";
 import { Badge } from "@/components/ui/badge";
+import { UnAuthorizedState } from "@/components/ui/un-authorized-state";
+import { serverAccessControl } from "@/lib/rbac/access-control";
 import { TemplateFieldProvider } from "@/providers/template-field-provider";
 import { withServerComponentSession } from "@/server/auth";
 import { api } from "@/trpc/server";
@@ -13,6 +15,10 @@ const EsignTemplateDetailPage = async (props: {
 
   const { templatePublicId } = params;
 
+  const { allow } = await serverAccessControl();
+  if (!allow(true, ["templates", "read"])) {
+    return <UnAuthorizedState />;
+  }
   const session = await withServerComponentSession();
 
   const { name, status, url, fields, recipients } =

@@ -2,6 +2,7 @@ import { PdfCanvas } from "@/components/template/pdf-canvas";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { UnAuthorizedState } from "@/components/ui/un-authorized-state";
 import { serverAccessControl } from "@/lib/rbac/access-control";
 import type { TemplateStatus } from "@/prisma/enums";
 import { TemplateSigningFieldProvider } from "@/providers/template-signing-field-provider";
@@ -30,6 +31,9 @@ export default async function TemplateDetailViewPage(props: {
   const { templatePublicId } = params;
 
   const { allow } = await serverAccessControl();
+  if (!allow(true, ["templates", "read"])) {
+    return <UnAuthorizedState />;
+  }
 
   const [{ name, status, url, fields }, auditsData] = await Promise.all([
     api.template.get.query({
