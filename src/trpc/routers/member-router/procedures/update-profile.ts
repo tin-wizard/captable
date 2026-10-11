@@ -1,6 +1,7 @@
 import { PayloadType } from "@/lib/constants";
 import { Audit } from "@/server/audit";
 import { withAuth } from "@/trpc/api/trpc";
+import { TRPCError } from "@trpc/server";
 import { ZodUpdateProfileMutationSchema } from "../schema";
 
 export const updateProfileProcedure = withAuth
@@ -10,6 +11,14 @@ export const updateProfileProcedure = withAuth
 
     if (input.type === PayloadType.PROFILE_DATA) {
       const { fullName, loginEmail, workEmail, jobTitle } = input.payload;
+
+      // the login email is a global identity; changing it needs a verified flow we don't have
+      if (loginEmail.toLowerCase() !== user.email?.toLowerCase()) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Changing the login email is not supported.",
+        });
+      }
 
       await db.$transaction(async (tx) => {
         const member = await tx.member.update({
@@ -24,7 +33,6 @@ export const updateProfileProcedure = withAuth
             user: {
               update: {
                 name: fullName,
-                email: loginEmail,
               },
             },
           },

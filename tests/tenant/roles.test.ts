@@ -1,4 +1,5 @@
 import { generatePublicId } from "@/common/id";
+import { PayloadType } from "@/lib/constants";
 import { queue } from "@/lib/queue";
 import type { TActions } from "@/lib/rbac/actions";
 import { SUBJECTS, type TSubjects } from "@/lib/rbac/subjects";
@@ -1185,5 +1186,55 @@ describe("last active admin", () => {
     } finally {
       await cleanupTenants(pair.a, pair.b);
     }
+  });
+});
+
+describe("global identity is not editable from a company context", () => {
+  it("updateMember leaves the member's global name alone", async () => {
+    const target = await seedMemberOf(tenants.a, "identity target", {});
+    await admin.member.updateMember({
+      memberId: target.member.id,
+      title: "Analyst",
+      // @ts-expect-error name is no longer part of the input
+      name: "Renamed by another company",
+    });
+    const user = await db.user.findUniqueOrThrow({
+      where: { id: target.user.id },
+    });
+    expect(user.name).toBe("identity target");
+    extraUserIds.push(target.user.id);
+  });
+
+  it("updateProfile refuses a login email change", async () => {
+    const self = await seedMemberOf(tenants.a, "identity self", {});
+    const caller = callerFor(self.tenant);
+    const payload = {
+      fullName: "Identity Self",
+      jobTitle: "Founder",
+      workEmail: "work@example.com",
+    };
+    expect(
+      await code(
+        caller.member.updateProfile({
+          type: PayloadType.PROFILE_DATA,
+          payload: { ...payload, loginEmail: "someone-else@example.com" },
+        }),
+      ),
+    ).toBe("BAD_REQUEST");
+    const after = await db.user.findUniqueOrThrow({
+      where: { id: self.user.id },
+    });
+    expect(after.email).toBe(self.user.email);
+
+    // the unchanged email still saves the rest of the profile
+    expect(
+      await code(
+        caller.member.updateProfile({
+          type: PayloadType.PROFILE_DATA,
+          payload: { ...payload, loginEmail: self.user.email as string },
+        }),
+      ),
+    ).toBe("resolved");
+    extraUserIds.push(self.user.id);
   });
 });

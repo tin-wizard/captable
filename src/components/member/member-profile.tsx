@@ -249,7 +249,13 @@ export const ProfileSettings = ({ memberProfile }: ProfileType) => {
           <div className="sm:col-span-3">
             <FormItem>
               <FormLabel htmlFor="name">Login email</FormLabel>
-              <Input id="name" type="text" {...form.register("loginEmail")} />
+              <Input
+                id="name"
+                type="text"
+                readOnly
+                className="bg-muted"
+                {...form.register("loginEmail")}
+              />
               {errors.loginEmail && (
                 <FormMessage>{errors.loginEmail.message}</FormMessage>
               )}

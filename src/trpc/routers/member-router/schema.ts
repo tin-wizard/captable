@@ -65,7 +65,6 @@ export const ZodUpdateMemberMutationSchema = z
     z
       .object({
         workEmail: z.string().email(),
-        name: z.string(),
         title: z.string(),
         roleId: z.string(),
       })
