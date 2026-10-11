@@ -13,6 +13,7 @@ import {
   Text,
 } from "@react-email/components";
 import { constants } from "../lib/constants";
+import { BrandHeader } from "./components/BrandHeader";
 
 interface MemberInviteEmailProps {
   invitedBy: string;
@@ -34,12 +35,13 @@ export const MemberInviteEmail = ({
       <Tailwind>
         <Body className="mx-auto my-auto bg-white font-sans">
           <Container className="mx-auto my-[40px] max-w-[465px] border-separate rounded border border-solid border-neutral-200 p-[20px]">
+            <BrandHeader />
             <Heading className="mx-0 my-[30px] p-0 text-center text-[24px] font-normal text-black">
               Join <strong>{companyName}</strong> on{" "}
               <strong>{constants.title}</strong>
             </Heading>
             <Text className="text-[14px] leading-[24px] text-black">
-              Hello ,
+              Hello,
             </Text>
             <Text className="text-[14px] leading-[24px] text-black">
               <strong>{invitedBy}</strong> has invited you to join{" "}
