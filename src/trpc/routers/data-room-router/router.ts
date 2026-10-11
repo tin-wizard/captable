@@ -10,6 +10,12 @@ import type { DataRoom } from "@prisma/client";
 import { z } from "zod";
 import { DataRoomSchema } from "./schema";
 
+export type ViewedBy = {
+  email: string;
+  views: number;
+  lastViewedAt: Date;
+};
+
 export const dataRoomRouter = createTRPCRouter({
   getDataRoom: withAccessControl
     .meta({ policies: { "data-rooms": { allow: ["read"] } } })
@@ -20,6 +26,7 @@ export const dataRoomRouter = createTRPCRouter({
           company: z.boolean().optional().default(false),
           documents: z.boolean().optional().default(false),
           recipients: z.boolean().optional().default(false),
+          views: z.boolean().optional().default(false),
         }),
       }),
     )
@@ -28,11 +35,13 @@ export const dataRoomRouter = createTRPCRouter({
         dataRoom: {},
         documents: [],
         recipients: [],
+        viewedBy: [],
         company: {},
       } as {
         dataRoom: object;
         documents: object[];
         recipients: object[];
+        viewedBy: ViewedBy[];
         company: object;
       };
 
@@ -94,6 +103,21 @@ export const dataRoomRouter = createTRPCRouter({
               }),
             })),
           );
+        }
+
+        if (include.views) {
+          const rows = await tx.viewEvent.groupBy({
+            by: ["recipientEmail"],
+            where: { dataRoomId: dataRoom.id },
+            _count: { _all: true },
+            _max: { viewedAt: true },
+            orderBy: { _max: { viewedAt: "desc" } },
+          });
+          response.viewedBy = rows.map((row) => ({
+            email: row.recipientEmail,
+            views: row._count._all,
+            lastViewedAt: row._max.viewedAt as Date,
+          }));
         }
 
         return { dataRoom };

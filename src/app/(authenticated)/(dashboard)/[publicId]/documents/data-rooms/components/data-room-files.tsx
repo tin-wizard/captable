@@ -5,6 +5,15 @@ import type { ExtendedDataRoomRecipientType } from "@/components/common/share-mo
 import DataRoomFileExplorer from "@/components/documents/data-room/explorer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import type { ViewedBy } from "@/trpc/routers/data-room-router/router";
 import type { ShareContactType } from "@/schema/contacts";
 import { api } from "@/trpc/react";
 
@@ -26,6 +35,7 @@ type DataRoomFilesProps = {
   documents: Bucket[];
   companyPublicId: string;
   contacts: ShareContactType[];
+  viewedBy: ViewedBy[];
 };
 
 const DataRoomFiles = ({
@@ -33,6 +43,7 @@ const DataRoomFiles = ({
   documents,
   contacts,
   companyPublicId,
+  viewedBy,
 }: DataRoomFilesProps) => {
   const { mutateAsync: saveDataRoomMutation } = api.dataRoom.save.useMutation();
 
@@ -133,6 +144,40 @@ const DataRoomFiles = ({
               />
             </EmptyState>
           )}
+        </div>
+
+        <div>
+          <h2 className="mb-2 text-sm font-medium text-primary/70">
+            Viewed by
+          </h2>
+          <Card className="p-4">
+            {viewedBy.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Recipient</TableHead>
+                    <TableHead>Views</TableHead>
+                    <TableHead>Last viewed</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {viewedBy.map((viewer) => (
+                    <TableRow key={viewer.email}>
+                      <TableCell>{viewer.email}</TableCell>
+                      <TableCell>{viewer.views}</TableCell>
+                      <TableCell>
+                        {new Date(viewer.lastViewedAt).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Nobody has opened this data room yet.
+              </p>
+            )}
+          </Card>
         </div>
       </div>
     </div>

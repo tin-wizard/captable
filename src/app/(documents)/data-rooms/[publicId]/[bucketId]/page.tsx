@@ -1,9 +1,11 @@
 import FilePreview from "@/components/file/preview";
 import { SharePageLayout } from "@/components/share/page-layout";
 import { type JWTVerifyResult, decode } from "@/lib/jwt";
+import { ViewEventKind } from "@/prisma/enums";
 import { db } from "@/server/db";
 import { assertHostOwns } from "@/server/domains/links";
 import { getPresignedGetUrl } from "@/server/file-uploads";
+import { recordView } from "@/server/view-events";
 import { RiFolder3Fill as FolderIcon } from "@remixicon/react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -41,6 +43,7 @@ const DataRoomPage = async (props: {
 
     select: {
       id: true,
+      email: true,
     },
   });
 
@@ -86,6 +89,15 @@ const DataRoomPage = async (props: {
   if (!file) {
     return notFound();
   }
+
+  await recordView({
+    companyId: dataRoom.companyId,
+    kind: ViewEventKind.DATA_ROOM_DOCUMENT,
+    dataRoomId: dataRoom.id,
+    bucketId: file.id,
+    recipientId: recipient.id,
+    recipientEmail: recipient.email,
+  });
 
   const company = dataRoom.company;
   const remoteFile = await getPresignedGetUrl(file.key);
