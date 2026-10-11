@@ -17,6 +17,7 @@ import { RiAddCircleLine, RiExpandUpDownLine } from "@remixicon/react";
 import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 
 interface CompanySwitcherProps {
   companies: TGetCompanyList;
@@ -59,7 +60,14 @@ export function CompanySwitcher({
           if (member) {
             // company host: switchCompany is denied there; the handoff's issue step updates lastAccessed
             if (!canonicalOrigin) {
-              await switchCompany.mutateAsync({ id: member.id });
+              try {
+                await switchCompany.mutateAsync({ id: member.id });
+              } catch {
+                // stale or foreign membership: reload to show current ones
+                toast.error("That company is no longer available.");
+                window.location.reload();
+                return;
+              }
               await update();
             }
 

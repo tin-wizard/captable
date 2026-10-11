@@ -244,7 +244,8 @@ export function handleError(err: Error, c: Context): Response {
   }
 
   // tenant guards are shared with tRPC and throw TRPCError
-  if (err instanceof TRPCError) {
+  // (5xx falls through to the generic branch so internals never leak)
+  if (err instanceof TRPCError && getHTTPStatusCodeFromError(err) < 500) {
     const status = getHTTPStatusCodeFromError(err);
     return c.json(
       {
