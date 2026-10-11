@@ -3,9 +3,10 @@ import { SharePageLayout } from "@/components/share/page-layout";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import UpdateRenderer from "@/components/update/renderer";
 import { type JWTVerifyResult, decode } from "@/lib/jwt";
-import { UpdateStatusEnum } from "@/prisma/enums";
+import { UpdateStatusEnum, ViewEventKind } from "@/prisma/enums";
 import { db } from "@/server/db";
 import { assertHostOwns } from "@/server/domains/links";
+import { recordView } from "@/server/view-events";
 import { render } from "@react-email/components";
 import { RiLock2Line } from "@remixicon/react";
 import { notFound } from "next/navigation";
@@ -103,6 +104,14 @@ const PublicUpdatePage = async (props: {
   if (!recipients) {
     return notFound();
   }
+
+  await recordView({
+    companyId: update.companyId,
+    kind: ViewEventKind.UPDATE,
+    updateId: update.id,
+    recipientId: recipients.id,
+    recipientEmail: recipients.email,
+  });
 
   const company = update?.company;
   const author = update?.author;

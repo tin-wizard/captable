@@ -146,6 +146,7 @@ model Company {
   updates          Update[]
   users            Member[]
   audits           Audit[]
+  viewEvents       ViewEvent[]
   shareClasses     ShareClass[]
   equityPlans      EquityPlan[]
   documents        Document[]
@@ -481,6 +482,7 @@ model DataRoom {
   public     Boolean             @default(false)
   documents  DataRoomDocument[]
   recipients DataRoomRecipient[]
+  viewEvents ViewEvent[]
   companyId  String
   company    Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -957,6 +959,7 @@ model Update {
   companyId String
 
   recipients UpdateRecipient[]
+  viewEvents ViewEvent[]
   author     Member            @relation(fields: [authorId], references: [id], onDelete: Cascade)
   company    Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -1203,4 +1206,32 @@ model AuthHandoff {
   createdAt  DateTime  @default(now())
 
   @@index([expiresAt])
+}
+
+enum ViewEventKind {
+  DATA_ROOM
+  DATA_ROOM_DOCUMENT
+  UPDATE
+}
+
+// One row per (throttled) open of a public share link. The signed link tells
+// us which recipient opened it; recipientEmail is copied so the record
+// survives the recipient being removed.
+model ViewEvent {
+  id             String        @id @default(cuid())
+  companyId      String
+  company        Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  kind           ViewEventKind
+  dataRoomId     String?
+  dataRoom       DataRoom?     @relation(fields: [dataRoomId], references: [id], onDelete: Cascade)
+  bucketId       String?
+  updateId       String?
+  update         Update?       @relation(fields: [updateId], references: [id], onDelete: Cascade)
+  recipientId    String
+  recipientEmail String
+  viewedAt       DateTime      @default(now())
+
+  @@index([companyId])
+  @@index([dataRoomId, viewedAt])
+  @@index([updateId, viewedAt])
 }

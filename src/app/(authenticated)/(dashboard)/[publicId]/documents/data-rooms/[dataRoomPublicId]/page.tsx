@@ -10,12 +10,13 @@ const DataRoomSettinsPage = async (props: {
 
   const { publicId, dataRoomPublicId } = params;
 
-  const { dataRoom, documents } = await api.dataRoom.getDataRoom.query({
+  const { dataRoom, documents, viewedBy } = await api.dataRoom.getDataRoom.query({
     dataRoomPublicId,
     include: {
       company: false,
       recipients: true,
       documents: true,
+      views: true,
     },
   });
   const contacts = await api.common.getContacts.query();
@@ -30,6 +31,7 @@ const DataRoomSettinsPage = async (props: {
       dataRoom={dataRoom as DataRoom}
       documents={documents as Bucket[]}
       companyPublicId={publicId}
+      viewedBy={viewedBy}
     />
   );
 };

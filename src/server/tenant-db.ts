@@ -31,6 +31,7 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   "CustomRole",
   "Stakeholder",
   "Audit",
+  "ViewEvent",
   "ShareClass",
   "EquityPlan",
   "Document",
