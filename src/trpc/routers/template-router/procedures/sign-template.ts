@@ -1,3 +1,4 @@
+import { signerFieldValues } from "@/services/esign-fields";
 import { EsignService } from "@/services/esign-service";
 import { withoutAuth } from "@/trpc/api/trpc";
 import { TRPCError } from "@trpc/server";
@@ -44,6 +45,8 @@ export const signTemplateProcedure = withoutAuth
         tx,
       );
 
+      const data = signerFieldValues(template.fields, recipient.id, input.data);
+
       // only a recipient still awaiting their signature may sign, exactly once
       const claimed = await tx.esignRecipient.updateMany({
         where: { id: recipient.id, status: "SENT" },
@@ -73,7 +76,7 @@ export const signTemplateProcedure = withoutAuth
           companyId,
           templateName,
           fields: template.fields,
-          data: input.data,
+          data,
           templateId: template.id,
           requestIp,
           userAgent,
@@ -90,7 +93,7 @@ export const signTemplateProcedure = withoutAuth
       }
 
       if (isMultiRecipient) {
-        await eSignService.saveFieldValues(template.fields, input.data, tx);
+        await eSignService.saveFieldValues(template.fields, data, tx);
 
         const allRecipients = await eSignService.getAllRecipients(
           template.id,
