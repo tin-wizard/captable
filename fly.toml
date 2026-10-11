@@ -1,10 +1,7 @@
-# fly.toml app configuration file generated for captable on 2024-04-09T23:33:08-05:00
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
+# Fly app config for this fork. Region is EU (Frankfurt) because investor data is subject to GDPR.
 
-app = 'captable'
-primary_region = 'lax'
+app = 'tin-captable'
+primary_region = 'fra'
 
 [experimental]
 allowed_public_ports = []
