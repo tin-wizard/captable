@@ -233,7 +233,7 @@ describe("REST bearer: A's token against B", () => {
       const { status } = await expectBUntouched(() =>
         call(`/${a.companyId}/shares`, aToken, { method: "POST", body }),
       );
-      expect(status).not.toBe(200);
+      expect(status).toBe(400);
     }
   });
 
@@ -248,7 +248,7 @@ describe("REST bearer: A's token against B", () => {
           body,
         }),
       );
-      expect(status).not.toBe(200);
+      expect(status).toBe(400);
     }
   });
 

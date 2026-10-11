@@ -195,7 +195,10 @@ export async function createOrRetrieveCustomer({
     );
     stripeCustomerId = existingStripeCustomer.id;
   } else {
-    const stripeCustomers = await stripe.customers.list({ email: email });
+    // an empty email filter matches arbitrary customers; only look up real addresses
+    const stripeCustomers = email
+      ? await stripe.customers.list({ email })
+      : undefined;
 
     stripeCustomerId = stripeCustomers?.data?.[0]
       ? stripeCustomers.data[0].id

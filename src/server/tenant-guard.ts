@@ -30,7 +30,11 @@ export async function assertTenantOwns(
     ];
 
   for (const [id, count] of checks) {
-    if (id && !(await count(id))) throw new Error("Invalid reference");
+    if (id && !(await count(id)))
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Invalid reference",
+      });
   }
 }
 
@@ -42,7 +46,7 @@ export async function assertBucketUsable(
   bucketId: string,
 ) {
   if (!(await tx.bucket.count({ where: { id: bucketId, companyId } })))
-    throw new Error("Invalid reference");
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid reference" });
 }
 
 type Role = "ADMIN" | "CUSTOM" | null;
