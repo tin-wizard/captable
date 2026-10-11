@@ -9,6 +9,7 @@ import {
   Tailwind,
   Text,
 } from "@react-email/components";
+import { BrandHeader } from "./components/BrandHeader";
 
 import type { TSchema } from "../jobs/esign-confirmation-email";
 
@@ -30,6 +31,7 @@ const ESignConfirmationEmail = ({
       <Tailwind>
         <Body className="mx-auto my-auto bg-white font-sans">
           <Container className="mx-auto my-[40px] max-w-[465px] border-separate rounded border border-solid border-neutral-200 p-[20px]">
+            <BrandHeader />
             <Heading className="mx-0 mb-[15px] mt-5 p-0 text-center text-[24px] font-normal text-black">
               {company?.name}
             </Heading>

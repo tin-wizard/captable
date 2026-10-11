@@ -19,6 +19,12 @@ export const metadata: Metadata = {
   },
   description: constants.description,
   metadataBase: new URL(constants.url),
+  openGraph: {
+    siteName: constants.title,
+    title: constants.title,
+    description: constants.description,
+    type: "website",
+  },
 };
 
 export default async function RootLayout({

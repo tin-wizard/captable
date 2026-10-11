@@ -1,9 +1,10 @@
 export const constants = {
   // The product name shown everywhere (titles, emails, screens). Change it
-  // here only, e.g. to "TIN Deal Room".
-  title: "Captable",
+  // here only.
+  title: "Deal Room",
   url: "https://tin.info",
-  description: "Cap table management by TIN, The Information Network.",
+  description:
+    "Cap tables, e-signatures and data rooms by TIN, The Information Network.",
   ocf: {
     url: "https://www.opencaptablecoalition.com/format",
     github: {
