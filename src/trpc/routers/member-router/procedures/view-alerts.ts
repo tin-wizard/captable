@@ -22,3 +22,23 @@ export const setViewAlertsProcedure = withTenant
     });
     return input.enabled;
   });
+
+export const getViewDigestProcedure = withTenant.query(
+  async ({ ctx: { tenant } }) => {
+    const member = await tenant.db.member.findUniqueOrThrow({
+      where: { id: tenant.memberId },
+      select: { viewDigest: true },
+    });
+    return member.viewDigest;
+  },
+);
+
+export const setViewDigestProcedure = withTenant
+  .input(z.object({ enabled: z.boolean() }))
+  .mutation(async ({ ctx: { tenant }, input }) => {
+    await tenant.db.member.update({
+      where: { id: tenant.memberId },
+      data: { viewDigest: input.enabled },
+    });
+    return input.enabled;
+  });
