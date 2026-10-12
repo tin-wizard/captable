@@ -1,4 +1,5 @@
 import EmptyState from "@/components/common/empty-state";
+import { ViewBeacon, ViewNotice } from "@/components/share/view-beacon";
 import { PdfCanvas } from "@/components/template/pdf-canvas";
 import { SigningFields } from "@/components/template/signing-fields";
 import { TemplateSigningFieldProvider } from "@/providers/template-signing-field-provider";
@@ -53,6 +54,7 @@ export default async function SigningPage(props: SigningPageProps) {
 
   return (
     <TemplateSigningFieldProvider fields={fields}>
+      <ViewBeacon kind="ESIGN" token={token} />
       <div className="flex min-h-screen bg-gray-50">
         <div className="flex h-full flex-grow flex-col">
           <div className="mx-auto min-h-full w-full px-5 py-10 lg:px-8 2xl:max-w-screen-xl">
@@ -67,6 +69,7 @@ export default async function SigningPage(props: SigningPageProps) {
             fields={signableFields}
             companyPublicId={companyPublicId}
           />
+          <ViewNotice />
         </div>
       </div>
     </TemplateSigningFieldProvider>

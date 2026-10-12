@@ -9,6 +9,7 @@ import MemberInviteEmail from "./MemberInviteEmail";
 import PasswordResetEmail from "./PasswordResetEmail";
 import ShareDataRoomEmail from "./ShareDataRoomEmail";
 import ShareUpdateEmail from "./ShareUpdateEmail";
+import ViewAlertEmail from "./ViewAlertEmail";
 
 vi.mock("@/env", () => ({
   env: { NEXT_PUBLIC_BASE_URL: "https://dealroom.tin.info" },
@@ -24,6 +25,7 @@ const templates = {
   PasswordResetEmail,
   ShareDataRoomEmail,
   ShareUpdateEmail,
+  ViewAlertEmail,
 } as const;
 
 describe("email branding", () => {
