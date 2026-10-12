@@ -14,8 +14,9 @@ const ProfileSettingsPage = async (props: {
   params: Promise<{ publicId: string }>;
 }) => {
   // Pages render in parallel with the layout, so its canonical redirect can lose
-  // the race to getProfile, which is FORBIDDEN on a company host.
-  if ((await getRequestHost()).kind === "tenant") {
+  // the race to getProfile, which is FORBIDDEN on a company or alias host.
+  const { kind } = await getRequestHost();
+  if (kind === "tenant" || kind === "alias") {
     const { publicId } = await props.params;
     redirect(`${domainConfig().canonicalOrigin}/${publicId}/settings/profile`);
   }

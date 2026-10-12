@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
-  host: { kind: "canonical" } as { kind: string; publicId?: string },
+  host: { kind: "canonical" } as { kind: string; [k: string]: string },
   getProfile: vi.fn(async () => ({ id: "m1" })),
   redirect: vi.fn((u: string) => {
     throw new Error(`REDIRECT:${u}`);
@@ -37,6 +37,14 @@ describe("profile settings page", () => {
   // getProfile is canonical-only: calling it on a company host throws FORBIDDEN
   it("on a company host redirects to canonical without fetching", async () => {
     h.host = { kind: "tenant", publicId: "pub" };
+    await expect(ProfileSettingsPage({ params })).rejects.toThrow(
+      "REDIRECT:https://dealroom.tin.info/pub/settings/profile",
+    );
+    expect(h.getProfile).not.toHaveBeenCalled();
+  });
+
+  it("on an alias host redirects to canonical without fetching", async () => {
+    h.host = { kind: "alias", redirectHost: "new.dealroom.tin.info" };
     await expect(ProfileSettingsPage({ params })).rejects.toThrow(
       "REDIRECT:https://dealroom.tin.info/pub/settings/profile",
     );
