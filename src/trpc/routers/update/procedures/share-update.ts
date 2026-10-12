@@ -6,6 +6,7 @@ import { Audit } from "@/server/audit";
 import { companyUrl } from "@/server/domains/links";
 import { assertTenantOwns } from "@/server/tenant-guard";
 import { withAccessControl } from "@/trpc/api/trpc";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 export const shareUpdateProcedure = withAccessControl
@@ -22,6 +23,13 @@ export const shareUpdateProcedure = withAccessControl
     const { db, companyId } = ctx.tenant;
     const { updateId, others, selectedContacts } = input;
     const { name: senderName, email: senderEmail, id } = session.user;
+
+    if (others.length + selectedContacts.length === 0) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Add at least one recipient before sharing.",
+      });
+    }
 
     const update = await db.update.findUniqueOrThrow({
       where: {

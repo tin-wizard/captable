@@ -105,6 +105,10 @@ const Share = ({
               }
             />
 
+            <p className="mt-2 text-xs text-primary/50">
+              Press Enter to add an email address.
+            </p>
+
             <h5 className="mt-6 font-medium">People with access</h5>
 
             {recipients?.length === 0 && (
@@ -186,6 +190,7 @@ const Share = ({
                 </Button>
                 <Button
                   type="submit"
+                  disabled={selected.length === 0}
                   onClick={() => {
                     const contacts = selected
                       .filter((option) => option.meta)
