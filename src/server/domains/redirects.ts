@@ -6,6 +6,15 @@ export function isUserLevelPath(path: string): boolean {
   return /^\/[^/]+\/settings\/(profile|security)(\/|$|\?)/.test(path);
 }
 
+// Absolute to canonical when rendered on a company host, where these pages can't load.
+export function userLevelHref(
+  canonicalOrigin: string | null,
+  publicId: string,
+  page: "profile" | "security",
+): string {
+  return `${canonicalOrigin ?? ""}/${publicId}/settings/${page}`;
+}
+
 // tenant → canonical only for user-level paths, canonical → tenant only for the
 // rest: disjoint sets, so no redirect loop. alias → primary is one hop.
 export function layoutRedirect(input: {

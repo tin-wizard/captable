@@ -3,13 +3,26 @@ import PasskeyModal from "@/components/security/passkey/create-passkey-modal";
 import PasskeyTable from "@/components/security/passkey/user-passkeys-data-table";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { domainConfig } from "@/server/domains/config";
+import { getRequestHost } from "@/server/domains/request-host";
 import { api } from "@/trpc/server";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Security",
 };
-export default async function PasskeyPage() {
+export default async function PasskeyPage(props: {
+  params: Promise<{ publicId: string }>;
+}) {
+  // Same race as the profile page: passkey.find is FORBIDDEN off canonical.
+  const { kind } = await getRequestHost();
+  if (kind === "tenant" || kind === "alias") {
+    const { publicId } = await props.params;
+    redirect(
+      `${domainConfig().canonicalOrigin}/${publicId}/settings/security/passkey`,
+    );
+  }
   const passkeys = await api.passkey.find.query();
   return (
     <div className="flex flex-col gap-y-3">

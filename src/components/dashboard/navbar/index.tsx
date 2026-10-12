@@ -28,6 +28,7 @@ export function NavBar({ publicId, companies, canonicalOrigin }: SideBarProps) {
             <UserDropdown
               companyPublicId={publicId}
               canonicalHost={canonicalHost}
+              canonicalOrigin={canonicalOrigin}
             />
           </div>
         </div>
