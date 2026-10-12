@@ -133,3 +133,55 @@ describe("recordView", () => {
     ).toBe(2);
   });
 });
+
+describe("phase 2 columns", () => {
+  it("a new visit has no location and zero active time", async () => {
+    const row = await db.viewEvent.create({
+      data: {
+        companyId: a.companyId,
+        kind: "ESIGN",
+        targetId: "t",
+        recipientId: "r2",
+        ip: "1.2.3.0",
+        userAgent: "ua",
+      },
+    });
+    expect(row.country).toBeNull();
+    expect(row.timezone).toBeNull();
+    expect(row.activeSeconds).toBe(0);
+    expect(row.pageSeconds).toBeNull();
+  });
+
+  it("stores page seconds as json", async () => {
+    const row = await db.viewEvent.create({
+      data: {
+        companyId: a.companyId,
+        kind: "DATA_ROOM",
+        targetId: "t",
+        recipientId: "r3",
+        ip: "1.2.3.0",
+        userAgent: "ua",
+        country: "CA",
+        network: "Example Net",
+        asn: "AS64500",
+        timezone: "America/Toronto",
+        activeSeconds: 42,
+        pageSeconds: { "1": 12, "2": 30 },
+      },
+    });
+    expect(row.pageSeconds).toEqual({ "1": 12, "2": 30 });
+    expect(row.country).toBe("CA");
+  });
+
+  it("a data room records no creator by default", async () => {
+    const room = await db.dataRoom.create({
+      data: {
+        name: `r-${Date.now()}`,
+        publicId: `p${Date.now()}`,
+        companyId: a.companyId,
+      },
+    });
+    expect(room.createdById).toBeNull();
+    await db.dataRoom.delete({ where: { id: room.id } });
+  });
+});
