@@ -52,6 +52,8 @@ const EXEMPT: Record<string, string> = {
   "passkey.createSigninOptions": "unauthenticated WebAuthn sign-in challenge",
   "security.updatePassword": "the user's own password",
   "member.updateProfile": "the user's own profile",
+  "member.setViewAlerts":
+    "the member's own alert preference; updates only ctx.tenant.memberId, takes no member id, reveals nothing",
   "member.acceptMember": "the invitee has no active membership until accepting",
   "company.switchCompany":
     "moves the session to another of the user's own memberships",
