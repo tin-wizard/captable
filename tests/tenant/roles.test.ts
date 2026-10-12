@@ -83,6 +83,7 @@ type Fx = Record<
   | "optionToDelete"
   | "safeToDelete"
   | "updateRecipientId"
+  | "nudgeUpdateRecipientId"
   | "dataRoomRecipientId"
   | "bankAccountToDelete"
   | "memberToEdit"
@@ -353,6 +354,16 @@ const cases: Case[] = [
     perm: ["updates", "update"],
     run: (c, f) => c.update.toggleVisibility({ updateId: f.updateId }),
   },
+  {
+    // after toggleVisibility: only a PUBLIC update can be nudged
+    proc: "update.nudge",
+    perm: ["updates", "update"],
+    run: (c, f) =>
+      c.update.nudge({
+        updateId: f.updateId,
+        recipientId: f.nudgeUpdateRecipientId,
+      }),
+  },
 
   // --- data rooms ---------------------------------------------------------
   {
@@ -369,6 +380,16 @@ const cases: Case[] = [
         dataRoomId: f.dataRoomId,
         others: [],
         selectedContacts: [contact()],
+      }),
+  },
+  {
+    // before unShare deletes the recipient
+    proc: "dataRoom.nudge",
+    perm: ["data-rooms", "update"],
+    run: (c, f) =>
+      c.dataRoom.nudge({
+        dataRoomId: f.dataRoomId,
+        recipientId: f.dataRoomRecipientId,
       }),
   },
   {
@@ -764,6 +785,9 @@ beforeAll(async () => {
   const updateRecipient = await db.updateRecipient.create({
     data: { updateId: aIds.updateId, name: "r", email: "r@example.com" },
   });
+  const nudgeUpdateRecipient = await db.updateRecipient.create({
+    data: { updateId: aIds.updateId, name: "n", email: "n@example.com" },
+  });
   const dataRoomRecipient = await db.dataRoomRecipient.create({
     data: { dataRoomId: aIds.dataRoomId, name: "r", email: "r@example.com" },
   });
@@ -820,6 +844,7 @@ beforeAll(async () => {
     optionToDelete: option.id,
     safeToDelete: safe.id,
     updateRecipientId: updateRecipient.id,
+    nudgeUpdateRecipientId: nudgeUpdateRecipient.id,
     dataRoomRecipientId: dataRoomRecipient.id,
     bankAccountToDelete: bankAccount.id,
     memberToEdit: m.toEdit.member.id,

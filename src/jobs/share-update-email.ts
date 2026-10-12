@@ -16,6 +16,7 @@ const config = defineWorkerConfig({
     email: z.string().email(),
     recipientName: z.string().nullish(),
     senderEmail: z.string().email().nullish(),
+    reminder: z.boolean().optional(),
   }),
 });
 
@@ -30,11 +31,14 @@ export const shareUpdateEmailWorker = defineWorker(config, async (job) => {
     senderName,
     email,
     senderEmail,
+    reminder,
   } = job.data;
   await sendMail({
     to: email,
     ...(senderEmail && { replyTo: senderEmail }),
-    subject: `${senderName} shared an update - ${update.title}`,
+    subject: `${reminder ? "Reminder: " : ""}${senderName} shared an update - ${
+      update.title
+    }`,
     html: await render(
       ShareUpdateEmail({
         senderName: senderName,

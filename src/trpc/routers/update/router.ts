@@ -4,6 +4,7 @@ import {
   getRecipientsProcedure,
   getUpdatesProcedure,
 } from "./procedures/get-updates";
+import { nudgeUpdateProcedure } from "./procedures/nudge-update";
 import { saveUpdateProcedure } from "./procedures/save-update";
 import {
   shareUpdateProcedure,
@@ -18,5 +19,6 @@ export const updateRouter = createTRPCRouter({
   clone: cloneUpdateProcedure,
   share: shareUpdateProcedure,
   unShare: unshareUpdateProcedure,
+  nudge: nudgeUpdateProcedure,
   toggleVisibility: toggleUpdateVisibilityProcedure,
 });

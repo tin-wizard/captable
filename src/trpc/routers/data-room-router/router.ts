@@ -2,10 +2,11 @@ import { generatePublicId } from "@/common/id";
 import { shareDataRoomEmailJob } from "@/jobs/share-data-room-email";
 import { encode } from "@/lib/jwt";
 import { ShareRecipientSchema } from "@/schema/contacts";
-import { expiryFromDays } from "@/server/activity/link-state";
+import { expiryFromDays, isExpired } from "@/server/activity/link-state";
+import { NUDGE_COOLDOWN_MS } from "@/server/activity/unopened";
 import { Audit } from "@/server/audit";
 import { companyUrl } from "@/server/domains/links";
-import { assertTenantOwns } from "@/server/tenant-guard";
+import { assertTenantOwns, runSerializable } from "@/server/tenant-guard";
 import { createTRPCRouter, withAccessControl } from "@/trpc/api/trpc";
 import type { DataRoom } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
@@ -428,5 +429,123 @@ export const dataRoomRouter = createTRPCRouter({
         success: true,
         message: "Successfully removed access to data room!",
       };
+    }),
+
+  nudge: withAccessControl
+    .input(z.object({ dataRoomId: z.string(), recipientId: z.string() }))
+    .meta({ policies: { "data-rooms": { allow: ["update"] } } })
+    .mutation(async ({ ctx, input }) => {
+      const { session, requestIp, userAgent } = ctx;
+      const { db, companyId } = ctx.tenant;
+      const { name: senderName, email: senderEmail, id: userId } = session.user;
+      const now = new Date();
+
+      const rec = await db.dataRoomRecipient.findFirst({
+        where: {
+          id: input.recipientId,
+          dataRoomId: input.dataRoomId,
+          dataRoom: { companyId },
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          expiresAt: true,
+          dataRoom: {
+            select: {
+              id: true,
+              name: true,
+              publicId: true,
+              company: { select: { name: true } },
+            },
+          },
+        },
+      });
+      if (!rec)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Recipient not found",
+        });
+      if (isExpired(rec.expiresAt, now))
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This link has expired. Share again to renew it.",
+        });
+      const opened = await db.viewEvent.count({
+        where: {
+          companyId,
+          kind: "DATA_ROOM",
+          recipientId: rec.id,
+          isBot: false,
+        },
+      });
+      if (opened)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "They have already opened it.",
+        });
+
+      // claim before sending: a double click must send once. Prisma's updateMany is
+      // SELECT-then-UPDATE (the filter is not re-checked), so it runs SERIALIZABLE:
+      // the loser conflicts, retries, and then finds nothing to claim
+      const claimed = await runSerializable((options) =>
+        db.$transaction(
+          (tx) =>
+            tx.dataRoomRecipient.updateMany({
+              where: {
+                id: rec.id,
+                OR: [
+                  { lastNudgedAt: null },
+                  {
+                    lastNudgedAt: {
+                      lt: new Date(now.getTime() - NUDGE_COOLDOWN_MS),
+                    },
+                  },
+                ],
+              },
+              data: { lastNudgedAt: now },
+            }),
+          options,
+        ),
+      );
+      if (claimed.count !== 1)
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "A reminder was sent in the last 24 hours.",
+        });
+
+      const token = await encode({
+        companyId,
+        dataRoomId: rec.dataRoom.id,
+        recipientId: rec.id,
+      });
+      const link = await companyUrl(
+        db,
+        companyId,
+        `/data-rooms/${rec.dataRoom.publicId}?token=${token}`,
+      );
+
+      await shareDataRoomEmailJob.emit({
+        senderName: `${senderName}`,
+        recipientName: rec.name,
+        companyName: rec.dataRoom.company.name,
+        dataRoom: rec.dataRoom.name,
+        link,
+        email: rec.email,
+        senderEmail,
+        reminder: true,
+      });
+      await Audit.create(
+        {
+          action: "dataroom.nudged",
+          companyId,
+          actor: { type: "user", id: userId },
+          context: { userAgent, requestIp },
+          target: [{ type: "dataroom", id: rec.dataRoom.id }],
+          summary: `${senderName} sent a reminder to ${rec.email} for the data room ${rec.dataRoom.name}`,
+        },
+        db,
+      );
+      return { success: true };
     }),
 });

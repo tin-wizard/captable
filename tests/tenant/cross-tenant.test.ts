@@ -537,6 +537,24 @@ const cases: Case[] = [
       }),
   },
   {
+    name: "update.nudge B's recipient on B's update",
+    kind: "update",
+    run: (a, { b }) =>
+      a.update.nudge({
+        updateId: b.updateId,
+        recipientId: b.updateRecipientId,
+      }),
+  },
+  {
+    name: "update.nudge B's recipient via A's update",
+    kind: "update",
+    run: (a, { a: own, b }) =>
+      a.update.nudge({
+        updateId: own.updateId,
+        recipientId: b.updateRecipientId,
+      }),
+  },
+  {
     name: "update.toggleVisibility B's update",
     kind: "update",
     run: (a, { b }) => a.update.toggleVisibility({ updateId: b.updateId }),
@@ -634,6 +652,24 @@ const cases: Case[] = [
     kind: "delete",
     run: (a, { a: own, b }) =>
       a.dataRoom.unShare({
+        dataRoomId: own.dataRoomId,
+        recipientId: b.dataRoomRecipientId,
+      }),
+  },
+  {
+    name: "dataRoom.nudge B's recipient on B's room",
+    kind: "update",
+    run: (a, { b }) =>
+      a.dataRoom.nudge({
+        dataRoomId: b.dataRoomId,
+        recipientId: b.dataRoomRecipientId,
+      }),
+  },
+  {
+    name: "dataRoom.nudge B's recipient via A's room",
+    kind: "update",
+    run: (a, { a: own, b }) =>
+      a.dataRoom.nudge({
         dataRoomId: own.dataRoomId,
         recipientId: b.dataRoomRecipientId,
       }),
