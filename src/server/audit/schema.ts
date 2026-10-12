@@ -59,6 +59,7 @@ export const AuditSchema = z.object({
     "update.cloned",
     "update.shared",
     "update.unshared",
+    "update.nudged",
 
     "accessToken.created",
     "accessToken.deleted",
@@ -68,6 +69,7 @@ export const AuditSchema = z.object({
     "dataroom.created",
     "dataroom.updated",
     "dataroom.shared",
+    "dataroom.nudged",
     "dataroom.deleted",
 
     "role.created",

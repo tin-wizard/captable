@@ -12,7 +12,9 @@ import { updateMemberProcedure } from "./procedures/update-member";
 import { updateProfileProcedure } from "./procedures/update-profile";
 import {
   getViewAlertsProcedure,
+  getViewDigestProcedure,
   setViewAlertsProcedure,
+  setViewDigestProcedure,
 } from "./procedures/view-alerts";
 
 export const memberRouter = createTRPCRouter({
@@ -28,4 +30,6 @@ export const memberRouter = createTRPCRouter({
   updateProfile: updateProfileProcedure,
   viewAlerts: getViewAlertsProcedure,
   setViewAlerts: setViewAlertsProcedure,
+  viewDigest: getViewDigestProcedure,
+  setViewDigest: setViewDigestProcedure,
 });

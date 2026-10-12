@@ -60,11 +60,12 @@ export const ShareDataRoomModal = ({
       baseLink={`${baseUrl}/data-rooms/${dataRoom.publicId}`}
       title={`Share data room - "${dataRoom.name}"`}
       subtitle="Share this data room with others."
-      onShare={async ({ selectedContacts, others }) => {
+      onShare={async ({ selectedContacts, others, expiresInDays }) => {
         await shareDataRoomMutation({
           dataRoomId: dataRoom.id,
           selectedContacts: selectedContacts as ShareRecipientType[],
           others: others as ShareRecipientType[],
+          expiresInDays,
         });
       }}
       removeAccess={async ({ recipientId }) => {

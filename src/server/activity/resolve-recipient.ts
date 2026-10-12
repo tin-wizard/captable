@@ -2,6 +2,7 @@ import { decode } from "@/lib/jwt";
 import { db } from "@/server/db";
 import { DecodeEmailToken } from "@/trpc/routers/template-field-router/procedures/add-fields";
 import type { ViewKind } from "@prisma/client";
+import { isExpired } from "./link-state";
 
 export type Found = {
   companyId: string;
@@ -51,11 +52,14 @@ export async function resolveRecipient(
           dataRoomId: p.dataRoomId,
           dataRoom: { companyId: p.companyId },
         },
-        select: { id: true },
+        select: { id: true, expiresAt: true },
       });
-      return r
-        ? { companyId: p.companyId, targetId: p.dataRoomId, recipientId: r.id }
-        : null;
+      if (!r || isExpired(r.expiresAt)) return null;
+      return {
+        companyId: p.companyId,
+        targetId: p.dataRoomId,
+        recipientId: r.id,
+      };
     }
 
     if (!p.publicId) return null;
@@ -67,11 +71,10 @@ export async function resolveRecipient(
     if (!update || update.status !== "PUBLIC" || !update.public) return null;
     const r = await db.updateRecipient.findFirst({
       where: { id: p.recipientId, updateId: update.id },
-      select: { id: true },
+      select: { id: true, expiresAt: true },
     });
-    return r
-      ? { companyId: p.companyId, targetId: update.id, recipientId: r.id }
-      : null;
+    if (!r || isExpired(r.expiresAt)) return null;
+    return { companyId: p.companyId, targetId: update.id, recipientId: r.id };
   } catch {
     return null;
   }

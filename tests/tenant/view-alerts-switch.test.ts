@@ -33,6 +33,40 @@ describe("member alert switch", () => {
     expect(bMember.notifyOnView).toBe(true);
   });
 
+  it("digest switch updates only the caller's own member row", async () => {
+    const asA = callerFor(a);
+    const other = await db.member.create({
+      data: {
+        companyId: a.companyId,
+        userId: (
+          await db.user.create({
+            data: { email: `digest-${Date.now()}@example.test` },
+          })
+        ).id,
+        status: "ACTIVE",
+        isOnboarded: true,
+      },
+    });
+    expect(await asA.member.viewDigest()).toBe(false);
+
+    expect(await asA.member.setViewDigest({ enabled: true })).toBe(true);
+    expect(await asA.member.viewDigest()).toBe(true);
+    expect(
+      (await db.member.findUniqueOrThrow({ where: { id: other.id } }))
+        .viewDigest,
+    ).toBe(false);
+    expect(
+      (await db.member.findUniqueOrThrow({ where: { id: b.memberId } }))
+        .viewDigest,
+    ).toBe(false);
+
+    expect(await asA.member.setViewDigest({ enabled: false })).toBe(false);
+    expect(await asA.member.viewDigest()).toBe(false);
+
+    await db.member.delete({ where: { id: other.id } });
+    await db.user.delete({ where: { id: other.userId } });
+  });
+
   it("works on a company host, as a company-host user reaches it", async () => {
     const onHost = appRouter.createCaller({
       db,

@@ -54,6 +54,8 @@ const EXEMPT: Record<string, string> = {
   "member.updateProfile": "the user's own profile",
   "member.setViewAlerts":
     "the member's own alert preference; updates only ctx.tenant.memberId, takes no member id, reveals nothing",
+  "member.setViewDigest":
+    "the member's own alert preference; updates only ctx.tenant.memberId, takes no member id, reveals nothing",
   "member.acceptMember": "the invitee has no active membership until accepting",
   "company.switchCompany":
     "moves the session to another of the user's own memberships",
@@ -83,6 +85,7 @@ type Fx = Record<
   | "optionToDelete"
   | "safeToDelete"
   | "updateRecipientId"
+  | "nudgeUpdateRecipientId"
   | "dataRoomRecipientId"
   | "bankAccountToDelete"
   | "memberToEdit"
@@ -353,6 +356,16 @@ const cases: Case[] = [
     perm: ["updates", "update"],
     run: (c, f) => c.update.toggleVisibility({ updateId: f.updateId }),
   },
+  {
+    // after toggleVisibility: only a PUBLIC update can be nudged
+    proc: "update.nudge",
+    perm: ["updates", "update"],
+    run: (c, f) =>
+      c.update.nudge({
+        updateId: f.updateId,
+        recipientId: f.nudgeUpdateRecipientId,
+      }),
+  },
 
   // --- data rooms ---------------------------------------------------------
   {
@@ -369,6 +382,16 @@ const cases: Case[] = [
         dataRoomId: f.dataRoomId,
         others: [],
         selectedContacts: [contact()],
+      }),
+  },
+  {
+    // before unShare deletes the recipient
+    proc: "dataRoom.nudge",
+    perm: ["data-rooms", "update"],
+    run: (c, f) =>
+      c.dataRoom.nudge({
+        dataRoomId: f.dataRoomId,
+        recipientId: f.dataRoomRecipientId,
       }),
   },
   {
@@ -764,9 +787,16 @@ beforeAll(async () => {
   const updateRecipient = await db.updateRecipient.create({
     data: { updateId: aIds.updateId, name: "r", email: "r@example.com" },
   });
+  const nudgeUpdateRecipient = await db.updateRecipient.create({
+    data: { updateId: aIds.updateId, name: "n", email: "n@example.com" },
+  });
   const dataRoomRecipient = await db.dataRoomRecipient.create({
     data: { dataRoomId: aIds.dataRoomId, name: "r", email: "r@example.com" },
   });
+  // both are nudged, and a nudge needs the share to have waited 3 days
+  const fourDaysAgo = new Date(Date.now() - 4 * 86_400_000);
+  await db.$executeRaw`UPDATE "UpdateRecipient" SET "updatedAt" = ${fourDaysAgo} WHERE id = ${nudgeUpdateRecipient.id}`;
+  await db.$executeRaw`UPDATE "DataRoomRecipient" SET "updatedAt" = ${fourDaysAgo} WHERE id = ${dataRoomRecipient.id}`;
   const bankAccount = await db.bankAccount.create({
     data: {
       companyId,
@@ -820,6 +850,7 @@ beforeAll(async () => {
     optionToDelete: option.id,
     safeToDelete: safe.id,
     updateRecipientId: updateRecipient.id,
+    nudgeUpdateRecipientId: nudgeUpdateRecipient.id,
     dataRoomRecipientId: dataRoomRecipient.id,
     bankAccountToDelete: bankAccount.id,
     memberToEdit: m.toEdit.member.id,

@@ -1,10 +1,12 @@
 import { dayjsExt } from "@/common/dayjs";
+import { ExpiredLink } from "@/components/share/expired-link";
 import { SharePageLayout } from "@/components/share/page-layout";
 import { ViewBeacon } from "@/components/share/view-beacon";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import UpdateRenderer from "@/components/update/renderer";
 import { type JWTVerifyResult, decode } from "@/lib/jwt";
 import { UpdateStatusEnum } from "@/prisma/enums";
+import { isExpired } from "@/server/activity/link-state";
 import { db } from "@/server/db";
 import { assertHostOwns } from "@/server/domains/links";
 import { render } from "@react-email/components";
@@ -103,6 +105,10 @@ const PublicUpdatePage = async (props: {
 
   if (!recipients) {
     return notFound();
+  }
+
+  if (isExpired(recipients.expiresAt)) {
+    return <ExpiredLink companyName={update.company.name} />;
   }
 
   const company = update?.company;

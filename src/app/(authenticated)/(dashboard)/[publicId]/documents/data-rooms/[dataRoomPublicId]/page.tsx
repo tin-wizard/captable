@@ -1,4 +1,5 @@
 import { ActivityTable } from "@/components/activity/activity-table";
+import { UnopenedList } from "@/components/activity/unopened-list";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { serverAccessControl } from "@/lib/rbac/access-control";
 import { api } from "@/trpc/server";
@@ -43,7 +44,17 @@ const DataRoomSettinsPage = async (props: {
             <CardTitle className="text-lg">Activity</CardTitle>
           </CardHeader>
           <CardContent>
-            <ActivityTable kind="DATA_ROOM" targetPublicId={dataRoomPublicId} />
+            <div className="flex flex-col gap-y-6">
+              <UnopenedList
+                kind="DATA_ROOM"
+                targetPublicId={dataRoomPublicId}
+                canNudge={allow(true, ["data-rooms", "update"])}
+              />
+              <ActivityTable
+                kind="DATA_ROOM"
+                targetPublicId={dataRoomPublicId}
+              />
+            </div>
           </CardContent>
         </Card>
       )}

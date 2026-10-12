@@ -126,6 +126,41 @@ describe("POST /api/activity/view", () => {
     expect(emit).not.toHaveBeenCalled();
   });
 
+  it("an expired link records nothing and alerts no one", async () => {
+    const past = new Date(Date.now() - 1000);
+    const rec = await db.dataRoomRecipient.create({
+      data: {
+        email: "expired@example.com",
+        dataRoomId: aIds.dataRoomId,
+        expiresAt: past,
+      },
+    });
+    const urec = await db.updateRecipient.create({
+      data: {
+        email: "expired@example.com",
+        updateId: aIds.updateId,
+        expiresAt: past,
+      },
+    });
+    const roomRes = await call({
+      kind: "DATA_ROOM",
+      token: await roomToken({ recipientId: rec.id }),
+    });
+    const updateRes = await call({
+      kind: "UPDATE",
+      token: await encode({
+        publicId: updatePublicId,
+        companyId: a.companyId,
+        recipientId: urec.id,
+      }),
+    });
+    expect(roomRes.status).toBe(404);
+    expect(updateRes.status).toBe(404);
+    expect(await eventsFor(rec.id)).toHaveLength(0);
+    expect(await eventsFor(urec.id)).toHaveLength(0);
+    expect(emit).not.toHaveBeenCalled();
+  });
+
   it("rejects a garbage token and a malformed body without a 500", async () => {
     expect((await call({ kind: "DATA_ROOM", token: "nope" })).status).toBe(404);
     expect((await call({ kind: "ESIGN", token: "nope" })).status).toBe(404);

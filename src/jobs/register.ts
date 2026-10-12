@@ -11,11 +11,13 @@ import { purgeViewEventsWorker } from "./purge-view-events";
 import { shareDataRoomEmailWorker } from "./share-data-room-email";
 import { shareUpdateEmailWorker } from "./share-update-email";
 import { viewAlertEmailWorker } from "./view-alert-email";
+import { viewDigestEmailWorker } from "./view-digest-email";
 
 export async function registerJobs() {
   queueManager.register(shareDataRoomEmailWorker);
   queueManager.register(shareUpdateEmailWorker);
   queueManager.register(viewAlertEmailWorker);
+  queueManager.register(viewDigestEmailWorker);
   queueManager.register(passwordResetEmailWorker);
   queueManager.register(sendMemberInviteEmailWorker);
   queueManager.register(eSignNotificationEmailWorker);
@@ -37,5 +39,13 @@ export async function registerJobs() {
       logger
         .child({ module: "queue" })
         .warn("could not schedule maintenance.purge-view-events"),
+    );
+
+  await queue
+    .schedule("email.view-digest", "0 7 * * *", {})
+    .catch(() =>
+      logger
+        .child({ module: "queue" })
+        .warn("could not schedule email.view-digest"),
     );
 }

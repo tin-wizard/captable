@@ -1,7 +1,9 @@
 import FilePreview from "@/components/file/preview";
+import { ExpiredLink } from "@/components/share/expired-link";
 import { SharePageLayout } from "@/components/share/page-layout";
 import { ViewBeacon } from "@/components/share/view-beacon";
 import { type JWTVerifyResult, decode } from "@/lib/jwt";
+import { isExpired } from "@/server/activity/link-state";
 import { db } from "@/server/db";
 import { assertHostOwns } from "@/server/domains/links";
 import { getPresignedGetUrl } from "@/server/file-uploads";
@@ -34,22 +36,16 @@ const DataRoomPage = async (props: {
     return notFound();
   }
 
-  const recipient = await db.dataRoomRecipient.findFirstOrThrow({
-    where: {
-      id: recipientId,
-      dataRoomId,
-    },
-
-    select: {
-      id: true,
-    },
+  const recipient = await db.dataRoomRecipient.findFirst({
+    where: { id: recipientId, dataRoomId },
+    select: { id: true, expiresAt: true },
   });
 
   if (!recipient) {
     return notFound();
   }
 
-  const dataRoom = await db.dataRoom.findFirstOrThrow({
+  const dataRoom = await db.dataRoom.findFirst({
     where: {
       publicId,
     },
@@ -68,6 +64,10 @@ const DataRoomPage = async (props: {
     },
   });
 
+  if (!dataRoom) {
+    return notFound();
+  }
+
   const dataRoomFile = dataRoom.documents.find(
     (doc) => doc.document.bucket.id === bucketId,
   );
@@ -81,6 +81,11 @@ const DataRoomPage = async (props: {
   }
 
   await assertHostOwns(dataRoom.companyId);
+
+  // before any file list or presigned URL is produced
+  if (isExpired(recipient.expiresAt)) {
+    return <ExpiredLink companyName={dataRoom.company.name} />;
+  }
 
   const file = dataRoomFile?.document.bucket;
 

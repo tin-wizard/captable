@@ -14,6 +14,7 @@ const config = defineWorkerConfig({
     companyName: z.string(),
     recipientName: z.string().nullish(),
     senderEmail: z.string().email().nullish(),
+    reminder: z.boolean().optional(),
   }),
 });
 
@@ -28,11 +29,14 @@ export const shareDataRoomEmailWorker = defineWorker(config, async (job) => {
     senderName,
     email,
     senderEmail,
+    reminder,
   } = job.data;
   await sendMail({
     to: email,
     ...(senderEmail && { replyTo: senderEmail }),
-    subject: `${senderName} shared a data room - ${dataRoom}`,
+    subject: `${
+      reminder ? "Reminder: " : ""
+    }${senderName} shared a data room - ${dataRoom}`,
     html: await render(
       ShareDataRoomEmail({
         senderName: senderName,

@@ -61,11 +61,12 @@ export const ShareUpdateModal = ({ update }: ShareUpdateModalProps) => {
       baseLink={`${baseUrl}/updates/${update.publicId}`}
       title={"Share investor updates"}
       subtitle="Share important updates with fellow members/stakeholders"
-      onShare={async ({ selectedContacts, others }) => {
+      onShare={async ({ selectedContacts, others, expiresInDays }) => {
         await shareUpdateMutation({
           updateId: update.id,
           selectedContacts: selectedContacts as ShareRecipientType[],
           others: others as ShareRecipientType[],
+          expiresInDays,
         });
       }}
       removeAccess={async ({ recipientId }) => {

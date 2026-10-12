@@ -1,5 +1,6 @@
 import ViewAlertEmail from "@/emails/ViewAlertEmail";
 import { env } from "@/env";
+import { describeTarget } from "@/server/activity/describe";
 import { db } from "@/server/db";
 import { sendMail } from "@/server/mailer";
 import { render } from "@react-email/components";
@@ -19,71 +20,6 @@ const config = defineWorkerConfig({
 
 export const viewAlertEmailJob = defineJob(config);
 
-type Described = {
-  label: string;
-  path: string;
-  who: string;
-  // the member who created the thing, notified besides the admins
-  ownerMemberId: string | null;
-};
-
-type Data = z.infer<(typeof config)["schema"]>;
-
-async function describe(d: Data): Promise<Described> {
-  if (d.kind === "DATA_ROOM") {
-    const [room, rec] = await Promise.all([
-      db.dataRoom.findFirstOrThrow({
-        where: { id: d.targetId, companyId: d.companyId },
-        select: { name: true, publicId: true, createdById: true },
-      }),
-      db.dataRoomRecipient.findUniqueOrThrow({
-        where: { id: d.recipientId },
-        select: { name: true, email: true },
-      }),
-    ]);
-    return {
-      label: `the data room "${room.name}"`,
-      path: `documents/data-rooms/${room.publicId}`,
-      who: rec.name || rec.email,
-      ownerMemberId: room.createdById,
-    };
-  }
-  if (d.kind === "UPDATE") {
-    const [update, rec] = await Promise.all([
-      db.update.findFirstOrThrow({
-        where: { id: d.targetId, companyId: d.companyId },
-        select: { title: true, publicId: true, authorId: true },
-      }),
-      db.updateRecipient.findUniqueOrThrow({
-        where: { id: d.recipientId },
-        select: { name: true, email: true },
-      }),
-    ]);
-    return {
-      label: `the update "${update.title}"`,
-      path: `updates/${update.publicId}`,
-      who: rec.name || rec.email,
-      ownerMemberId: update.authorId,
-    };
-  }
-  const [template, rec] = await Promise.all([
-    db.template.findFirstOrThrow({
-      where: { id: d.targetId, companyId: d.companyId },
-      select: { name: true, publicId: true, uploaderId: true },
-    }),
-    db.esignRecipient.findUniqueOrThrow({
-      where: { id: d.recipientId },
-      select: { name: true, email: true },
-    }),
-  ]);
-  return {
-    label: `the document "${template.name}"`,
-    path: `documents/esign/v/${template.publicId}`,
-    who: rec.name || rec.email,
-    ownerMemberId: template.uploaderId,
-  };
-}
-
 export const viewAlertEmailWorker = defineWorker(config, async (job) => {
   const d = job.data;
   const [company, target] = await Promise.all([
@@ -91,7 +27,7 @@ export const viewAlertEmailWorker = defineWorker(config, async (job) => {
       where: { id: d.companyId },
       select: { name: true, publicId: true },
     }),
-    describe(d),
+    describeTarget(d),
   ]);
 
   const members = await db.member.findMany({
@@ -99,6 +35,7 @@ export const viewAlertEmailWorker = defineWorker(config, async (job) => {
       companyId: d.companyId,
       status: "ACTIVE",
       notifyOnView: true,
+      viewDigest: false,
       OR: [
         { role: "ADMIN" },
         ...(target.ownerMemberId ? [{ id: target.ownerMemberId }] : []),
