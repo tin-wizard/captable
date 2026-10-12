@@ -84,7 +84,11 @@ export const PdfViewer = ({
   }, [containerRef, numPages]);
 
   return (
-    <div className="overflow-hidden" ref={setContainerRef}>
+    <div
+      className="overflow-hidden"
+      ref={setContainerRef}
+      data-total-pages={numPages}
+    >
       <Document
         file={file}
         onLoadSuccess={onDocumentLoadSuccess}
