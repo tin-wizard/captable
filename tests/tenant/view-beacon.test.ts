@@ -21,6 +21,11 @@ import {
 
 const emit = vi.hoisted(() => vi.fn());
 vi.mock("@/jobs/view-alert-email", () => ({ viewAlertEmailJob: { emit } }));
+const getSession = vi.hoisted(() => vi.fn().mockResolvedValue(null));
+vi.mock("@/server/auth", async (orig) => ({
+  ...(await orig<typeof import("@/server/auth")>()),
+  getServerAuthSession: getSession,
+}));
 
 import { POST } from "@/app/api/activity/view/route";
 
@@ -57,8 +62,12 @@ beforeAll(async () => {
       data: { email: "inv@example.com", dataRoomId: aIds.dataRoomId },
     })
   ).id;
+  // the beacon only counts a viewable update, like the public page
   updatePublicId = (
-    await db.update.findUniqueOrThrow({ where: { id: aIds.updateId } })
+    await db.update.update({
+      where: { id: aIds.updateId },
+      data: { status: "PUBLIC", public: true },
+    })
   ).publicId;
   updateRecipientId = (
     await db.updateRecipient.create({
@@ -87,7 +96,7 @@ const eventsFor = (recipientId: string) =>
 describe("POST /api/activity/view", () => {
   it("records a data room view and alerts once", async () => {
     const token = await roomToken();
-    expect((await call({ kind: "DATA_ROOM", token })).status).toBe(204);
+    expect((await call({ kind: "DATA_ROOM", token })).status).toBe(200);
     expect(await eventsFor(roomRecipientId)).toHaveLength(1);
     expect(emit).toHaveBeenCalledTimes(1);
     expect(emit.mock.calls[0]?.[0]).toMatchObject({
@@ -98,7 +107,7 @@ describe("POST /api/activity/view", () => {
     });
 
     // a reload within 10s is neither stored nor emailed
-    expect((await call({ kind: "DATA_ROOM", token })).status).toBe(204);
+    expect((await call({ kind: "DATA_ROOM", token })).status).toBe(200);
     expect(await eventsFor(roomRecipientId)).toHaveLength(1);
     expect(emit).toHaveBeenCalledTimes(1);
   });
@@ -128,7 +137,7 @@ describe("POST /api/activity/view", () => {
       { kind: "DATA_ROOM", token },
       "Mozilla/5.0 (compatible; Googlebot/2.1)",
     );
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
     const [row] = await eventsFor(recipient.id);
     expect(row?.isBot).toBe(true);
     expect(emit).not.toHaveBeenCalled();
@@ -140,7 +149,7 @@ describe("POST /api/activity/view", () => {
       companyId: a.companyId,
       recipientId: updateRecipientId,
     });
-    expect((await call({ kind: "UPDATE", token })).status).toBe(204);
+    expect((await call({ kind: "UPDATE", token })).status).toBe(200);
     expect(await eventsFor(updateRecipientId)).toHaveLength(1);
   });
 
@@ -152,12 +161,75 @@ describe("POST /api/activity/view", () => {
       recipientId: recipient.id,
       templateId: recipient.templateId,
     });
-    expect((await call({ kind: "ESIGN", token })).status).toBe(204);
-    expect((await call({ kind: "ESIGN", token })).status).toBe(204);
+    expect((await call({ kind: "ESIGN", token })).status).toBe(200);
+    expect((await call({ kind: "ESIGN", token })).status).toBe(200);
     const audits = await db.esignAudit.findMany({
       where: { recipientId: recipient.id, action: "recipient.viewed" },
     });
     expect(audits).toHaveLength(1);
     expect(audits[0]?.ip).toBe("203.0.113.9");
+  });
+
+  it("returns a visit id and stores location and timezone", async () => {
+    const rec = await db.dataRoomRecipient.create({
+      data: { email: "geo@example.com", dataRoomId: aIds.dataRoomId },
+    });
+    const token = await roomToken({ recipientId: rec.id });
+    const res = await call({
+      kind: "DATA_ROOM",
+      token,
+      timezone: "America/Toronto",
+    });
+    expect(res.status).toBe(200);
+    const { visitId } = await res.json();
+    const row = await db.viewEvent.findUniqueOrThrow({
+      where: { id: visitId },
+    });
+    expect(row.timezone).toBe("America/Toronto");
+  });
+
+  it("records nothing for a signed-in active member of the same company", async () => {
+    getSession.mockResolvedValueOnce({ user: { id: a.userId } });
+    const rec = await db.dataRoomRecipient.create({
+      data: { email: "self@example.com", dataRoomId: aIds.dataRoomId },
+    });
+    const res = await call({
+      kind: "DATA_ROOM",
+      token: await roomToken({ recipientId: rec.id }),
+    });
+    expect((await res.json()).visitId).toBeNull();
+    expect(await eventsFor(rec.id)).toHaveLength(0);
+    expect(emit).not.toHaveBeenCalled();
+  });
+
+  it("still records a viewer who has a session only in another company", async () => {
+    getSession.mockResolvedValueOnce({ user: { id: b.userId } });
+    const rec = await db.dataRoomRecipient.create({
+      data: { email: "other@example.com", dataRoomId: aIds.dataRoomId },
+    });
+    const res = await call({
+      kind: "DATA_ROOM",
+      token: await roomToken({ recipientId: rec.id }),
+    });
+    expect((await res.json()).visitId).not.toBeNull();
+  });
+
+  it("rejects an update that is not public", async () => {
+    await db.update.update({
+      where: { id: aIds.updateId },
+      data: { public: false },
+    });
+    const token = await encode({
+      publicId: updatePublicId,
+      companyId: a.companyId,
+      recipientId: updateRecipientId,
+    });
+    const before = (await eventsFor(updateRecipientId)).length;
+    expect((await call({ kind: "UPDATE", token })).status).toBe(404);
+    expect(await eventsFor(updateRecipientId)).toHaveLength(before);
+    await db.update.update({
+      where: { id: aIds.updateId },
+      data: { public: true, status: "PUBLIC" },
+    });
   });
 });
