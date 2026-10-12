@@ -1,4 +1,5 @@
 import { ActivityTable } from "@/components/activity/activity-table";
+import { UnopenedList } from "@/components/activity/unopened-list";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Editor from "@/components/update/editor-client";
 import { serverAccessControl } from "@/lib/rbac/access-control";
@@ -31,7 +32,14 @@ const UpdatePage = async (props: {
             <CardTitle className="text-lg">Activity</CardTitle>
           </CardHeader>
           <CardContent>
-            <ActivityTable kind="UPDATE" targetPublicId={updatePublicId} />
+            <div className="flex flex-col gap-y-6">
+              <UnopenedList
+                kind="UPDATE"
+                targetPublicId={updatePublicId}
+                canNudge={allow(true, ["updates", "update"])}
+              />
+              <ActivityTable kind="UPDATE" targetPublicId={updatePublicId} />
+            </div>
           </CardContent>
         </Card>
       )}
