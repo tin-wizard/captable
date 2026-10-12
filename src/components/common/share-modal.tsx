@@ -6,6 +6,7 @@ import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import MultipleSelector, { type Option } from "@/components/ui/multi-selector";
 
+import { dayjsExt } from "@/common/dayjs";
 import type { ShareContactType } from "@/schema/contacts";
 import type { DataRoomRecipient, UpdateRecipient } from "@prisma/client";
 import {
@@ -39,7 +40,11 @@ export type Props = {
   baseLink: string;
   contacts: ShareContactType[] | [];
   recipientsPayload: Recipients;
-  onShare: (data: { others: object[]; selectedContacts: object[] }) => void;
+  onShare: (data: {
+    others: object[];
+    selectedContacts: object[];
+    expiresInDays: 7 | 14 | 30;
+  }) => void;
   removeAccess?: (data: { recipientId: string }) => void;
 };
 
@@ -56,6 +61,7 @@ const Share = ({
   const [_copiedText, copy] = useCopyToClipboard();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Option[]>([]);
+  const [expiresInDays, setExpiresInDays] = useState<7 | 14 | 30>(30);
   const { recipients } = recipientsPayload;
 
   const copyToClipboard = (id: string, text: string) => {
@@ -134,6 +140,11 @@ const Share = ({
                       <span className="text-xs text-primary/50">
                         {recipient.email}
                       </span>
+                      {recipient.expiresAt && (
+                        <span className="text-xs text-primary/50">
+                          Expires {dayjsExt().to(recipient.expiresAt)}
+                        </span>
+                      )}
                     </span>
                   </div>
 
@@ -178,7 +189,21 @@ const Share = ({
               ))}
             </ul>
 
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex items-center justify-between gap-x-4">
+              <label className="flex items-center gap-2 text-sm">
+                Link expires after
+                <select
+                  className="rounded-md border px-2 py-1 text-sm"
+                  value={expiresInDays}
+                  onChange={(e) =>
+                    setExpiresInDays(Number(e.target.value) as 7 | 14 | 30)
+                  }
+                >
+                  <option value={7}>7 days</option>
+                  <option value={14}>14 days</option>
+                  <option value={30}>30 days</option>
+                </select>
+              </label>
               <div className="space-x-4">
                 <Button
                   variant={"outline"}
@@ -202,6 +227,7 @@ const Share = ({
                     onShare({
                       others: others as object[],
                       selectedContacts: contacts as object[],
+                      expiresInDays,
                     });
 
                     setSelected([]);

@@ -2,6 +2,7 @@ import { shareUpdateEmailJob } from "@/jobs/share-update-email";
 import { encode } from "@/lib/jwt";
 import { UpdateStatusEnum } from "@/prisma/enums";
 import { ShareRecipientSchema } from "@/schema/contacts";
+import { expiryFromDays } from "@/server/activity/link-state";
 import { Audit } from "@/server/audit";
 import { companyUrl } from "@/server/domains/links";
 import { assertTenantOwns } from "@/server/tenant-guard";
@@ -15,6 +16,9 @@ export const shareUpdateProcedure = withAccessControl
       updateId: z.string(),
       others: z.array(ShareRecipientSchema),
       selectedContacts: z.array(ShareRecipientSchema),
+      expiresInDays: z
+        .union([z.literal(7), z.literal(14), z.literal(30)])
+        .default(30),
     }),
   )
   .meta({ policies: { updates: { allow: ["update"] } } })
@@ -48,6 +52,9 @@ export const shareUpdateProcedure = withAccessControl
 
     const company = update.company;
 
+    // one instant for every recipient of this share
+    const expiresAt = expiryFromDays(input.expiresInDays);
+
     const upsertManyRecipients = async () => {
       const recipients = [...others, ...selectedContacts];
 
@@ -77,10 +84,12 @@ export const shareUpdateProcedure = withAccessControl
             name: recipient.name,
             email,
             ...memberOrStakeholderId,
+            expiresAt,
           },
           update: {
             name: recipient.name,
             ...memberOrStakeholderId,
+            expiresAt,
           },
         });
 

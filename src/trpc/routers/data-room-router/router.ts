@@ -2,6 +2,7 @@ import { generatePublicId } from "@/common/id";
 import { shareDataRoomEmailJob } from "@/jobs/share-data-room-email";
 import { encode } from "@/lib/jwt";
 import { ShareRecipientSchema } from "@/schema/contacts";
+import { expiryFromDays } from "@/server/activity/link-state";
 import { Audit } from "@/server/audit";
 import { companyUrl } from "@/server/domains/links";
 import { assertTenantOwns } from "@/server/tenant-guard";
@@ -246,6 +247,9 @@ export const dataRoomRouter = createTRPCRouter({
         dataRoomId: z.string(),
         others: z.array(ShareRecipientSchema),
         selectedContacts: z.array(ShareRecipientSchema),
+        expiresInDays: z
+          .union([z.literal(7), z.literal(14), z.literal(30)])
+          .default(30),
       }),
     )
     .meta({ policies: { "data-rooms": { allow: ["update"] } } })
@@ -279,6 +283,9 @@ export const dataRoomRouter = createTRPCRouter({
 
       const company = dataRoom.company;
 
+      // one instant for every recipient of this share
+      const expiresAt = expiryFromDays(input.expiresInDays);
+
       const upsertManyRecipients = async () => {
         const recipients = [...others, ...selectedContacts];
 
@@ -309,10 +316,12 @@ export const dataRoomRouter = createTRPCRouter({
                 name: recipient.name,
                 email,
                 ...memberOrStakeholderId,
+                expiresAt,
               },
               update: {
                 name: recipient.name,
                 ...memberOrStakeholderId,
+                expiresAt,
               },
             });
             return { recipientRecord };
