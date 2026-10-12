@@ -133,6 +133,7 @@ export const EsignAuditSchema = z.object({
   action: z.enum([
     "document.complete",
     "recipient.signed",
+    "recipient.viewed",
     "document.email.sent",
   ]),
   occurredAt: z.date().optional(),

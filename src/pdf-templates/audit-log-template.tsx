@@ -99,6 +99,7 @@ const humanizedStatus: Record<TEsignAuditSchema["action"], string> = {
   "document.complete": "Document completed",
   "document.email.sent": "Email sent",
   "recipient.signed": "Signed",
+  "recipient.viewed": "Viewed",
 };
 
 export interface AuditLogTemplateProps {

@@ -164,6 +164,7 @@ model Company {
 
   BankAccount BankAccount[]
   domains     CompanyDomain[]
+  viewEvents  ViewEvent[]
 
   @@unique([publicId])
 }
@@ -218,6 +219,8 @@ model Member {
   role         Roles?
   workEmail    String?
   lastAccessed DateTime         @default(now())
+  // email alerts when a recipient opens or returns to something shared
+  notifyOnView Boolean          @default(true)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
@@ -991,6 +994,34 @@ model EsignAudit {
   @@index([companyId])
   @@index([templateId])
   @@index([recipientId])
+}
+
+enum ViewKind {
+  DATA_ROOM
+  UPDATE
+  ESIGN
+}
+
+// One confirmed view of a shared page by a known recipient. `isBot` rows are
+// kept for transparency but never count as a first or return visit.
+model ViewEvent {
+  id          String   @id @default(cuid())
+  kind        ViewKind
+  // DataRoom.id | Update.id | Template.id
+  targetId    String
+  // DataRoomRecipient.id | UpdateRecipient.id | EsignRecipient.id (three tables, so no FK)
+  recipientId String
+  // truncated at write: /24 for IPv4, /48 for IPv6
+  ip          String
+  userAgent   String
+  isBot       Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([kind, targetId, recipientId, createdAt])
 }
 
 enum PricingType {

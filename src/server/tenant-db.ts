@@ -44,6 +44,7 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   "Update",
   "EsignAudit",
   "CompanyDomain",
+  "ViewEvent",
   // companyId is nullable only for legacy orphans, which no tenant can see
   "Bucket",
 ]);
