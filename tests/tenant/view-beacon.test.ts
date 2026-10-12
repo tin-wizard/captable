@@ -127,6 +127,11 @@ describe("POST /api/activity/view", () => {
   });
 
   it("an expired link records nothing and alerts no one", async () => {
+    // the update must be viewable, or the 404 would not prove expiry
+    await db.update.update({
+      where: { id: aIds.updateId },
+      data: { status: "PUBLIC", public: true },
+    });
     const past = new Date(Date.now() - 1000);
     const rec = await db.dataRoomRecipient.create({
       data: {

@@ -72,7 +72,7 @@ const DataRoomPage = async (props: {
 
   await assertHostOwns(dataRoom.companyId);
 
-  // before any file list or presigned URL is produced
+  // before the file explorer is rendered
   if (isExpired(recipient.expiresAt)) {
     return <ExpiredLink companyName={dataRoom.company.name} />;
   }

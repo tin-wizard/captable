@@ -106,6 +106,8 @@ type Case = {
   // the handler calls a third party (Stripe) or is flag-gated off in tests:
   // ADMIN is only required to get past the access check
   adminPastAclOnly?: true;
+  // runs once before the refusal snapshots, so the case needs no earlier case
+  setup?: () => Promise<unknown>;
 };
 
 const DAY = "2024-01-01";
@@ -357,9 +359,14 @@ const cases: Case[] = [
     run: (c, f) => c.update.toggleVisibility({ updateId: f.updateId }),
   },
   {
-    // after toggleVisibility: only a PUBLIC update can be nudged
     proc: "update.nudge",
     perm: ["updates", "update"],
+    // only a PUBLIC update can be nudged
+    setup: () =>
+      db.update.update({
+        where: { id: fx.updateId },
+        data: { status: "PUBLIC", public: true },
+      }),
     run: (c, f) =>
       c.update.nudge({
         updateId: f.updateId,
@@ -906,6 +913,7 @@ describe("roles inside a tenant", () => {
   it.each(cases.map((c) => [c.proc, c] as const))(
     "%s: no-role and read-only members are refused, ADMIN is not",
     async (_name, c) => {
+      await c.setup?.();
       for (const caller of [noRole, readOnlyCustom]) {
         const before = await snapshotA();
         expect(await code(c.run(caller, fx))).toBe("UNAUTHORIZED");

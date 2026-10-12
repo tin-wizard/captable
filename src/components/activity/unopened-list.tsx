@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { api } from "@/trpc/react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 type Props = {
@@ -28,6 +29,7 @@ export const UnopenedList = ({ kind, targetPublicId, canNudge }: Props) => {
 
   const options = {
     onError: (e: { message: string }) => toast.error(e.message),
+    onSettled: () => setSending(null),
     onSuccess: async () => {
       toast.success("Reminder sent");
       await utils.activity.unopened.invalidate();
@@ -35,7 +37,8 @@ export const UnopenedList = ({ kind, targetPublicId, canNudge }: Props) => {
   };
   const nudgeDataRoom = api.dataRoom.nudge.useMutation(options);
   const nudgeUpdate = api.update.nudge.useMutation(options);
-  const pending = nudgeDataRoom.isLoading || nudgeUpdate.isLoading;
+  // only the row being reminded is disabled
+  const [sending, setSending] = useState<string | null>(null);
 
   // callers without audits:read (or any failure) see nothing
   if (error || !data?.items.length) return null;
@@ -57,24 +60,28 @@ export const UnopenedList = ({ kind, targetPublicId, canNudge }: Props) => {
               <TableCell className="font-medium">
                 {item.name || item.email}
               </TableCell>
-              <TableCell>Waiting {dayjsExt().to(item.waitingSince)}</TableCell>
+              <TableCell>
+                Waiting {dayjsExt().to(item.waitingSince, true)}
+              </TableCell>
               <TableCell className="text-right">
                 {canNudge && (
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={!item.nudgeable || pending}
-                    onClick={() =>
-                      kind === "DATA_ROOM"
-                        ? nudgeDataRoom.mutate({
-                            dataRoomId: item.targetId,
-                            recipientId: item.recipientId,
-                          })
-                        : nudgeUpdate.mutate({
-                            updateId: item.targetId,
-                            recipientId: item.recipientId,
-                          })
-                    }
+                    disabled={!item.nudgeable || sending === item.recipientId}
+                    onClick={() => {
+                      setSending(item.recipientId);
+                      if (kind === "DATA_ROOM")
+                        nudgeDataRoom.mutate({
+                          dataRoomId: item.targetId,
+                          recipientId: item.recipientId,
+                        });
+                      else
+                        nudgeUpdate.mutate({
+                          updateId: item.targetId,
+                          recipientId: item.recipientId,
+                        });
+                    }}
                   >
                     {/* a fresh nudge bumps updatedAt and removes the row, so this shows only on an old unopened row with lastNudgedAt set */}
                     {!item.nudgeable && item.lastNudgedAt

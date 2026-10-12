@@ -234,6 +234,30 @@ describe.each(kinds.map((k) => [k.kind, k] as const))("%s.nudge", (_, k) => {
     expect(k.emit).toHaveBeenCalledTimes(1);
   });
 
+  it("a failed send releases the claim so a retry works", async () => {
+    const r = await k.recipient(mail("f1"));
+    k.emit.mockRejectedValueOnce(new Error("smtp down"));
+    await expect(k.nudge(a, k.parentA(), r.id)).rejects.toThrow();
+    expect(await k.nudgedAt(r.id)).toBeNull();
+    await expect(k.nudge(a, k.parentA(), r.id)).resolves.toEqual({
+      success: true,
+    });
+    expect(k.emit).toHaveBeenCalledTimes(2);
+    expect(await k.nudgedAt(r.id)).not.toBeNull();
+  });
+
+  it("refuses a link that expires within a day, before any claim", async () => {
+    const r = await k.recipient(mail("x1"), {
+      expiresAt: new Date(Date.now() + 23 * 3600 * 1000),
+    });
+    await expect(k.nudge(a, k.parentA(), r.id)).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: "This link expires within a day. Share again to renew it.",
+    });
+    expect(k.emit).not.toHaveBeenCalled();
+    expect(await k.nudgedAt(r.id)).toBeNull();
+  });
+
   it("a nudge restarts the waiting clock: the row leaves Not opened yet", async () => {
     const r = await k.recipient(mail("u1"));
     const listed = async () =>

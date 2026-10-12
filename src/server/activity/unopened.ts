@@ -1,9 +1,11 @@
-import { LINK_TTL_MS } from "@/server/activity/link-state";
+import { LINK_TTL_MS, effectiveExpiry } from "@/server/activity/link-state";
 import type { TPrismaOrTransaction } from "@/server/db";
 
 export const UNOPENED_AFTER_DAYS = 3;
 export const NUDGE_COOLDOWN_MS = 24 * 3600 * 1000;
 const CAP = 200;
+// shortcut: 50 pages of candidates per kind, raise when a company needs more
+const MAX_PAGES = 50;
 
 type Page = { id: string; updatedAt: Date };
 // keyset: rows strictly after the last one seen, in (updatedAt, id) order
@@ -30,6 +32,7 @@ export async function findUnopened(
     now?: Date;
     cap?: number;
     batch?: number;
+    maxPages?: number;
     // only rows whose updatedAt is after this (bounds the window in the query,
     // before the cap)
     newerThan?: Date;
@@ -38,6 +41,7 @@ export async function findUnopened(
   const now = opts.now ?? new Date();
   const cap = opts.cap ?? CAP;
   const batch = opts.batch ?? cap;
+  const maxPages = opts.maxPages ?? MAX_PAGES;
   const waitedEnough = new Date(
     now.getTime() - UNOPENED_AFTER_DAYS * 86_400_000,
   );
@@ -64,7 +68,7 @@ export async function findUnopened(
   ): Promise<T[]> {
     const out: T[] = [];
     let last: T | undefined;
-    for (;;) {
+    for (let page = 0; page < maxPages; page++) {
       const rows = await fetch(last);
       if (!rows.length) break;
       // recipient ids are cuids, unique across both tables, so no kind filter is needed
@@ -103,6 +107,7 @@ export async function findUnopened(
               email: true,
               name: true,
               updatedAt: true,
+              expiresAt: true,
               lastNudgedAt: true,
               dataRoom: {
                 select: {
@@ -131,6 +136,7 @@ export async function findUnopened(
               email: true,
               name: true,
               updatedAt: true,
+              expiresAt: true,
               lastNudgedAt: true,
               update: {
                 select: {
@@ -151,6 +157,15 @@ export async function findUnopened(
   // design; the nudge mutation enforces the 24 h cooldown itself
   const cooled = (d: Date | null) =>
     d === null || now.getTime() - d.getTime() >= NUDGE_COOLDOWN_MS;
+  // a nudge does not renew the link, so one dying within a day is not worth one
+  const nudgeable = (r: {
+    lastNudgedAt: Date | null;
+    expiresAt: Date | null;
+    updatedAt: Date;
+  }) =>
+    cooled(r.lastNudgedAt) &&
+    effectiveExpiry(r.expiresAt, r.updatedAt).getTime() - now.getTime() >=
+      NUDGE_COOLDOWN_MS;
 
   return [
     ...rooms.map((r) => ({
@@ -164,7 +179,7 @@ export async function findUnopened(
       name: r.name,
       waitingSince: r.updatedAt,
       lastNudgedAt: r.lastNudgedAt,
-      nudgeable: cooled(r.lastNudgedAt),
+      nudgeable: nudgeable(r),
     })),
     ...updates.map((r) => ({
       kind: "UPDATE" as const,
@@ -177,7 +192,7 @@ export async function findUnopened(
       name: r.name,
       waitingSince: r.updatedAt,
       lastNudgedAt: r.lastNudgedAt,
-      nudgeable: cooled(r.lastNudgedAt),
+      nudgeable: nudgeable(r),
     })),
   ];
 }
