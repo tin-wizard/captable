@@ -221,6 +221,8 @@ model Member {
   lastAccessed DateTime         @default(now())
   // email alerts when a recipient opens or returns to something shared
   notifyOnView Boolean          @default(true)
+  // true = one daily summary email instead of an email per view
+  viewDigest   Boolean          @default(false)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
@@ -525,6 +527,10 @@ model DataRoomRecipient {
   stakeholderId String?
   stakeholder   Stakeholder? @relation(fields: [stakeholderId], references: [id], onDelete: SetNull)
 
+  // null = only the 30-day signed-link lifetime applies (links sent before Phase 3)
+  expiresAt    DateTime?
+  lastNudgedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -547,6 +553,10 @@ model UpdateRecipient {
 
   stakeholderId String?
   stakeholder   Stakeholder? @relation(fields: [stakeholderId], references: [id], onDelete: SetNull)
+
+  // null = only the 30-day signed-link lifetime applies (links sent before Phase 3)
+  expiresAt    DateTime?
+  lastNudgedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
