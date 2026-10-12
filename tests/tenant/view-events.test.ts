@@ -95,4 +95,41 @@ describe("recordView", () => {
     });
     expect(row.ip).toBe("203.0.113.0");
   });
+
+  it("a burst inside 10 seconds stores one row", async () => {
+    const v = view();
+    expect([await recordView(db, v), await recordView(db, v)]).toEqual([
+      "first",
+      "repeat",
+    ]);
+    expect(
+      await db.viewEvent.count({ where: { recipientId: v.recipientId } }),
+    ).toBe(1);
+  });
+
+  it("a bot burst stores one bot row and does not block the human clock", async () => {
+    const v = view({ userAgent: "Slackbot-LinkExpanding 1.0" });
+    for (let i = 0; i < 3; i++) await recordView(db, v);
+    expect(
+      await db.viewEvent.count({
+        where: { recipientId: v.recipientId, isBot: true },
+      }),
+    ).toBe(1);
+    expect(await recordView(db, { ...v, userAgent: UA })).toBe("first");
+  });
+
+  it("after 10 seconds a second human view is stored again", async () => {
+    const v = view();
+    await recordView(db, v);
+    await db.viewEvent.updateMany({
+      where: { recipientId: v.recipientId },
+      data: { createdAt: new Date(Date.now() - 11 * 1000) },
+    });
+    expect(await recordView(db, v)).toBe("repeat");
+    expect(
+      await db.viewEvent.count({
+        where: { recipientId: v.recipientId, isBot: false },
+      }),
+    ).toBe(2);
+  });
 });

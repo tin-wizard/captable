@@ -96,7 +96,7 @@ export const POST = async (req: Request) => {
   if (!found) return new Response(null, { status: 404 });
 
   const ip = getIp(req.headers);
-  const userAgent = getUserAgent(req.headers);
+  const userAgent = getUserAgent(req.headers).slice(0, 512);
 
   const visit = await recordView(db, {
     companyId: found.companyId,

@@ -29,6 +29,9 @@ export function truncateIp(ip: string) {
 export type Visit = "first" | "return" | "repeat" | "bot";
 
 const RETURN_AFTER_MS = 30 * 60 * 1000;
+// a public beacon must not grow the table without bound: one row per class per
+// recipient+target per 10s caps it at ~8.6k rows/day.
+const MIN_GAP_MS = 10_000;
 
 type NewView = {
   companyId: string;
@@ -51,11 +54,14 @@ export async function recordView(
       kind: v.kind,
       targetId: v.targetId,
       recipientId: v.recipientId,
-      isBot: false,
+      isBot,
     },
     orderBy: { createdAt: "desc" },
     select: { createdAt: true },
   });
+
+  if (last && Date.now() - last.createdAt.getTime() < MIN_GAP_MS)
+    return isBot ? "bot" : "repeat";
 
   await db.viewEvent.create({ data: { ...v, ip: truncateIp(v.ip), isBot } });
 

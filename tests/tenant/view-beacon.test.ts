@@ -97,9 +97,9 @@ describe("POST /api/activity/view", () => {
       occurrence: "first",
     });
 
-    // a reload is stored but never emailed
+    // a reload within 10s is neither stored nor emailed
     expect((await call({ kind: "DATA_ROOM", token })).status).toBe(204);
-    expect(await eventsFor(roomRecipientId)).toHaveLength(2);
+    expect(await eventsFor(roomRecipientId)).toHaveLength(1);
     expect(emit).toHaveBeenCalledTimes(1);
   });
 

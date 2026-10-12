@@ -44,7 +44,8 @@ export const ViewAlertEmail = ({
             </Heading>
             <Text className="text-[14px] leading-[24px] text-black">
               This was shared from <strong>{companyName}</strong> on{" "}
-              {constants.title}. Previews from mail scanners are filtered out.
+              {constants.title}. Most previews from mail scanners are filtered
+              out.
             </Text>
             <Section className="mb-[32px] mt-[32px] text-center">
               <Button
