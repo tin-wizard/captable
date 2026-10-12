@@ -18,6 +18,15 @@ describe("createDwell", () => {
     d.tick([1]);
     expect(s).toEqual({ activeSeconds: 0, pageSeconds: {} });
   });
+
+  it("caps a page at 3600 seconds, the heartbeat's limit, but not active time", () => {
+    const d = createDwell();
+    for (let i = 0; i < 3601; i++) d.tick([1]);
+    expect(d.snapshot()).toEqual({
+      activeSeconds: 3601,
+      pageSeconds: { "1": 3600 },
+    });
+  });
 });
 
 describe("visible pages store", () => {

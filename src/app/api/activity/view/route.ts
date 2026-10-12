@@ -41,7 +41,8 @@ export const POST = async (req: Request) => {
   const ip = getIp(req.headers);
   const userAgent = getUserAgent(req.headers).slice(0, 512);
 
-  if (await isOwnMember(found.companyId))
+  // not for e-sign: every signer's view feeds the recipient.viewed audit row
+  if (kind !== "ESIGN" && (await isOwnMember(found.companyId)))
     return Response.json({ visitId: null });
 
   // geo reads the full ip in memory; recordView stores only the truncated one

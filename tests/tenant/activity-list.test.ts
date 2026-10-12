@@ -249,6 +249,15 @@ describe("activity.list", () => {
     expect(res.items).toEqual([]);
   });
 
+  it("returns an empty page for another tenant's targetPublicId", async () => {
+    const res = await callerFor(a).activity.list({
+      kind: "DATA_ROOM",
+      targetPublicId: bIds.dataRoomPublicId,
+    });
+    expect(res.items).toEqual([]);
+    expect(res.nextCursor).toBeNull();
+  });
+
   it("refuses a member without a role", async () => {
     const noRole = await memberWith(null);
     await expect(noRole.activity.list({})).rejects.toMatchObject({

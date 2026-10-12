@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { queue, queueManager } from "../lib/queue";
 import { authVerificationEmailWorker } from "./auth-verification-email";
 import { eSignCompletePDFWorker } from "./esign-complete-pdf";
@@ -28,6 +29,13 @@ export async function registerJobs() {
   //start
   await queueManager.start();
 
-  // upserted by name (pg-boss), so repeated app starts are idempotent
-  await queue.schedule("maintenance.purge-view-events", "17 3 * * *", {});
+  // upserted by name (pg-boss), so repeated app starts are idempotent; a
+  // failure here must never stop the app from booting
+  await queue
+    .schedule("maintenance.purge-view-events", "17 3 * * *", {})
+    .catch(() =>
+      logger
+        .child({ module: "queue" })
+        .warn("could not schedule maintenance.purge-view-events"),
+    );
 }

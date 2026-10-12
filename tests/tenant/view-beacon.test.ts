@@ -26,6 +26,8 @@ vi.mock("@/server/auth", async (orig) => ({
   ...(await orig<typeof import("@/server/auth")>()),
   getServerAuthSession: getSession,
 }));
+const lookupGeo = vi.hoisted(() => vi.fn().mockResolvedValue({}));
+vi.mock("@/server/geo", () => ({ lookupGeo }));
 
 import { POST } from "@/app/api/activity/view/route";
 
@@ -80,7 +82,11 @@ afterAll(async () => {
   await cleanupFixtures(aIds, bIds, [a, b]);
 });
 
-beforeEach(() => emit.mockClear());
+beforeEach(() => {
+  emit.mockClear();
+  // an e-sign view never reads the session, so drop any unused Once value
+  getSession.mockReset().mockResolvedValue(null);
+});
 
 const roomToken = (over: Record<string, string> = {}) =>
   encode({
@@ -200,6 +206,49 @@ describe("POST /api/activity/view", () => {
     expect((await res.json()).visitId).toBeNull();
     expect(await eventsFor(rec.id)).toHaveLength(0);
     expect(emit).not.toHaveBeenCalled();
+  });
+
+  it("still records an e-sign view and its audit row for a signed-in active member", async () => {
+    getSession.mockResolvedValueOnce({ user: { id: a.userId } });
+    const rec = await db.esignRecipient.create({
+      data: { templateId: aIds.templateId, email: "founder@example.com" },
+    });
+    const token = await EncodeEmailToken({
+      recipientId: rec.id,
+      templateId: aIds.templateId,
+    });
+    const res = await call({ kind: "ESIGN", token });
+    expect((await res.json()).visitId).not.toBeNull();
+    const audits = await db.esignAudit.findMany({
+      where: { recipientId: rec.id, action: "recipient.viewed" },
+    });
+    expect(audits).toHaveLength(1);
+  });
+
+  it("stores country, asn and network from the full ip, and only the truncated ip", async () => {
+    lookupGeo.mockResolvedValueOnce({
+      country: "NL",
+      asn: "AS1",
+      network: "Example Net",
+    });
+    const rec = await db.dataRoomRecipient.create({
+      data: { email: "geo2@example.com", dataRoomId: aIds.dataRoomId },
+    });
+    const res = await call({
+      kind: "DATA_ROOM",
+      token: await roomToken({ recipientId: rec.id }),
+    });
+    const { visitId } = await res.json();
+    const row = await db.viewEvent.findUniqueOrThrow({
+      where: { id: visitId },
+    });
+    expect(row).toMatchObject({
+      country: "NL",
+      asn: "AS1",
+      network: "Example Net",
+      ip: "203.0.113.0",
+    });
+    expect(lookupGeo).toHaveBeenLastCalledWith("203.0.113.9");
   });
 
   it("still records a viewer who has a session only in another company", async () => {
