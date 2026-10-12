@@ -1,4 +1,5 @@
 import { generatePublicId } from "@/common/id";
+import { findUnopened } from "@/server/activity/unopened";
 import { db } from "@/server/db";
 import {
   afterAll,
@@ -26,6 +27,11 @@ vi.mock("@/jobs/share-data-room-email", () => ({
 vi.mock("@/jobs/share-update-email", () => ({
   shareUpdateEmailJob: { emit: updateEmit },
 }));
+
+const DAY = 86_400_000;
+// a nudge needs the share to have waited 3 days, so fixtures start 4 days old
+const ago = (ms: number) => new Date(Date.now() - ms);
+const old = () => ago(4 * DAY);
 
 let a: Tenant;
 let b: Tenant;
@@ -80,10 +86,18 @@ const kinds = [
     publicId: () => aIds.dataRoomPublicId,
     parentA: () => aIds.dataRoomId,
     parentB: () => bIds.dataRoomId,
-    recipient: async (email: string, extra = {}, parentId?: string) =>
-      db.dataRoomRecipient.create({
+    recipient: async (
+      email: string,
+      extra = {},
+      parentId?: string,
+      at = old(),
+    ) => {
+      const r = await db.dataRoomRecipient.create({
         data: { dataRoomId: parentId ?? aIds.dataRoomId, email, ...extra },
-      }),
+      });
+      await db.$executeRaw`UPDATE "DataRoomRecipient" SET "updatedAt" = ${at} WHERE id = ${r.id}`;
+      return r;
+    },
     nudge: (t: Tenant, parentId: string, recipientId: string) =>
       callerFor(t).dataRoom.nudge({ dataRoomId: parentId, recipientId }),
     nudgedAt: async (id: string) =>
@@ -98,10 +112,18 @@ const kinds = [
     publicId: () => updatePublicId,
     parentA: () => aIds.updateId,
     parentB: () => bIds.updateId,
-    recipient: async (email: string, extra = {}, parentId?: string) =>
-      db.updateRecipient.create({
+    recipient: async (
+      email: string,
+      extra = {},
+      parentId?: string,
+      at = old(),
+    ) => {
+      const r = await db.updateRecipient.create({
         data: { updateId: parentId ?? aIds.updateId, email, ...extra },
-      }),
+      });
+      await db.$executeRaw`UPDATE "UpdateRecipient" SET "updatedAt" = ${at} WHERE id = ${r.id}`;
+      return r;
+    },
     nudge: (t: Tenant, parentId: string, recipientId: string) =>
       callerFor(t).update.nudge({ updateId: parentId, recipientId }),
     nudgedAt: async (id: string) =>
@@ -177,6 +199,48 @@ describe.each(kinds.map((k) => [k.kind, k] as const))("%s.nudge", (_, k) => {
     expect(k.emit).not.toHaveBeenCalled();
     expect(await k.nudgedAt(opened.id)).toBeNull();
     expect(await k.nudgedAt(dead.id)).toBeNull();
+  });
+
+  it("a just-shared recipient is refused; one waiting 3 days + 1 minute is allowed", async () => {
+    const fresh = await k.recipient(mail("w1"), {}, undefined, new Date());
+    await expect(k.nudge(a, k.parentA(), fresh.id)).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: "Wait a few days after sharing before sending a reminder.",
+    });
+    expect(k.emit).not.toHaveBeenCalled();
+    expect(await k.nudgedAt(fresh.id)).toBeNull();
+
+    const waited = await k.recipient(
+      mail("w2"),
+      {},
+      undefined,
+      ago(3 * DAY + 60_000),
+    );
+    await k.nudge(a, k.parentA(), waited.id);
+    expect(k.emit).toHaveBeenCalledTimes(1);
+  });
+
+  it("a pre-Phase-3 link (null expiresAt) dies with its 30-day token", async () => {
+    const dead = await k.recipient(mail("l40"), {}, undefined, ago(40 * DAY));
+    await expect(k.nudge(a, k.parentA(), dead.id)).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: "This link has expired. Share again to renew it.",
+    });
+    expect(k.emit).not.toHaveBeenCalled();
+    expect(await k.nudgedAt(dead.id)).toBeNull();
+
+    const alive = await k.recipient(mail("l10"), {}, undefined, ago(10 * DAY));
+    await k.nudge(a, k.parentA(), alive.id);
+    expect(k.emit).toHaveBeenCalledTimes(1);
+  });
+
+  it("a nudge restarts the waiting clock: the row leaves Not opened yet", async () => {
+    const r = await k.recipient(mail("u1"));
+    const listed = async () =>
+      (await findUnopened(db, a.companyId)).map((i) => i.recipientId);
+    expect(await listed()).toContain(r.id);
+    await k.nudge(a, k.parentA(), r.id);
+    expect(await listed()).not.toContain(r.id);
   });
 
   it("a bot view does not count as opened", async () => {

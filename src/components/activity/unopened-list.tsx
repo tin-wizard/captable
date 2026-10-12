@@ -76,6 +76,7 @@ export const UnopenedList = ({ kind, targetPublicId, canNudge }: Props) => {
                           })
                     }
                   >
+                    {/* a fresh nudge bumps updatedAt and removes the row, so this shows only on an old unopened row with lastNudgedAt set */}
                     {!item.nudgeable && item.lastNudgedAt
                       ? `Reminded ${dayjsExt().to(item.lastNudgedAt)}`
                       : "Send reminder"}

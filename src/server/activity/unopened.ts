@@ -1,3 +1,4 @@
+import { LINK_TTL_MS } from "@/server/activity/link-state";
 import type { TPrismaOrTransaction } from "@/server/db";
 
 export const UNOPENED_AFTER_DAYS = 3;
@@ -40,13 +41,20 @@ export async function findUnopened(
   const waitedEnough = new Date(
     now.getTime() - UNOPENED_AFTER_DAYS * 86_400_000,
   );
-  const live = { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] };
-  const base = {
-    updatedAt: {
-      lte: waitedEnough,
-      ...(opts.newerThan && { gt: opts.newerThan }),
-    },
+  // a null expiresAt (link sent before Phase 3) lives as long as its token
+  const live = {
+    OR: [
+      { expiresAt: { gt: now } },
+      {
+        expiresAt: null,
+        updatedAt: { gt: new Date(now.getTime() - LINK_TTL_MS) },
+      },
+    ],
   };
+  const window = [
+    { updatedAt: { lte: waitedEnough } },
+    ...(opts.newerThan ? [{ updatedAt: { gt: opts.newerThan } }] : []),
+  ];
   const orderBy = [{ updatedAt: "asc" as const }, { id: "asc" as const }];
 
   // page through candidates until `cap` unopened rows or none left, so opened
@@ -86,8 +94,7 @@ export async function findUnopened(
       : unopenedOf((last) =>
           tx.dataRoomRecipient.findMany({
             where: {
-              ...base,
-              AND: [live, ...after(last)],
+              AND: [...window, live, ...after(last)],
               dataRoom: { companyId },
               ...(opts.targetId && { dataRoomId: opts.targetId }),
             },
@@ -115,8 +122,7 @@ export async function findUnopened(
       : unopenedOf((last) =>
           tx.updateRecipient.findMany({
             where: {
-              ...base,
-              AND: [live, ...after(last)],
+              AND: [...window, live, ...after(last)],
               update: { companyId, status: "PUBLIC", public: true },
               ...(opts.targetId && { updateId: opts.targetId }),
             },

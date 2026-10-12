@@ -9,3 +9,11 @@ export const expiryFromDays = (days: ExpiryDays, now = new Date()) =>
 // null = a link sent before expiry existed: only the token lifetime applies
 export const isExpired = (expiresAt: Date | null, now = new Date()) =>
   expiresAt !== null && expiresAt.getTime() <= now.getTime();
+
+// LINK_TTL in src/lib/jwt.ts; a null expiresAt row dies with its token
+export const LINK_TTL_MS = 30 * 86_400_000;
+
+// for server-side decisions (unopened list, nudge) that must not revive a dead
+// legacy link; the public pages keep isExpired(expiresAt), the JWT enforces the rest
+export const effectiveExpiry = (expiresAt: Date | null, updatedAt: Date) =>
+  expiresAt ?? new Date(updatedAt.getTime() + LINK_TTL_MS);

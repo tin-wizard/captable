@@ -1,7 +1,10 @@
 import { shareUpdateEmailJob } from "@/jobs/share-update-email";
 import { encode } from "@/lib/jwt";
-import { isExpired } from "@/server/activity/link-state";
-import { NUDGE_COOLDOWN_MS } from "@/server/activity/unopened";
+import { effectiveExpiry, isExpired } from "@/server/activity/link-state";
+import {
+  NUDGE_COOLDOWN_MS,
+  UNOPENED_AFTER_DAYS,
+} from "@/server/activity/unopened";
 import { Audit } from "@/server/audit";
 import { companyUrl } from "@/server/domains/links";
 import { runSerializable } from "@/server/tenant-guard";
@@ -17,6 +20,9 @@ export const nudgeUpdateProcedure = withAccessControl
     const { db, companyId } = ctx.tenant;
     const { name: senderName, email: senderEmail, id: userId } = session.user;
     const now = new Date();
+    const waitedEnough = new Date(
+      now.getTime() - UNOPENED_AFTER_DAYS * 86_400_000,
+    );
 
     const rec = await db.updateRecipient.findFirst({
       where: {
@@ -29,6 +35,8 @@ export const nudgeUpdateProcedure = withAccessControl
         name: true,
         email: true,
         expiresAt: true,
+        updatedAt: true,
+        lastNudgedAt: true,
         update: {
           select: {
             id: true,
@@ -44,7 +52,7 @@ export const nudgeUpdateProcedure = withAccessControl
         code: "NOT_FOUND",
         message: "Recipient not found",
       });
-    if (isExpired(rec.expiresAt, now))
+    if (isExpired(effectiveExpiry(rec.expiresAt, rec.updatedAt), now))
       throw new TRPCError({
         code: "BAD_REQUEST",
         message: "This link has expired. Share again to renew it.",
@@ -67,6 +75,7 @@ export const nudgeUpdateProcedure = withAccessControl
           tx.updateRecipient.updateMany({
             where: {
               id: rec.id,
+              updatedAt: { lte: waitedEnough },
               OR: [
                 { lastNudgedAt: null },
                 {
@@ -81,6 +90,20 @@ export const nudgeUpdateProcedure = withAccessControl
         options,
       ),
     );
+    // the 3-day wait is in the claim too, so it is atomic with the cooldown;
+    // a recent nudge also bumps updatedAt, so report the cooldown for that case
+    if (
+      claimed.count !== 1 &&
+      rec.updatedAt > waitedEnough &&
+      !(
+        rec.lastNudgedAt &&
+        now.getTime() - rec.lastNudgedAt.getTime() < NUDGE_COOLDOWN_MS
+      )
+    )
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Wait a few days after sharing before sending a reminder.",
+      });
     if (claimed.count !== 1)
       throw new TRPCError({
         code: "TOO_MANY_REQUESTS",

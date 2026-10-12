@@ -20,7 +20,6 @@ export const DataRoomSchema = z.object({
         email: z.string(),
         memberId: z.string().optional(),
         stakeholderId: z.string().optional(),
-        expiresAt: z.date().optional(),
       }),
     )
     .optional(),

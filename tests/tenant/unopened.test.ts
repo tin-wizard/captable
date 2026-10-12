@@ -121,6 +121,32 @@ describe("findUnopened", () => {
     expect(items.map((i) => i.recipientId)).toContain(r.id);
   });
 
+  it("a pre-Phase-3 row (null expiresAt) lives only as long as its 30-day token", async () => {
+    const day = 86_400_000;
+    const dead = await mk(
+      aIds.dataRoomId,
+      "legacy40@example.com",
+      {},
+      new Date(Date.now() - 40 * day),
+    );
+    const alive = await mk(
+      aIds.dataRoomId,
+      "legacy10@example.com",
+      {},
+      new Date(Date.now() - 10 * day),
+    );
+    const ids = (await findUnopened(db, a.companyId)).map((i) => i.recipientId);
+    expect(ids).not.toContain(dead.id);
+    expect(ids).toContain(alive.id);
+    // the expiry branch must not clobber the newerThan window
+    const recent = (
+      await findUnopened(db, a.companyId, {
+        newerThan: new Date(Date.now() - 5 * day),
+      })
+    ).map((i) => i.recipientId);
+    expect(recent).not.toContain(alive.id);
+  });
+
   it("a human view removes them; a bot view does not", async () => {
     const bot = await mk(aIds.dataRoomId, "bot@example.com");
     const human = await mk(aIds.dataRoomId, "human@example.com");

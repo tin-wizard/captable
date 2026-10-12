@@ -793,6 +793,10 @@ beforeAll(async () => {
   const dataRoomRecipient = await db.dataRoomRecipient.create({
     data: { dataRoomId: aIds.dataRoomId, name: "r", email: "r@example.com" },
   });
+  // both are nudged, and a nudge needs the share to have waited 3 days
+  const fourDaysAgo = new Date(Date.now() - 4 * 86_400_000);
+  await db.$executeRaw`UPDATE "UpdateRecipient" SET "updatedAt" = ${fourDaysAgo} WHERE id = ${nudgeUpdateRecipient.id}`;
+  await db.$executeRaw`UPDATE "DataRoomRecipient" SET "updatedAt" = ${fourDaysAgo} WHERE id = ${dataRoomRecipient.id}`;
   const bankAccount = await db.bankAccount.create({
     data: {
       companyId,

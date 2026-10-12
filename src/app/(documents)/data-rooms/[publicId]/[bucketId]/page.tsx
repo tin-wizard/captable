@@ -45,7 +45,7 @@ const DataRoomPage = async (props: {
     return notFound();
   }
 
-  const dataRoom = await db.dataRoom.findFirstOrThrow({
+  const dataRoom = await db.dataRoom.findFirst({
     where: {
       publicId,
     },
@@ -63,6 +63,10 @@ const DataRoomPage = async (props: {
       },
     },
   });
+
+  if (!dataRoom) {
+    return notFound();
+  }
 
   const dataRoomFile = dataRoom.documents.find(
     (doc) => doc.document.bucket.id === bucketId,
