@@ -219,12 +219,29 @@ describe("findUnopened", () => {
       const o = await mk(r1.id, `opened${n}@example.com`, {}, new Date(t + n));
       await humanView(o.id, r1.id);
     }
-    const u = await mk(r1.id, "late@example.com"); // newer than all three
+    // the three opened rows are the oldest: capping before the opened filter
+    // would keep only opened rows and return []
+    const u = await mk(r1.id, "late@example.com");
+    const items = await findUnopened(db, a.companyId, {
+      targetId: r1.id,
+      cap: 2,
+    });
+    expect(items.map((i) => i.recipientId)).toEqual([u.id]);
+  });
+
+  it("pages through identical updatedAt values without skipping or repeating", async () => {
+    const r1 = await room();
+    const at = new Date(Date.now() - 5 * 86_400_000);
+    const made = [];
+    for (const n of [0, 1, 2])
+      made.push(await mk(r1.id, `tie${n}@example.com`, {}, at));
     const items = await findUnopened(db, a.companyId, {
       targetId: r1.id,
       batch: 2,
     });
-    expect(items.map((i) => i.recipientId)).toEqual([u.id]);
+    expect(items.map((i) => i.recipientId).sort()).toEqual(
+      made.map((r) => r.id).sort(),
+    );
   });
 
   it("filters by targetId and by kind; expiry applies to UPDATE recipients", async () => {

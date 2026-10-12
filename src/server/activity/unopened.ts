@@ -27,11 +27,13 @@ export async function findUnopened(
     kind?: "DATA_ROOM" | "UPDATE";
     targetId?: string;
     now?: Date;
+    cap?: number;
     batch?: number;
   } = {},
 ): Promise<Unopened[]> {
   const now = opts.now ?? new Date();
-  const batch = opts.batch ?? CAP;
+  const cap = opts.cap ?? CAP;
+  const batch = opts.batch ?? cap;
   const waitedEnough = new Date(
     now.getTime() - UNOPENED_AFTER_DAYS * 86_400_000,
   );
@@ -39,7 +41,7 @@ export async function findUnopened(
   const base = { updatedAt: { lte: waitedEnough } };
   const orderBy = [{ updatedAt: "asc" as const }, { id: "asc" as const }];
 
-  // page through candidates until CAP unopened rows or none left, so opened
+  // page through candidates until `cap` unopened rows or none left, so opened
   // rows never crowd the unopened ones out
   async function unopenedOf<T extends Page>(
     fetch: (last?: Page) => Promise<T[]>,
@@ -64,10 +66,10 @@ export async function findUnopened(
         ).map((e) => e.recipientId),
       );
       out.push(...rows.filter((r) => !opened.has(r.id)));
-      if (out.length >= CAP || rows.length < batch) break;
+      if (out.length >= cap || rows.length < batch) break;
       last = rows[rows.length - 1];
     }
-    return out.slice(0, CAP);
+    return out.slice(0, cap);
   }
 
   const [rooms, updates] = await Promise.all([
