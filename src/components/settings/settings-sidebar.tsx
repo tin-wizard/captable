@@ -1,6 +1,7 @@
 "use client";
 
 import { NavLink } from "@/components/dashboard/sidebar/nav-link";
+import { userLevelHref } from "@/server/domains/redirects";
 import {
   RiAccountCircleFill,
   RiAccountCircleLine,
@@ -63,12 +64,14 @@ const accountNav = [
   {
     name: "Profile",
     href: "/settings/profile",
+    userLevel: "profile" as const,
     icon: RiAccountCircleLine,
     activeIcon: RiAccountCircleFill,
   },
   {
     name: "Security",
     href: "/settings/security",
+    userLevel: "security" as const,
     icon: RiLock2Line,
     activeIcon: RiLock2Fill,
   },
@@ -90,9 +93,14 @@ const accountNav = [
 
 interface SettingsSidebarProps {
   isBillingEnabled: boolean;
+  /** set only on a company host */
+  canonicalOrigin: string | null;
 }
 
-export function SettingsSidebar({ isBillingEnabled }: SettingsSidebarProps) {
+export function SettingsSidebar({
+  isBillingEnabled,
+  canonicalOrigin,
+}: SettingsSidebarProps) {
   const currentPath = usePathname();
   const { data } = useSession();
   const companyPublicId = data?.user.companyPublicId;
@@ -124,7 +132,10 @@ export function SettingsSidebar({ isBillingEnabled }: SettingsSidebarProps) {
       </div>
 
       {accountNav.map((item) => {
-        const href = `/${companyPublicId}${item.href}`;
+        // absolute only on a company host, where these pages are never the active one
+        const href = item.userLevel
+          ? userLevelHref(canonicalOrigin, `${companyPublicId}`, item.userLevel)
+          : `/${companyPublicId}${item.href}`;
         const isActive = currentPath.includes(href) || currentPath === href;
 
         return (

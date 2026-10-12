@@ -1,5 +1,9 @@
 import { db } from "@/server/db";
-import { isUserLevelPath, layoutRedirect } from "@/server/domains/redirects";
+import {
+  isUserLevelPath,
+  layoutRedirect,
+  userLevelHref,
+} from "@/server/domains/redirects";
 import {
   assignPlatformSubdomain,
   primaryHostnameForPublicId,
@@ -48,6 +52,25 @@ describe("isUserLevelPath", () => {
     ["/pub", false],
   ])("%s → %s", (path, expected) => {
     expect(isUserLevelPath(path)).toBe(expected);
+  });
+});
+
+describe("userLevelHref", () => {
+  it.each([
+    [null, "profile", "/pub/settings/profile"],
+    [null, "security", "/pub/settings/security"],
+    [
+      "https://dealroom.tin.info",
+      "profile",
+      "https://dealroom.tin.info/pub/settings/profile",
+    ],
+    [
+      "https://dealroom.tin.info",
+      "security",
+      "https://dealroom.tin.info/pub/settings/security",
+    ],
+  ] as const)("%s + %s → %s", (origin, page, expected) => {
+    expect(userLevelHref(origin, "pub", page)).toBe(expected);
   });
 });
 

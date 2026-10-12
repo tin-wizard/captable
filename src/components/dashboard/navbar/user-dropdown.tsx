@@ -12,6 +12,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { userLevelHref } from "@/server/domains/redirects";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 
@@ -19,11 +20,14 @@ type UserDropdownProps = {
   companyPublicId: string;
   /** null when company domains are off */
   canonicalHost: string | null;
+  /** set only on a company host */
+  canonicalOrigin: string | null;
 };
 
 export function UserDropdown({
   companyPublicId,
   canonicalHost,
+  canonicalOrigin,
 }: UserDropdownProps) {
   const { data } = useSession();
   const name = data?.user.name;
@@ -50,7 +54,9 @@ export function UserDropdown({
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <Link href={`/${companyPublicId}/settings/profile`}>
+          <Link
+            href={userLevelHref(canonicalOrigin, companyPublicId, "profile")}
+          >
             <DropdownMenuItem>
               Profile
               <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
