@@ -29,5 +29,8 @@ describe("truncateIp", () => {
     ["2001:db8::1", "2001:db8::"],
     ["::1", "::"],
     ["not-an-ip", ""],
+    ["203.0.113.9:443", "203.0.113.0"],
+    ["[2001:db8::1]:443", "2001:db8::"],
+    ["203.0.113.9:443:x", ""],
   ])("%s -> %s", (input, expected) => expect(truncateIp(input)).toBe(expected));
 });

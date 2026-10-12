@@ -11,10 +11,16 @@ export const isAtypicalSource = (userAgent: string) =>
 
 // IPv4 -> /24, IPv6 -> /48; unparseable input is dropped, not stored
 export function truncateIp(ip: string) {
-  const v4 = ip.match(/(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/);
+  // drop "[v6]:port" brackets, "v4:port" and an IPv6 zone id before parsing
+  const s = ip
+    .trim()
+    .replace(/^\[([^\]]*)\](?::\d+)?$/, "$1")
+    .replace(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/, "$1")
+    .replace(/%.*$/, "");
+  const v4 = s.match(/^(?:[0-9a-f:]+:)?(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/i);
   if (v4) return `${v4[1]}.0`;
-  if (ip.includes(":")) {
-    const head = ip.split("::")[0] ?? "";
+  if (/^[0-9a-f:]*:[0-9a-f:]*$/i.test(s)) {
+    const head = s.split("::")[0] ?? "";
     return `${head.split(":").slice(0, 3).filter(Boolean).join(":")}::`;
   }
   return "";
