@@ -8,6 +8,7 @@ export const JOB_TYPES = {
     "esign-confirmation",
     "esign-notification",
     "view-alert",
+    "view-digest",
   ],
   esign: ["generate-pdf", "complete-pdf"],
   maintenance: ["purge-view-events"],

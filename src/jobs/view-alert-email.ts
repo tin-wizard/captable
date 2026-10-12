@@ -35,6 +35,7 @@ export const viewAlertEmailWorker = defineWorker(config, async (job) => {
       companyId: d.companyId,
       status: "ACTIVE",
       notifyOnView: true,
+      viewDigest: false,
       OR: [
         { role: "ADMIN" },
         ...(target.ownerMemberId ? [{ id: target.ownerMemberId }] : []),
