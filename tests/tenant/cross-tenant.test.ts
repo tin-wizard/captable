@@ -746,6 +746,15 @@ const cases: Case[] = [
     kind: "read",
     run: (a, { bViewEventId }) => a.activity.list({ cursor: bViewEventId }),
   },
+  {
+    name: "activity.unopened filtered to B's data room",
+    kind: "read",
+    run: (a, { b }) =>
+      a.activity.unopened({
+        kind: "DATA_ROOM",
+        targetPublicId: b.dataRoomPublicId,
+      }),
+  },
 
   // --- user-scoped credentials and stubs ----------------------------------
   {
