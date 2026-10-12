@@ -1,3 +1,4 @@
+import { generatePublicId } from "@/common/id";
 import { findUnopened } from "@/server/activity/unopened";
 import { db } from "@/server/db";
 import { nanoid } from "nanoid";
@@ -63,15 +64,43 @@ async function memberWith(permissions: object[] | null) {
 }
 
 const old = () => new Date(Date.now() - 4 * 86_400_000);
-const mk = (dataRoomId: string, email: string, extra = {}) =>
+const mk = (dataRoomId: string, email: string, extra = {}, at = old()) =>
   db.dataRoomRecipient
     .create({ data: { dataRoomId, email, ...extra } })
     .then(async (r) => {
-      await db.$executeRaw`UPDATE "DataRoomRecipient" SET "updatedAt" = ${old()} WHERE id = ${
+      await db.$executeRaw`UPDATE "DataRoomRecipient" SET "updatedAt" = ${at} WHERE id = ${r.id}`;
+      return r;
+    });
+const mkUpd = (updateId: string, email: string, extra = {}) =>
+  db.updateRecipient
+    .create({ data: { updateId, email, ...extra } })
+    .then(async (r) => {
+      await db.$executeRaw`UPDATE "UpdateRecipient" SET "updatedAt" = ${old()} WHERE id = ${
         r.id
       }`;
       return r;
     });
+// a fresh room isolates a test from recipients the other tests add
+const room = () =>
+  db.dataRoom.create({
+    data: {
+      companyId: a.companyId,
+      name: `room ${nanoid(4)}`,
+      publicId: generatePublicId(),
+    },
+  });
+const humanView = (recipientId: string, targetId: string) =>
+  db.viewEvent.create({
+    data: {
+      companyId: a.companyId,
+      kind: "DATA_ROOM",
+      targetId,
+      recipientId,
+      ip: "1.2.3.0",
+      userAgent: "ua",
+      isBot: false,
+    },
+  });
 
 beforeAll(async () => {
   ({ a, b } = await seedTwoTenants());
@@ -167,6 +196,74 @@ describe("findUnopened", () => {
     );
     expect(item?.nudgeable).toBe(false);
   });
+
+  it("nudgeable flips at exactly 24 h", async () => {
+    const r1 = await room();
+    const nudged = new Date();
+    const r = await mk(r1.id, "edge@example.com", { lastNudgedAt: nudged });
+    const at = async (ms: number) =>
+      (
+        await findUnopened(db, a.companyId, {
+          targetId: r1.id,
+          now: new Date(nudged.getTime() + ms),
+        })
+      ).find((i) => i.recipientId === r.id)?.nudgeable;
+    expect(await at(24 * 3600 * 1000)).toBe(true);
+    expect(await at(24 * 3600 * 1000 - 1)).toBe(false);
+  });
+
+  it("caps after the opened filter: opened rows don't crowd out unopened ones", async () => {
+    const r1 = await room();
+    const t = Date.now() - 6 * 86_400_000;
+    for (const n of [0, 1, 2]) {
+      const o = await mk(r1.id, `opened${n}@example.com`, {}, new Date(t + n));
+      await humanView(o.id, r1.id);
+    }
+    const u = await mk(r1.id, "late@example.com"); // newer than all three
+    const items = await findUnopened(db, a.companyId, {
+      targetId: r1.id,
+      batch: 2,
+    });
+    expect(items.map((i) => i.recipientId)).toEqual([u.id]);
+  });
+
+  it("filters by targetId and by kind; expiry applies to UPDATE recipients", async () => {
+    const r1 = await room();
+    const r2 = await room();
+    const inR1 = await mk(r1.id, "r1@example.com");
+    const inR2 = await mk(r2.id, "r2@example.com");
+    const upd = await db.update.create({
+      data: {
+        companyId: a.companyId,
+        authorId: a.memberId,
+        publicId: generatePublicId(),
+        title: "public update",
+        content: { text: "x" },
+        html: "<p>x</p>",
+        status: "PUBLIC",
+        public: true,
+      },
+    });
+    const liveUr = await mkUpd(upd.id, "live-ur@example.com");
+    const deadUr = await mkUpd(upd.id, "dead-ur@example.com", {
+      expiresAt: new Date(Date.now() - 1000),
+    });
+
+    const byTarget = await findUnopened(db, a.companyId, { targetId: r1.id });
+    expect(byTarget.map((i) => i.recipientId)).toEqual([inR1.id]);
+
+    const rooms = await findUnopened(db, a.companyId, { kind: "DATA_ROOM" });
+    expect(rooms.every((i) => i.kind === "DATA_ROOM")).toBe(true);
+    expect(rooms.map((i) => i.recipientId)).toContain(inR2.id);
+    expect(rooms.map((i) => i.recipientId)).not.toContain(liveUr.id);
+
+    const updates = await findUnopened(db, a.companyId, { kind: "UPDATE" });
+    expect(updates.every((i) => i.kind === "UPDATE")).toBe(true);
+    const updIds = updates.map((i) => i.recipientId);
+    expect(updIds).toContain(liveUr.id);
+    expect(updIds).not.toContain(deadUr.id);
+    expect(updIds).not.toContain(inR1.id);
+  });
 });
 
 describe("activity.unopened", () => {
@@ -177,10 +274,21 @@ describe("activity.unopened", () => {
     expect(res.items.every((i) => i.recipientId !== undefined)).toBe(true);
     expect(res.items.map((i) => i.recipientId)).not.toContain(theirs.id);
 
-    const noRole = await memberWith(null);
-    await expect(noRole.activity.unopened({})).rejects.toMatchObject({
+    // a custom role that grants something else, but not audits:read
+    const noAudits = await memberWith([
+      { subject: "securities", actions: ["read"] },
+    ]);
+    await expect(noAudits.activity.unopened({})).rejects.toMatchObject({
       code: "UNAUTHORIZED",
     });
+  });
+
+  it("rejects targetPublicId without kind", async () => {
+    await expect(
+      callerFor(a).activity.unopened({
+        targetPublicId: bIds.dataRoomPublicId,
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
   it("returns an empty list for another company's targetPublicId", async () => {

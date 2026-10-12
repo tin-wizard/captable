@@ -5,10 +5,15 @@ import { z } from "zod";
 export const unopenedProcedure = withAccessControl
   .meta({ policies: { audits: { allow: ["read"] } } })
   .input(
-    z.object({
-      kind: z.enum(["DATA_ROOM", "UPDATE"]).optional(),
-      targetPublicId: z.string().optional(),
-    }),
+    z
+      .object({
+        kind: z.enum(["DATA_ROOM", "UPDATE"]).optional(),
+        targetPublicId: z.string().optional(),
+      })
+      .refine((i) => !i.targetPublicId || i.kind, {
+        message: "targetPublicId requires kind",
+        path: ["kind"],
+      }),
   )
   .query(async ({ ctx, input }) => {
     const { db, companyId } = ctx.tenant;
