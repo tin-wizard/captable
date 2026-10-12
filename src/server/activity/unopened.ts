@@ -29,6 +29,9 @@ export async function findUnopened(
     now?: Date;
     cap?: number;
     batch?: number;
+    // only rows whose updatedAt is after this (bounds the window in the query,
+    // before the cap)
+    newerThan?: Date;
   } = {},
 ): Promise<Unopened[]> {
   const now = opts.now ?? new Date();
@@ -38,7 +41,12 @@ export async function findUnopened(
     now.getTime() - UNOPENED_AFTER_DAYS * 86_400_000,
   );
   const live = { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] };
-  const base = { updatedAt: { lte: waitedEnough } };
+  const base = {
+    updatedAt: {
+      lte: waitedEnough,
+      ...(opts.newerThan && { gt: opts.newerThan }),
+    },
+  };
   const orderBy = [{ updatedAt: "asc" as const }, { id: "asc" as const }];
 
   // page through candidates until `cap` unopened rows or none left, so opened

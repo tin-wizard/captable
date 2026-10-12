@@ -42,13 +42,12 @@ async function digestForCompany(
       activeSeconds: true,
     },
   });
-  // waitingSince inside the last (N + 1) days: each recipient is mentioned once,
-  // on the day it crosses the line
-  const crossing = (await findUnopened(db, companyId, { now })).filter(
-    (u) =>
-      now.getTime() - u.waitingSince.getTime() <
-      (UNOPENED_AFTER_DAYS + 1) * DAY,
-  );
+  // waitingSince inside the last (N + 1) days, bounded in the query so the cap
+  // never hides them: each recipient is mentioned once, on the day it crosses
+  const crossing = await findUnopened(db, companyId, {
+    now,
+    newerThan: new Date(now.getTime() - (UNOPENED_AFTER_DAYS + 1) * DAY),
+  });
   if (!events.length && !crossing.length) return;
 
   // one row per (kind, target, recipient)
@@ -89,36 +88,49 @@ async function digestForCompany(
   );
 
   for (const m of members) {
-    const mine = (owner: string | null) => m.role === "ADMIN" || owner === m.id;
-    const viewRows = described.flatMap((x) =>
-      x.d && mine(x.d.ownerMemberId)
-        ? [
-            {
-              who: x.d.who,
-              label: x.d.label,
-              visits: x.r.visits,
-              seconds: x.r.seconds,
-            },
-          ]
-        : [],
-    );
-    const unopened = crossing
-      .filter((u) => mine(u.ownerMemberId))
-      .map((u) => ({ who: u.name || u.email, label: u.targetName }));
-    if (!m.user.email || (!viewRows.length && !unopened.length)) continue;
+    try {
+      const mine = (owner: string | null) =>
+        m.role === "ADMIN" || owner === m.id;
+      const viewRows = described.flatMap((x) =>
+        x.d && mine(x.d.ownerMemberId)
+          ? [
+              {
+                who: x.d.who,
+                label: x.d.label,
+                visits: x.r.visits,
+                seconds: x.r.seconds,
+              },
+            ]
+          : [],
+      );
+      const unopened = crossing
+        .filter((u) => mine(u.ownerMemberId))
+        .map((u) => ({ who: u.name || u.email, label: u.targetName }));
+      if (!m.user.email || (!viewRows.length && !unopened.length)) continue;
 
-    await sendMail({
-      to: m.user.email,
-      subject: `${company.name}: activity in the last 24 hours`,
-      html: await render(
-        ViewDigestEmail({
-          companyName: company.name,
-          rows: viewRows,
-          unopened,
-          link: `${env.NEXT_PUBLIC_BASE_URL}/${company.publicId}/activity`,
-        }),
-      ),
-    });
+      await sendMail({
+        to: m.user.email,
+        subject: `${company.name}: activity in the last 24 hours`,
+        html: await render(
+          ViewDigestEmail({
+            companyName: company.name,
+            rows: viewRows,
+            unopened,
+            link: `${env.NEXT_PUBLIC_BASE_URL}/${company.publicId}/activity`,
+          }),
+        ),
+      });
+    } catch (error) {
+      // one member's failure must not stop the rest of the company
+      logger
+        .child({ module: "queue" })
+        .error(
+          `view digest failed for member ${m.id} in company ${companyId}`,
+          {
+            error,
+          },
+        );
+    }
   }
 }
 

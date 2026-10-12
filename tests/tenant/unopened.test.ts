@@ -229,6 +229,31 @@ describe("findUnopened", () => {
     expect(items.map((i) => i.recipientId)).toEqual([u.id]);
   });
 
+  it("newerThan bounds the window before the cap", async () => {
+    const r1 = await room();
+    const day = 86_400_000;
+    const oldOne = await mk(
+      r1.id,
+      "ten@example.com",
+      {},
+      new Date(Date.now() - 10 * day),
+    );
+    const fresh = await mk(
+      r1.id,
+      "crossing@example.com",
+      {},
+      new Date(Date.now() - 3.5 * day),
+    );
+    const opts = { targetId: r1.id, cap: 1 };
+    const plain = await findUnopened(db, a.companyId, opts);
+    expect(plain.map((i) => i.recipientId)).toEqual([oldOne.id]);
+    const bounded = await findUnopened(db, a.companyId, {
+      ...opts,
+      newerThan: new Date(Date.now() - 4 * day),
+    });
+    expect(bounded.map((i) => i.recipientId)).toEqual([fresh.id]);
+  });
+
   it("pages through identical updatedAt values without skipping or repeating", async () => {
     const r1 = await room();
     const at = new Date(Date.now() - 5 * 86_400_000);

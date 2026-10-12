@@ -200,4 +200,60 @@ describe("view digest job", () => {
       expect(await sentTo(a.userId)).toHaveLength(0);
     }
   });
+
+  it("names a newly crossing unopened recipient even behind an older one", async () => {
+    const day = 86_400_000;
+    const mkR = async (name: string, ageDays: number) => {
+      const r = await db.dataRoomRecipient.create({
+        data: {
+          dataRoomId: aIds.dataRoomId,
+          email: `${name}@example.com`,
+          name,
+        },
+      });
+      await db.$executeRaw`UPDATE "DataRoomRecipient" SET "updatedAt" = ${new Date(
+        Date.now() - ageDays * day,
+      )} WHERE id = ${r.id}`;
+      return r.id;
+    };
+    const ids = [await mkR("LongWaiter", 10), await mkR("NewlyCrossing", 3.5)];
+    await run();
+    const mine = await sentTo(a.userId);
+    expect(mine).toHaveLength(1);
+    expect(mine[0]?.html).toContain("NewlyCrossing");
+    expect(mine[0]?.html).not.toContain("LongWaiter");
+    await db.dataRoomRecipient.deleteMany({ where: { id: { in: ids } } });
+  });
+
+  it("one member's send failure does not stop the others in the company", async () => {
+    const u = await db.user.create({
+      data: {
+        name: "second",
+        email: `second-${Date.now()}@example.com`,
+        emailVerified: new Date(),
+      },
+    });
+    const m = await db.member.create({
+      data: {
+        userId: u.id,
+        companyId: a.companyId,
+        role: "ADMIN",
+        status: "ACTIVE",
+        isOnboarded: true,
+        notifyOnView: true,
+        viewDigest: true,
+      },
+    });
+    await visit(20);
+    sendMail.mockClear();
+    sendMail.mockRejectedValueOnce(new Error("smtp down"));
+    await expect(run()).resolves.not.toThrow();
+    const toA = sendMail.mock.calls
+      .map((c) => c[0].to)
+      .filter((t) => t !== undefined);
+    expect(sendMail).toHaveBeenCalledTimes(2);
+    expect(toA).toHaveLength(2);
+    await db.member.delete({ where: { id: m.id } });
+    await db.user.delete({ where: { id: u.id } });
+  });
 });
