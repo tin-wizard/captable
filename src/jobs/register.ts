@@ -8,10 +8,12 @@ import { sendMemberInviteEmailWorker } from "./member-inivite-email";
 import { passwordResetEmailWorker } from "./password-reset-email";
 import { shareDataRoomEmailWorker } from "./share-data-room-email";
 import { shareUpdateEmailWorker } from "./share-update-email";
+import { viewAlertEmailWorker } from "./view-alert-email";
 
 export async function registerJobs() {
   queueManager.register(shareDataRoomEmailWorker);
   queueManager.register(shareUpdateEmailWorker);
+  queueManager.register(viewAlertEmailWorker);
   queueManager.register(passwordResetEmailWorker);
   queueManager.register(sendMemberInviteEmailWorker);
   queueManager.register(eSignNotificationEmailWorker);
