@@ -185,6 +185,43 @@ describe("POST /api/activity/visit", () => {
     ).toBeLessThanOrEqual(120);
   });
 
+  it("an expired link cannot extend its visit", async () => {
+    const rec = await db.dataRoomRecipient.create({
+      data: { email: "exp@example.com", dataRoomId: aIds.dataRoomId },
+    });
+    const visit = await db.viewEvent.create({
+      data: {
+        companyId: a.companyId,
+        kind: "DATA_ROOM",
+        targetId: aIds.dataRoomId,
+        recipientId: rec.id,
+        ip: "1.2.3.0",
+        userAgent: "ua",
+      },
+    });
+    const token = await tokenFor(rec.id);
+    const beat = (activeSeconds: number) =>
+      post({
+        kind: "DATA_ROOM",
+        token,
+        visitId: visit.id,
+        activeSeconds,
+        pageSeconds: {},
+      });
+    expect((await beat(5)).status).toBe(204);
+    await db.dataRoomRecipient.update({
+      where: { id: rec.id },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    });
+    const res = await beat(30);
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("");
+    const row = await db.viewEvent.findUniqueOrThrow({
+      where: { id: visit.id },
+    });
+    expect(row.activeSeconds).toBe(5);
+  });
+
   it("rejects malformed bodies without a 500", async () => {
     const token = await tokenFor(recA);
     expect(
