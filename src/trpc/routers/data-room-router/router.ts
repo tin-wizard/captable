@@ -7,6 +7,7 @@ import { companyUrl } from "@/server/domains/links";
 import { assertTenantOwns } from "@/server/tenant-guard";
 import { createTRPCRouter, withAccessControl } from "@/trpc/api/trpc";
 import type { DataRoom } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { DataRoomSchema } from "./schema";
 
@@ -254,6 +255,13 @@ export const dataRoomRouter = createTRPCRouter({
       const { dataRoomId, others, selectedContacts } = input;
       const { name: senderName, email: senderEmail } = session.user;
       const { user } = session;
+      if (others.length + selectedContacts.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Add at least one recipient before sharing.",
+        });
+      }
+
       const dataRoom = await db.dataRoom.findUniqueOrThrow({
         where: {
           id: dataRoomId,
