@@ -21,6 +21,8 @@ jobs:
           context: .
           file: ./docker/Dockerfile
           push: true
+          secrets: |
+            ipinfo_token=${{ secrets.IPINFO_TOKEN }}
           tags: |
             ghcr.io/${{ github.repository }}:${{ github.sha }}
             ghcr.io/${{ github.repository }}:main

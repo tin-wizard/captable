@@ -18,6 +18,20 @@ ENV HUSKY 0
 COPY package.json pnpm-lock.yaml* ./
 RUN corepack enable pnpm && pnpm i --frozen-lockfile
 
+FROM base AS geo
+RUN apk add --no-cache curl && mkdir -p /geo
+# IPINFO_TOKEN is a BuildKit secret (never an ARG/ENV, so it cannot reach a layer).
+# The URL goes to curl as a config on stdin, so the token is in no argv and no error message.
+# Missing token, failed download or a suspiciously small file all end the same
+# way: no database, and the app simply records no location.
+RUN --mount=type=secret,id=ipinfo_token \
+    if [ -s /run/secrets/ipinfo_token ]; then \
+      printf 'url = "https://ipinfo.io/data/ipinfo_lite.mmdb?token=%s"\n' "$(cat /run/secrets/ipinfo_token)" \
+        | curl -fsSL -K - -o /geo/ipinfo_lite.mmdb \
+      && [ "$(wc -c < /geo/ipinfo_lite.mmdb)" -gt 1000000 ] \
+      || { echo "ipinfo database not available; continuing without location"; rm -f /geo/ipinfo_lite.mmdb; }; \
+    else echo "no ipinfo token; continuing without location"; fi
+
 ##### BUILDER
 
 FROM base AS builder
@@ -57,6 +71,7 @@ RUN chown nextjs:nodejs .next
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=geo --chown=nextjs:nodejs /geo /app/data
 
 # copy prisma and migrate script
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.sh ./scripts/migrate.sh
