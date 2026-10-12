@@ -10,6 +10,10 @@ import { revokeInviteProcedure } from "./procedures/revoke-invite";
 import { toggleActivation } from "./procedures/toggle-activation";
 import { updateMemberProcedure } from "./procedures/update-member";
 import { updateProfileProcedure } from "./procedures/update-profile";
+import {
+  getViewAlertsProcedure,
+  setViewAlertsProcedure,
+} from "./procedures/view-alerts";
 
 export const memberRouter = createTRPCRouter({
   inviteMember: inviteMemberProcedure,
@@ -22,4 +26,6 @@ export const memberRouter = createTRPCRouter({
   getMembers: getMembersProcedure,
   getProfile: getProfileProcedure,
   updateProfile: updateProfileProcedure,
+  viewAlerts: getViewAlertsProcedure,
+  setViewAlerts: setViewAlertsProcedure,
 });

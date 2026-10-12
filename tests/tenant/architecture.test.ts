@@ -20,6 +20,8 @@ const ALLOWLIST_TENANTLESS: Record<string, string> = {
   [`${R}company-router/procedures/switch-company.ts`]:
     "reads the caller's own membership in another company",
   [`${R}member-router/procedures/get-profile.ts`]: "user's own profile",
+  [`${R}member-router/procedures/view-alerts.ts`]:
+    "user's own notification preference, scoped by memberId and companyId",
   [`${R}member-router/procedures/update-profile.ts`]: "user's own profile",
   [`${R}member-router/procedures/accept-member.ts`]:
     "invitee has no active membership until accepting",
