@@ -1,89 +1,32 @@
 import { viewAlertEmailJob } from "@/jobs/view-alert-email";
 import { getIp, getUserAgent } from "@/lib/headers";
-import { decode } from "@/lib/jwt";
+import { resolveRecipient } from "@/server/activity/resolve-recipient";
 import { EsignAudit } from "@/server/audit";
+import { getServerAuthSession } from "@/server/auth";
 import { db } from "@/server/db";
+import { lookupGeo } from "@/server/geo";
 import { recordView } from "@/server/view-events";
-import { DecodeEmailToken } from "@/trpc/routers/template-field-router/procedures/add-fields";
 import { z } from "zod";
 
 const bodySchema = z.object({
   kind: z.enum(["DATA_ROOM", "UPDATE", "ESIGN"]),
   token: z.string().min(1),
+  timezone: z.string().max(64).optional(),
 });
 
-type Kind = z.infer<typeof bodySchema>["kind"];
-
-type Found = {
-  companyId: string;
-  targetId: string;
-  recipientId: string;
-  templateName?: string;
-  recipientName?: string | null;
-};
-
-// Same tokens the public pages already accept; this only reads them.
-// null for anything invalid, expired, or not owned by the company in the token.
-async function resolveRecipient(
-  kind: Kind,
-  token: string,
-): Promise<Found | null> {
+// the company's own active members previewing their link are not visits;
+// any session or lookup failure counts as "not a member", so recording goes on
+async function isOwnMember(companyId: string) {
   try {
-    if (kind === "ESIGN") {
-      const { id: templateId, rec } = await DecodeEmailToken(token);
-      const r = await db.esignRecipient.findFirst({
-        where: { id: rec, templateId },
-        select: {
-          id: true,
-          name: true,
-          template: { select: { companyId: true, name: true } },
-        },
-      });
-      return r
-        ? {
-            companyId: r.template.companyId,
-            targetId: templateId,
-            recipientId: r.id,
-            templateName: r.template.name,
-            recipientName: r.name,
-          }
-        : null;
-    }
-
-    const { payload } = await decode(token);
-    const p = payload as Record<string, string | undefined>;
-    if (!p.companyId || !p.recipientId) return null;
-
-    if (kind === "DATA_ROOM") {
-      if (!p.dataRoomId) return null;
-      const r = await db.dataRoomRecipient.findFirst({
-        where: {
-          id: p.recipientId,
-          dataRoomId: p.dataRoomId,
-          dataRoom: { companyId: p.companyId },
-        },
-        select: { id: true },
-      });
-      return r
-        ? { companyId: p.companyId, targetId: p.dataRoomId, recipientId: r.id }
-        : null;
-    }
-
-    if (!p.publicId) return null;
-    const update = await db.update.findFirst({
-      where: { publicId: p.publicId, companyId: p.companyId },
+    const session = await getServerAuthSession();
+    if (!session?.user.id) return false;
+    const member = await db.member.findFirst({
+      where: { userId: session.user.id, companyId, status: "ACTIVE" },
       select: { id: true },
     });
-    if (!update) return null;
-    const r = await db.updateRecipient.findFirst({
-      where: { id: p.recipientId, updateId: update.id },
-      select: { id: true },
-    });
-    return r
-      ? { companyId: p.companyId, targetId: update.id, recipientId: r.id }
-      : null;
+    return !!member;
   } catch {
-    return null;
+    return false;
   }
 }
 
@@ -98,13 +41,21 @@ export const POST = async (req: Request) => {
   const ip = getIp(req.headers);
   const userAgent = getUserAgent(req.headers).slice(0, 512);
 
-  const visit = await recordView(db, {
+  // not for e-sign: every signer's view feeds the recipient.viewed audit row
+  if (kind !== "ESIGN" && (await isOwnMember(found.companyId)))
+    return Response.json({ visitId: null });
+
+  // geo reads the full ip in memory; recordView stores only the truncated one
+  const geo = await lookupGeo(ip);
+  const { visit, id } = await recordView(db, {
     companyId: found.companyId,
     kind,
     targetId: found.targetId,
     recipientId: found.recipientId,
     ip,
     userAgent,
+    timezone: body.data.timezone,
+    ...geo,
   });
 
   // the e-sign trail keeps the full ip, like recipient.signed does
@@ -142,5 +93,5 @@ export const POST = async (req: Request) => {
     );
   }
 
-  return new Response(null, { status: 204 });
+  return Response.json({ visitId: visit === "bot" ? null : id });
 };

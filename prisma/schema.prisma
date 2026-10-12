@@ -478,14 +478,16 @@ model Document {
 }
 
 model DataRoom {
-  id         String              @id @default(cuid())
-  name       String
-  publicId   String
-  public     Boolean             @default(false)
-  documents  DataRoomDocument[]
-  recipients DataRoomRecipient[]
-  companyId  String
-  company    Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id          String              @id @default(cuid())
+  name        String
+  publicId    String
+  public      Boolean             @default(false)
+  documents   DataRoomDocument[]
+  recipients  DataRoomRecipient[]
+  companyId   String
+  company     Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // Member.id of the creator; null for rooms created before this column existed
+  createdById String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1017,10 +1019,20 @@ model ViewEvent {
   isBot       Boolean  @default(false)
   createdAt   DateTime @default(now())
 
+  // from the IPinfo Lite database (in memory, full IP) and the browser; all optional
+  country       String? // ISO 3166-1 alpha-2
+  asn           String? // e.g. "AS8075"
+  network       String? // organisation behind the ASN
+  timezone      String? // IANA name reported by the browser
+  activeSeconds Int     @default(0)
+  // { "1": 12, "2": 40 } seconds per PDF page; only ever raised by the heartbeat
+  pageSeconds   Json?
+
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
+  @@index([companyId, createdAt])
   @@index([kind, targetId, recipientId, createdAt])
 }
 

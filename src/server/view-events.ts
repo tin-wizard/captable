@@ -40,14 +40,20 @@ type NewView = {
   recipientId: string;
   ip: string;
   userAgent: string;
+  country?: string;
+  asn?: string;
+  network?: string;
+  timezone?: string;
 };
+
+export type Recorded = { visit: Visit; id: string };
 
 // shortcut: read-then-write is not atomic, so two simultaneous first beacons can
 // both report "first"; the alert job's singletonKey absorbs the duplicate email.
 export async function recordView(
   db: TPrismaOrTransaction,
   v: NewView,
-): Promise<Visit> {
+): Promise<Recorded> {
   const isBot = isAtypicalSource(v.userAgent);
   const last = await db.viewEvent.findFirst({
     where: {
@@ -57,17 +63,22 @@ export async function recordView(
       isBot,
     },
     orderBy: { createdAt: "desc" },
-    select: { createdAt: true },
+    select: { id: true, createdAt: true },
+  });
+  const age = last
+    ? Date.now() - last.createdAt.getTime()
+    : Number.POSITIVE_INFINITY;
+
+  if (last && age < MIN_GAP_MS) {
+    return { visit: isBot ? "bot" : "repeat", id: last.id };
+  }
+
+  const row = await db.viewEvent.create({
+    data: { ...v, ip: truncateIp(v.ip), isBot },
+    select: { id: true },
   });
 
-  if (last && Date.now() - last.createdAt.getTime() < MIN_GAP_MS)
-    return isBot ? "bot" : "repeat";
-
-  await db.viewEvent.create({ data: { ...v, ip: truncateIp(v.ip), isBot } });
-
-  if (isBot) return "bot";
-  if (!last) return "first";
-  return Date.now() - last.createdAt.getTime() > RETURN_AFTER_MS
-    ? "return"
-    : "repeat";
+  if (isBot) return { visit: "bot", id: row.id };
+  if (!last) return { visit: "first", id: row.id };
+  return { visit: age > RETURN_AFTER_MS ? "return" : "repeat", id: row.id };
 }

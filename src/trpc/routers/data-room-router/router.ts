@@ -125,6 +125,7 @@ export const dataRoomRouter = createTRPCRouter({
                 name: input.name,
                 companyId,
                 publicId: generatePublicId(),
+                createdById: ctx.tenant.memberId,
               },
             });
 

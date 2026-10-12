@@ -23,6 +23,8 @@ import {
   RiMoneyDollarCircleLine,
   RiPieChartFill,
   RiPieChartLine,
+  RiPulseFill,
+  RiPulseLine,
   RiSafeFill,
   RiSafeLine,
 } from "@remixicon/react";
@@ -154,6 +156,13 @@ const navigation = [
     href: "/reports",
     icon: RiFolderChartLine,
     activeIcon: RiFolderChartFill,
+  },
+
+  {
+    name: "Activity",
+    href: "/activity",
+    icon: RiPulseLine,
+    activeIcon: RiPulseFill,
   },
 
   {

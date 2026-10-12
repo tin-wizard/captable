@@ -98,4 +98,62 @@ describe("view alert job", () => {
     const other = await db.user.findUniqueOrThrow({ where: { id: b.userId } });
     expect(sendMail.mock.calls.map((c) => c[0].to)).not.toContain(other.email);
   });
+
+  describe("data room creator", () => {
+    let creatorMemberId: string;
+    let creatorUserId: string;
+    let creatorEmail: string;
+
+    beforeAll(async () => {
+      const u = await db.user.create({
+        data: {
+          name: "creator",
+          email: `creator-${Date.now()}@example.com`,
+          emailVerified: new Date(),
+        },
+      });
+      creatorUserId = u.id;
+      creatorEmail = u.email as string;
+      const m = await db.member.create({
+        data: {
+          userId: u.id,
+          companyId: a.companyId,
+          role: "CUSTOM",
+          status: "ACTIVE",
+          isOnboarded: true,
+          notifyOnView: true,
+        },
+      });
+      creatorMemberId = m.id;
+      await db.dataRoom.update({
+        where: { id: aIds.dataRoomId },
+        data: { createdById: creatorMemberId },
+      });
+    });
+
+    afterAll(async () => {
+      await db.dataRoom.update({
+        where: { id: aIds.dataRoomId },
+        data: { createdById: null },
+      });
+      await db.member.delete({ where: { id: creatorMemberId } });
+      await db.user.delete({ where: { id: creatorUserId } });
+    });
+
+    it("alerts the non-admin member who created the room", async () => {
+      await run("first");
+      expect(sendMail.mock.calls.map((c) => c[0].to)).toContain(creatorEmail);
+    });
+
+    it("does not alert the creator who turned alerts off", async () => {
+      await db.member.update({
+        where: { id: creatorMemberId },
+        data: { notifyOnView: false },
+      });
+      await run("first");
+      expect(sendMail.mock.calls.map((c) => c[0].to)).not.toContain(
+        creatorEmail,
+      );
+    });
+  });
 });

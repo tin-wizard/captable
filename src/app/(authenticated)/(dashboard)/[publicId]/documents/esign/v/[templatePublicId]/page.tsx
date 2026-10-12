@@ -1,3 +1,4 @@
+import { ActivityTable } from "@/components/activity/activity-table";
 import { PdfCanvas } from "@/components/template/pdf-canvas";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +67,19 @@ export default async function TemplateDetailViewPage(props: {
             <div className="grid grid-cols-12">
               <PdfCanvas mode="readonly" url={url} />
             </div>
+            {auditsData ? (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle className="text-lg">Activity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ActivityTable
+                    kind="ESIGN"
+                    targetPublicId={templatePublicId}
+                  />
+                </CardContent>
+              </Card>
+            ) : null}
           </div>
         </div>
 

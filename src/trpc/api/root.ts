@@ -1,5 +1,6 @@
 import { createTRPCRouter } from "@/trpc/api/trpc";
 import { accessTokenRouter } from "../routers/access-token/router";
+import { activityRouter } from "../routers/activity-router/router";
 import { auditRouter } from "../routers/audit-router/router";
 import { authRouter } from "../routers/auth/router";
 import { bankAccountsRouter } from "../routers/bank-accounts/router";
@@ -31,6 +32,7 @@ import { updateRouter } from "../routers/update/router";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = createTRPCRouter({
+  activity: activityRouter,
   audit: auditRouter,
   company: companyRouter,
   document: documentRouter,

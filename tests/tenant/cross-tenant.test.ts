@@ -33,7 +33,8 @@ vi.hoisted(() => {
 });
 
 type Caller = ReturnType<typeof callerFor>;
-type Ids = { a: AIds; b: BIds; aEmail: string };
+// bViewEventId: the newer of two B view events, so a B cursor still has a page
+type Ids = { a: AIds; b: BIds; aEmail: string; bViewEventId: string };
 type Case = {
   // "<dotted.procedure> <what A tries>"; the first word drives the coverage guard
   name: string;
@@ -730,6 +731,22 @@ const cases: Case[] = [
     run: (a, { b }) => a.rbac.deleteRole({ roleId: b.customRoleId }),
   },
 
+  // --- activity -----------------------------------------------------------
+  {
+    name: "activity.list filtered to B's data room",
+    kind: "read",
+    run: (a, { b }) =>
+      a.activity.list({
+        kind: "DATA_ROOM",
+        targetPublicId: b.dataRoomPublicId,
+      }),
+  },
+  {
+    name: "activity.list paged from B's view event",
+    kind: "read",
+    run: (a, { bViewEventId }) => a.activity.list({ cursor: bViewEventId }),
+  },
+
   // --- user-scoped credentials and stubs ----------------------------------
   {
     name: "passkey.createAuthenticationOptions with B admin's passkey",
@@ -818,10 +835,29 @@ describe("cross-tenant isolation", () => {
     vi.spyOn(console, "log").mockImplementation(() => undefined);
 
     tenants = await seedTwoTenants();
+    const a = await seedTenantA(tenants.a);
+    const b = await seedTenantB(tenants.b);
+    // here, not in the shared fixtures: activity-list.test counts B's events.
+    // Removed by the company cascade in cleanupFixtures.
+    const bViewEvent = (createdAt: Date) =>
+      db.viewEvent.create({
+        data: {
+          companyId: tenants.b.companyId,
+          kind: "DATA_ROOM",
+          targetId: b.dataRoomId,
+          recipientId: b.dataRoomRecipientId,
+          ip: "1.2.3.0",
+          userAgent: "ua",
+          createdAt,
+        },
+      });
+    await bViewEvent(new Date("2026-01-01T00:00:00Z"));
+    const newest = await bViewEvent(new Date("2026-01-02T00:00:00Z"));
     ids = {
-      a: await seedTenantA(tenants.a),
-      b: await seedTenantB(tenants.b),
+      a,
+      b,
       aEmail: tenants.a.session.user.email as string,
+      bViewEventId: newest.id,
     };
     callerA = callerFor(tenants.a);
   });
@@ -996,6 +1032,21 @@ describe("cross-tenant isolation", () => {
         updateId: ids.b.updateId,
       });
       expect(stringify(res)).toContain(B_SECRET);
+    });
+
+    it("activity.list returns B's viewer to B's own caller, by data room and by cursor", async () => {
+      const callerB = callerFor(tenants.b);
+      const byRoom = await callerB.activity.list({
+        kind: "DATA_ROOM",
+        targetPublicId: ids.b.dataRoomPublicId,
+      });
+      expect(byRoom.items).toHaveLength(2);
+      expect(stringify(byRoom)).toContain(B_SECRET);
+      const byCursor = await callerB.activity.list({
+        cursor: ids.bViewEventId,
+      });
+      expect(byCursor.items).toHaveLength(1);
+      expect(stringify(byCursor)).toContain(B_SECRET);
     });
   });
 });

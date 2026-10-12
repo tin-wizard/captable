@@ -10,4 +10,5 @@ export const JOB_TYPES = {
     "view-alert",
   ],
   esign: ["generate-pdf", "complete-pdf"],
+  maintenance: ["purge-view-events"],
 } as const;

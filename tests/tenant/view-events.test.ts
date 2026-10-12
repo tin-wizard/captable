@@ -68,19 +68,19 @@ const view = (over: Partial<Parameters<typeof recordView>[1]> = {}) => ({
 describe("recordView", () => {
   it("first, then repeat inside 30 minutes, then return after", async () => {
     const v = view();
-    expect(await recordView(db, v)).toBe("first");
-    expect(await recordView(db, v)).toBe("repeat");
+    expect((await recordView(db, v)).visit).toBe("first");
+    expect((await recordView(db, v)).visit).toBe("repeat");
     await db.viewEvent.updateMany({
       where: { recipientId: v.recipientId },
       data: { createdAt: new Date(Date.now() - 31 * 60 * 1000) },
     });
-    expect(await recordView(db, v)).toBe("return");
+    expect((await recordView(db, v)).visit).toBe("return");
   });
 
   it("stores a bot without letting it count or reset the clock", async () => {
     const v = view({ userAgent: "Slackbot-LinkExpanding 1.0" });
-    expect(await recordView(db, v)).toBe("bot");
-    expect(await recordView(db, { ...v, userAgent: UA })).toBe("first");
+    expect((await recordView(db, v)).visit).toBe("bot");
+    expect((await recordView(db, { ...v, userAgent: UA })).visit).toBe("first");
     const rows = await db.viewEvent.findMany({
       where: { recipientId: v.recipientId },
     });
@@ -98,10 +98,10 @@ describe("recordView", () => {
 
   it("a burst inside 10 seconds stores one row", async () => {
     const v = view();
-    expect([await recordView(db, v), await recordView(db, v)]).toEqual([
-      "first",
-      "repeat",
-    ]);
+    expect([
+      (await recordView(db, v)).visit,
+      (await recordView(db, v)).visit,
+    ]).toEqual(["first", "repeat"]);
     expect(
       await db.viewEvent.count({ where: { recipientId: v.recipientId } }),
     ).toBe(1);
@@ -115,7 +115,7 @@ describe("recordView", () => {
         where: { recipientId: v.recipientId, isBot: true },
       }),
     ).toBe(1);
-    expect(await recordView(db, { ...v, userAgent: UA })).toBe("first");
+    expect((await recordView(db, { ...v, userAgent: UA })).visit).toBe("first");
   });
 
   it("after 10 seconds a second human view is stored again", async () => {
@@ -125,11 +125,71 @@ describe("recordView", () => {
       where: { recipientId: v.recipientId },
       data: { createdAt: new Date(Date.now() - 11 * 1000) },
     });
-    expect(await recordView(db, v)).toBe("repeat");
+    expect((await recordView(db, v)).visit).toBe("repeat");
     expect(
       await db.viewEvent.count({
         where: { recipientId: v.recipientId, isBot: false },
       }),
     ).toBe(2);
+  });
+
+  it("returns the id of the row it stored, or of the row that throttled it", async () => {
+    const v = view();
+    const first = await recordView(db, v);
+    const again = await recordView(db, v);
+    expect(first.visit).toBe("first");
+    expect(again).toEqual({ visit: "repeat", id: first.id });
+  });
+});
+
+describe("phase 2 columns", () => {
+  it("a new visit has no location and zero active time", async () => {
+    const row = await db.viewEvent.create({
+      data: {
+        companyId: a.companyId,
+        kind: "ESIGN",
+        targetId: "t",
+        recipientId: "r2",
+        ip: "1.2.3.0",
+        userAgent: "ua",
+      },
+    });
+    expect(row.country).toBeNull();
+    expect(row.timezone).toBeNull();
+    expect(row.activeSeconds).toBe(0);
+    expect(row.pageSeconds).toBeNull();
+  });
+
+  it("stores page seconds as json", async () => {
+    const row = await db.viewEvent.create({
+      data: {
+        companyId: a.companyId,
+        kind: "DATA_ROOM",
+        targetId: "t",
+        recipientId: "r3",
+        ip: "1.2.3.0",
+        userAgent: "ua",
+        country: "CA",
+        network: "Example Net",
+        asn: "AS64500",
+        timezone: "America/Toronto",
+        activeSeconds: 42,
+        pageSeconds: { "1": 12, "2": 30 },
+      },
+    });
+    expect(row.pageSeconds).toEqual({ "1": 12, "2": 30 });
+    expect(row.country).toBe("CA");
+  });
+
+  it("a data room records no creator by default", async () => {
+    const room = await db.dataRoom.create({
+      data: {
+        name: `r-${Date.now()}`,
+        publicId: `p${Date.now()}`,
+        companyId: a.companyId,
+      },
+    });
+    expect(room.createdById).toBeNull();
+    await db.dataRoom.delete({ where: { id: room.id } });
   });
 });

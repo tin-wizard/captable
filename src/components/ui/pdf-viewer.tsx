@@ -1,5 +1,6 @@
 "use client";
 
+import { setVisiblePages } from "@/components/share/dwell";
 import { invariant } from "@/lib/error";
 import { useResizeObserver } from "@wojtekmaj/react-hooks";
 import {
@@ -7,6 +8,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useState,
 } from "react";
 import { Document, type DocumentProps, Page, pdfjs } from "react-pdf";
@@ -58,6 +60,29 @@ export const PdfViewer = ({
     setNumPages(nextNumPages);
   };
 
+  // Publish which pages are on screen so the view beacon can attribute time to them.
+  useEffect(() => {
+    if (!containerRef || !numPages) return;
+    const seen = new Set<number>();
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const n = Number((e.target as HTMLElement).dataset.page);
+          if (e.isIntersecting) seen.add(n);
+          else seen.delete(n);
+        }
+        setVisiblePages(seen);
+      },
+      { threshold: 0.5 },
+    );
+    for (const el of containerRef.querySelectorAll("[data-page]"))
+      io.observe(el);
+    return () => {
+      io.disconnect();
+      setVisiblePages([]);
+    };
+  }, [containerRef, numPages]);
+
   return (
     <div className="overflow-hidden" ref={setContainerRef}>
       <Document
@@ -67,13 +92,14 @@ export const PdfViewer = ({
         className="w-full overflow-hidden rounded"
       >
         {Array.from(new Array(numPages), (el, index) => (
-          <Page
-            key={`page_${index + 1}`}
-            pageNumber={index + 1}
-            renderAnnotationLayer={false}
-            renderTextLayer={false}
-            width={containerWidth}
-          />
+          <div data-page={index + 1} key={`page_${index + 1}`}>
+            <Page
+              pageNumber={index + 1}
+              renderAnnotationLayer={false}
+              renderTextLayer={false}
+              width={containerWidth}
+            />
+          </div>
         ))}
       </Document>
     </div>
