@@ -238,6 +238,39 @@ describe("findUnopened", () => {
     expect(await at(24 * 3600 * 1000 - 1)).toBe(false);
   });
 
+  it("nudgeable is false when the link dies within 24 h", async () => {
+    const r1 = await room();
+    const h = 3600 * 1000;
+    const soon = await mk(r1.id, "soon@example.com", {
+      expiresAt: new Date(Date.now() + 23 * h),
+    });
+    const later = await mk(r1.id, "later@example.com", {
+      expiresAt: new Date(Date.now() + 25 * h),
+    });
+    const items = await findUnopened(db, a.companyId, { targetId: r1.id });
+    const ok = (id: string) =>
+      items.find((i) => i.recipientId === id)?.nudgeable;
+    expect(ok(soon.id)).toBe(false);
+    expect(ok(later.id)).toBe(true);
+  });
+
+  it("stops after maxPages of candidates", async () => {
+    const r1 = await room();
+    const t = Date.now() - 6 * 86_400_000;
+    for (const n of [0, 1, 2]) {
+      const o = await mk(r1.id, `page${n}@example.com`, {}, new Date(t + n));
+      await humanView(o.id, r1.id);
+    }
+    const u = await mk(r1.id, "beyond@example.com");
+    const opts = { targetId: r1.id, batch: 1, cap: 10 };
+    expect(
+      await findUnopened(db, a.companyId, { ...opts, maxPages: 2 }),
+    ).toEqual([]);
+    expect(
+      (await findUnopened(db, a.companyId, opts)).map((i) => i.recipientId),
+    ).toEqual([u.id]);
+  });
+
   it("caps after the opened filter: opened rows don't crowd out unopened ones", async () => {
     const r1 = await room();
     const t = Date.now() - 6 * 86_400_000;

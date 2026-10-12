@@ -482,6 +482,15 @@ export const dataRoomRouter = createTRPCRouter({
           code: "BAD_REQUEST",
           message: "This link has expired. Share again to renew it.",
         });
+      if (
+        effectiveExpiry(rec.expiresAt, rec.updatedAt).getTime() -
+          now.getTime() <
+        NUDGE_COOLDOWN_MS
+      )
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This link expires within a day. Share again to renew it.",
+        });
       const opened = await db.viewEvent.count({
         where: {
           companyId,
@@ -540,27 +549,37 @@ export const dataRoomRouter = createTRPCRouter({
           message: "A reminder was sent in the last 24 hours.",
         });
 
-      const token = await encode({
-        companyId,
-        dataRoomId: rec.dataRoom.id,
-        recipientId: rec.id,
-      });
-      const link = await companyUrl(
-        db,
-        companyId,
-        `/data-rooms/${rec.dataRoom.publicId}?token=${token}`,
-      );
+      // a failed send must not leave the recipient in a 24 h cooldown with no email;
+      // updatedAt is restored too, or the claim would restart the 3-day wait
+      try {
+        const token = await encode({
+          companyId,
+          dataRoomId: rec.dataRoom.id,
+          recipientId: rec.id,
+        });
+        const link = await companyUrl(
+          db,
+          companyId,
+          `/data-rooms/${rec.dataRoom.publicId}?token=${token}`,
+        );
 
-      await shareDataRoomEmailJob.emit({
-        senderName: `${senderName}`,
-        recipientName: rec.name,
-        companyName: rec.dataRoom.company.name,
-        dataRoom: rec.dataRoom.name,
-        link,
-        email: rec.email,
-        senderEmail,
-        reminder: true,
-      });
+        await shareDataRoomEmailJob.emit({
+          senderName: `${senderName}`,
+          recipientName: rec.name,
+          companyName: rec.dataRoom.company.name,
+          dataRoom: rec.dataRoom.name,
+          link,
+          email: rec.email,
+          senderEmail,
+          reminder: true,
+        });
+      } catch (e) {
+        await db.dataRoomRecipient.updateMany({
+          where: { id: rec.id, lastNudgedAt: now },
+          data: { lastNudgedAt: rec.lastNudgedAt, updatedAt: rec.updatedAt },
+        });
+        throw e;
+      }
       await Audit.create(
         {
           action: "dataroom.nudged",

@@ -57,6 +57,14 @@ export const nudgeUpdateProcedure = withAccessControl
         code: "BAD_REQUEST",
         message: "This link has expired. Share again to renew it.",
       });
+    if (
+      effectiveExpiry(rec.expiresAt, rec.updatedAt).getTime() - now.getTime() <
+      NUDGE_COOLDOWN_MS
+    )
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "This link expires within a day. Share again to renew it.",
+      });
     const opened = await db.viewEvent.count({
       where: { companyId, kind: "UPDATE", recipientId: rec.id, isBot: false },
     });
@@ -110,28 +118,38 @@ export const nudgeUpdateProcedure = withAccessControl
         message: "A reminder was sent in the last 24 hours.",
       });
 
-    const token = await encode({
-      companyId,
-      updateId: rec.update.id,
-      publicId: rec.update.publicId,
-      recipientId: rec.id,
-    });
-    const link = await companyUrl(
-      db,
-      companyId,
-      `/updates/${rec.update.publicId}?token=${token}`,
-    );
+    // a failed send must not leave the recipient in a 24 h cooldown with no email;
+    // updatedAt is restored too, or the claim would restart the 3-day wait
+    try {
+      const token = await encode({
+        companyId,
+        updateId: rec.update.id,
+        publicId: rec.update.publicId,
+        recipientId: rec.id,
+      });
+      const link = await companyUrl(
+        db,
+        companyId,
+        `/updates/${rec.update.publicId}?token=${token}`,
+      );
 
-    await shareUpdateEmailJob.emit({
-      senderName: `${senderName}`,
-      recipientName: rec.name,
-      companyName: rec.update.company.name,
-      update: { title: rec.update.title },
-      link,
-      email: rec.email,
-      senderEmail,
-      reminder: true,
-    });
+      await shareUpdateEmailJob.emit({
+        senderName: `${senderName}`,
+        recipientName: rec.name,
+        companyName: rec.update.company.name,
+        update: { title: rec.update.title },
+        link,
+        email: rec.email,
+        senderEmail,
+        reminder: true,
+      });
+    } catch (e) {
+      await db.updateRecipient.updateMany({
+        where: { id: rec.id, lastNudgedAt: now },
+        data: { lastNudgedAt: rec.lastNudgedAt, updatedAt: rec.updatedAt },
+      });
+      throw e;
+    }
     await Audit.create(
       {
         action: "update.nudged",
