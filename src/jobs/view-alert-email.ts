@@ -34,7 +34,7 @@ async function describe(d: Data): Promise<Described> {
     const [room, rec] = await Promise.all([
       db.dataRoom.findFirstOrThrow({
         where: { id: d.targetId, companyId: d.companyId },
-        select: { name: true, publicId: true },
+        select: { name: true, publicId: true, createdById: true },
       }),
       db.dataRoomRecipient.findUniqueOrThrow({
         where: { id: d.recipientId },
@@ -45,7 +45,7 @@ async function describe(d: Data): Promise<Described> {
       label: `the data room "${room.name}"`,
       path: `documents/data-rooms/${room.publicId}`,
       who: rec.name || rec.email,
-      ownerMemberId: null,
+      ownerMemberId: room.createdById,
     };
   }
   if (d.kind === "UPDATE") {
