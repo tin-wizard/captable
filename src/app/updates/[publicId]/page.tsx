@@ -1,5 +1,6 @@
 import { dayjsExt } from "@/common/dayjs";
 import { SharePageLayout } from "@/components/share/page-layout";
+import { ViewBeacon } from "@/components/share/view-beacon";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import UpdateRenderer from "@/components/update/renderer";
 import { type JWTVerifyResult, decode } from "@/lib/jwt";
@@ -126,6 +127,7 @@ const PublicUpdatePage = async (props: {
       }
     >
       <Fragment>
+        <ViewBeacon kind="UPDATE" token={token} />
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10 rounded-full">
             <AvatarImage src={author.user.image || "/placeholders/user.svg"} />

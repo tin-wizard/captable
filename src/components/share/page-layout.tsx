@@ -1,6 +1,7 @@
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
+import { ViewNotice } from "./view-beacon";
 
 type SharePageLayoutProps = {
   company: {
@@ -31,6 +32,7 @@ export const SharePageLayout = ({
       <Card className="p-10">{children}</Card>
 
       <div className="my-10 text-center text-sm text-muted-foreground">
+        <ViewNotice />
         <p>
           Powered by{" "}
           <Link

@@ -1,5 +1,6 @@
 import FilePreview from "@/components/file/preview";
 import { SharePageLayout } from "@/components/share/page-layout";
+import { ViewBeacon } from "@/components/share/view-beacon";
 import { type JWTVerifyResult, decode } from "@/lib/jwt";
 import { db } from "@/server/db";
 import { assertHostOwns } from "@/server/domains/links";
@@ -116,6 +117,7 @@ const DataRoomPage = async (props: {
         </div>
       }
     >
+      <ViewBeacon kind="DATA_ROOM" token={token} />
       <FilePreview
         name={file.name}
         url={remoteFile.url}

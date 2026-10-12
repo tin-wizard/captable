@@ -1,5 +1,6 @@
 import DataRoomFileExplorer from "@/components/documents/data-room/explorer";
 import { SharePageLayout } from "@/components/share/page-layout";
+import { ViewBeacon } from "@/components/share/view-beacon";
 import { type JWTVerifyResult, decode } from "@/lib/jwt";
 import { db } from "@/server/db";
 import { assertHostOwns } from "@/server/domains/links";
@@ -94,6 +95,7 @@ const DataRoomPage = async (props: {
         </div>
       }
     >
+      <ViewBeacon kind="DATA_ROOM" token={token} />
       <div>
         <DataRoomFileExplorer
           shared={true}
