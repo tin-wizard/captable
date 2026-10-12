@@ -1,37 +1,24 @@
-import { withAuth } from "@/trpc/api/trpc";
+import { withTenant } from "@/trpc/api/trpc";
 import { z } from "zod";
 
-// The caller's own preference, scoped by their member id and company, in the
-// same shape as get-profile.
-export const getViewAlertsProcedure = withAuth.query(
-  async ({
-    ctx: {
-      db,
-      session: { user },
-    },
-  }) => {
-    const member = await db.member.findUniqueOrThrow({
-      where: { id: user.memberId, companyId: user.companyId },
+// The caller's own preference. withTenant (not withAuth) so it is callable on
+// company hosts; the tenant client forces companyId on Member.
+export const getViewAlertsProcedure = withTenant.query(
+  async ({ ctx: { tenant } }) => {
+    const member = await tenant.db.member.findUniqueOrThrow({
+      where: { id: tenant.memberId },
       select: { notifyOnView: true },
     });
     return member.notifyOnView;
   },
 );
 
-export const setViewAlertsProcedure = withAuth
+export const setViewAlertsProcedure = withTenant
   .input(z.object({ enabled: z.boolean() }))
-  .mutation(
-    async ({
-      ctx: {
-        db,
-        session: { user },
-      },
-      input,
-    }) => {
-      await db.member.update({
-        where: { id: user.memberId, companyId: user.companyId },
-        data: { notifyOnView: input.enabled },
-      });
-      return input.enabled;
-    },
-  );
+  .mutation(async ({ ctx: { tenant }, input }) => {
+    await tenant.db.member.update({
+      where: { id: tenant.memberId },
+      data: { notifyOnView: input.enabled },
+    });
+    return input.enabled;
+  });
