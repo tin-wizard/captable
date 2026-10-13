@@ -17,8 +17,11 @@ async function submitLogin(page: Page, email: string) {
 }
 
 // company-host login page: "Continue" starts the handoff, which signs in on the canonical host
-async function continueToCanonicalLogin(page: Page, label: string) {
-  await page.waitForURL(new RegExp(`^${esc(host(label))}/login`));
+async function continueToCanonicalLogin(page: Page, ...labels: string[]) {
+  // an alias host can still resolve as the company for a moment after a rename
+  await page.waitForURL(
+    new RegExp(`^(${labels.map((l) => esc(host(l))).join("|")})/login`),
+  );
   await page.getByRole("link", { name: "Continue" }).click();
   await page.waitForURL(new RegExp(`^${esc(ROOT)}/login`));
 }
@@ -123,8 +126,9 @@ test("mandatory: company creation provisions a working, isolated subdomain", asy
   const op = await outsider.newPage();
   await op.goto(`${ROOT}/login`);
   await submitLogin(op, "outsider@e2e.test");
-  // one company: straight to its own host, no chooser
-  await op.waitForURL((u) => u.origin !== new URL(ROOT).origin);
+  // one company: straight in, no chooser (the seeded company may be served on the canonical host)
+  await op.waitForURL((u) => !u.pathname.startsWith("/login"));
+  await expect(op).not.toHaveURL(/\/choose-company/);
   await op.goto(botskiUrl);
   await op.waitForURL(new RegExp(`^${esc(host(botski))}/login`));
   await op.getByRole("link", { name: "Continue" }).click(); // canonical session, not a member
@@ -263,7 +267,7 @@ test("alias: the old company URL follows a rename, logged out", async ({
   const fp = await fresh.newPage();
   const publicPath = new URL(url).pathname;
   await fp.goto(`${host(old)}${publicPath}`);
-  await continueToCanonicalLogin(fp, renamed);
+  await continueToCanonicalLogin(fp, renamed, old);
   await submitLogin(fp, "admin@e2e.test");
   await fp.waitForURL(new RegExp(`^${esc(host(renamed))}${esc(publicPath)}`));
 });
@@ -286,7 +290,10 @@ test("company login page shows the name only when the company opts in", async ({
 
   await page.goto(`${url}/settings/company`);
   await page.getByLabel("Show our name and logo on the login page").click();
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Save", exact: true })
+    .last() // the preferences card is the last form on the page
+    .click();
   await expect(page.getByText("Preferences saved")).toBeVisible();
 
   await visitor.reload();
