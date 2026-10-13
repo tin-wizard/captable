@@ -1,5 +1,5 @@
 import { getCompanyList } from "@/server/company";
-import { chooserDecision } from "@/server/company-chooser";
+import { chooserDecision, enterCompany } from "@/server/company-chooser";
 import { db } from "@/server/db";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { type Tenant, cleanupTenants, seedTenant } from "../helpers/seed";
@@ -100,5 +100,44 @@ describe("chooserDecision", () => {
     expect(chooserDecision([{ url: "/x" }, { url: "/y" }])).toEqual({
       kind: "many",
     });
+  });
+});
+
+describe("enterCompany (chooser click)", () => {
+  const run = async (url: string) => {
+    const calls: string[] = [];
+    await enterCompany(
+      { url, memberId: "m1" },
+      {
+        switchCompany: async (id) => calls.push(`switch:${id}`),
+        refreshSession: async () => calls.push("refresh"),
+        assign: (u) => calls.push(`go:${u}`),
+      },
+    );
+    return calls;
+  };
+
+  it("no company host (relative url): switch, refresh session, then navigate", async () => {
+    expect(await run("/pubB")).toEqual(["switch:m1", "refresh", "go:/pubB"]);
+  });
+
+  it("host-bound (handoff url): navigate only", async () => {
+    const url = "https://b.dealroom.tin.info/auth/handoff/start?next=%2FpubB";
+    expect(await run(url)).toEqual([`go:${url}`]);
+  });
+
+  it("a refused switch does not navigate", async () => {
+    const assign = vi.fn();
+    await expect(
+      enterCompany(
+        { url: "/pubB", memberId: "m1" },
+        {
+          switchCompany: () => Promise.reject(new Error("FORBIDDEN")),
+          refreshSession: async () => undefined,
+          assign,
+        },
+      ),
+    ).rejects.toThrow("FORBIDDEN");
+    expect(assign).not.toHaveBeenCalled();
   });
 });

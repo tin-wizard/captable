@@ -20,6 +20,7 @@ export default async function ChooseCompanyPage() {
     <CompanyChooser
       companies={list.map((m) => ({
         id: m.company.id,
+        memberId: m.id,
         name: m.company.name,
         url: m.url,
         // highlight only; the list itself comes from the DB

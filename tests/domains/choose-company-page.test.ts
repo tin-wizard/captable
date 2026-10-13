@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type Entry = {
+  id: string;
   company: { id: string; publicId: string; name: string };
   url: string;
 };
 const h = vi.hoisted(() => {
-  const s = { list: [] as Entry[] };
+  const s = { list: [] as Entry[], enabled: true };
   return {
     host: { kind: "canonical" } as { kind: string; [k: string]: string },
     session: null as null | {
@@ -37,6 +38,9 @@ vi.mock("@/server/auth", () => ({
   },
 }));
 vi.mock("@/server/db", () => ({ db: {} }));
+vi.mock("@/server/domains/config", () => ({
+  domainConfig: () => ({ enabled: h.s.enabled }),
+}));
 vi.mock("@/server/company", () => ({ getCompanyList: h.getCompanyList }));
 vi.mock("@/server/domains/links", () => ({ companyEntryUrl: h.homeUrl }));
 vi.mock("@/components/onboarding/company-chooser", () => ({
@@ -47,6 +51,7 @@ import ChooseCompanyPage from "@/app/(authenticated)/choose-company/page";
 import HomePage from "@/app/page";
 
 const entry = (n: string): Entry => ({
+  id: `m-${n}`,
   company: { id: `c-${n}`, publicId: `p-${n}`, name: `${n} Inc` },
   url: `https://${n}.dealroom.tin.info/p-${n}`,
 });
@@ -55,6 +60,7 @@ beforeEach(() => {
   h.host = { kind: "canonical" };
   h.session = { user: { id: "u1" } };
   h.s.list = [];
+  h.s.enabled = true;
   h.getCompanyList.mockClear();
 });
 
@@ -77,6 +83,17 @@ describe("home page", () => {
   it("several companies: the chooser", async () => {
     h.s.list = [entry("acme"), entry("beta")];
     await expect(HomePage()).rejects.toThrow("REDIRECT:/choose-company");
+  });
+
+  it("several companies, domains off: today's redirect, no chooser", async () => {
+    h.s.enabled = false;
+    h.s.list = [entry("acme"), entry("beta")];
+    h.session = { user: { id: "u1", companyId: "x", companyPublicId: "x" } };
+    await expect(HomePage()).rejects.toThrow(
+      "REDIRECT:https://stale.dealroom.tin.info/stale",
+    );
+    h.session = { user: { id: "u1" } };
+    await expect(HomePage()).rejects.toThrow("REDIRECT:/login");
   });
 
   it("no company: today's fallback (session company, else /login)", async () => {
@@ -112,12 +129,14 @@ describe("choose-company page", () => {
       companies: [
         {
           id: "c-acme",
+          memberId: "m-acme",
           name: "acme Inc",
           url: entry("acme").url,
           current: false,
         },
         {
           id: "c-beta",
+          memberId: "m-beta",
           name: "beta Inc",
           url: entry("beta").url,
           current: true,

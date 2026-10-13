@@ -42,7 +42,8 @@ export function layoutRedirect(input: {
         : null;
     case "canonical":
       return !userLevel && routeCompanyPrimaryHost
-        ? // only signed-in users get here: enter via the handoff, not the company login page
+        ? // enter via the handoff, not the company login page; a logged-out visitor
+          // goes start -> issue -> canonical /login and returns here after login
           { redirect: handoffStartUrl(routeCompanyPrimaryHost, path) }
         : null;
     default:

@@ -49,6 +49,7 @@ export function CompanyAddressForm({
           autoCorrect="off"
           value={label}
           aria-invalid={error ? true : undefined}
+          aria-describedby={error ? "company-address-error" : undefined}
           onChange={(e) => {
             setLabel(e.target.value);
             setError(null);
@@ -58,7 +59,14 @@ export function CompanyAddressForm({
           .{baseDomain}
         </span>
       </div>
-      {error && <p className="text-xs font-light text-destructive">{error}</p>}
+      {error && (
+        <p
+          id="company-address-error"
+          className="text-xs font-light text-destructive"
+        >
+          {error}
+        </p>
+      )}
       <Button type="submit">Continue</Button>
       <p className="text-center text-sm text-gray-500">
         Don{`'`}t know your address? Log in below.
