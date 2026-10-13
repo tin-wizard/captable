@@ -1,10 +1,12 @@
 import FilePreview from "@/components/file/preview";
 import { DownloadButton } from "@/components/share/download-button";
 import { ExpiredLink } from "@/components/share/expired-link";
+import { NdaGate } from "@/components/share/nda-gate";
 import { SharePageLayout } from "@/components/share/page-layout";
 import { ViewBeacon } from "@/components/share/view-beacon";
 import { type JWTVerifyResult, decode } from "@/lib/jwt";
 import { isExpired } from "@/server/activity/link-state";
+import { getNdaState } from "@/server/activity/nda";
 import { db } from "@/server/db";
 import { assertHostOwns } from "@/server/domains/links";
 import { getPresignedGetUrl } from "@/server/file-uploads";
@@ -95,6 +97,30 @@ const DataRoomPage = async (props: {
   }
 
   const company = dataRoom.company;
+
+  // the gate also holds on a direct bucket URL: no presigned URL before acceptance
+  const nda = await getNdaState(db, {
+    kind: "DATA_ROOM",
+    targetId: dataRoom.id,
+    recipientId: recipient.id,
+    companyId: dataRoom.companyId,
+  });
+  if (nda.required && !nda.accepted) {
+    return (
+      <SharePageLayout
+        company={{ name: company.name, logo: company.logo }}
+        title={null}
+      >
+        <NdaGate
+          kind="DATA_ROOM"
+          token={token}
+          companyName={company.name}
+          text={nda.text}
+        />
+      </SharePageLayout>
+    );
+  }
+
   const remoteFile = await getPresignedGetUrl(file.key);
 
   return (
