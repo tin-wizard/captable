@@ -32,7 +32,7 @@ const money = new Intl.NumberFormat("en-US", {
 
 export const formatCount = (n: number) => whole.format(n);
 export const formatCompact = (n: number) => compact.format(n);
-export const formatMoney = (n: number) => money.format(n);
+export const formatMoney = (n: number) => (n === 0 ? "$0" : money.format(n));
 export const formatPercent = (ratio: number | null) =>
   ratio === null ? "—" : `${Math.round(ratio * 100)}%`;
 export const formatSeconds = formatDuration;

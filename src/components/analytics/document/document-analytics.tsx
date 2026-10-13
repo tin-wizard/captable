@@ -59,6 +59,15 @@ const LABEL_STYLE = {
   cold: "bg-slate-100 text-slate-700",
 } as const;
 
+// ranges are UTC days: format them in UTC so the label matches the series
+const utcDay = (iso: string, year: boolean) =>
+  new Date(iso).toLocaleDateString("en", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    ...(year && { year: "numeric" }),
+  });
+
 // Biggest fall in viewers from one page to the next: "most people stop here".
 const dropOff = (byPage: { page: number; viewers: number }[]) => {
   let best: { after: number; lost: number } | null = null;
@@ -193,9 +202,10 @@ export const DocumentAnalytics = ({
 
       <ChartCard
         title="Views over time"
-        description={`${dayjsExt(data.range.from).format("MMM D")} – ${dayjsExt(
+        description={`${utcDay(data.range.from, false)} – ${utcDay(
           data.range.to,
-        ).format("MMM D, YYYY")}`}
+          true,
+        )}`}
         state={noVisits ? "empty" : "ready"}
         emptyHint="No views in this period. Recipients who haven't opened it appear below."
         tableAlt={{
