@@ -400,6 +400,8 @@ export async function snapshotB(b: BIds) {
       ...byId,
     }),
     esignAudits: await db.esignAudit.findMany(own),
+    ndaAcceptances: await db.ndaAcceptance.findMany(own),
+    downloadEvents: await db.downloadEvent.findMany(own),
     audits: await db.audit.findMany(own),
     bankAccounts: await db.bankAccount.findMany(own),
     passkeys: await db.passkey.findMany({ where: { userId: users }, ...byId }),

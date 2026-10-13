@@ -24,6 +24,7 @@ export function retentionCutoff(
 // Global db on purpose: retention is a platform job, but each company is
 // purged at its own period and companyId is explicit in every delete.
 // viewRetentionMonths = null means the company keeps its data.
+// Download events share the period; NdaAcceptance is a consent record, never purged.
 export const purgeViewEventsWorker = defineWorker(config, async () => {
   const companies = await db.company.findMany({
     where: { viewRetentionMonths: { not: null } },
@@ -31,16 +32,16 @@ export const purgeViewEventsWorker = defineWorker(config, async () => {
   });
   const now = new Date();
   for (const c of companies) {
-    await db.viewEvent.deleteMany({
-      where: {
-        companyId: c.id,
-        createdAt: {
-          lt: retentionCutoff(
-            now,
-            c.viewRetentionMonths ?? DEFAULT_RETENTION_MONTHS,
-          ),
-        },
+    const where = {
+      companyId: c.id,
+      createdAt: {
+        lt: retentionCutoff(
+          now,
+          c.viewRetentionMonths ?? DEFAULT_RETENTION_MONTHS,
+        ),
       },
-    });
+    };
+    await db.viewEvent.deleteMany({ where });
+    await db.downloadEvent.deleteMany({ where });
   }
 });
