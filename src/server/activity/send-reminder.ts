@@ -202,6 +202,15 @@ export async function sendReminder(
         rec.parent.publicId
       }?token=${token}`,
     );
+    // only automatic reminders carry an opt-out (a person pressing the button
+    // already knows who is asking)
+    const unsubscribeLink = args.auto
+      ? await companyUrl(
+          db,
+          companyId,
+          `/unsubscribed?kind=${kind}&token=${token}`,
+        )
+      : undefined;
     const mail = {
       senderName: sender.name,
       recipientName: rec.name,
@@ -210,6 +219,7 @@ export async function sendReminder(
       email: rec.email,
       senderEmail: sender.email,
       reminder: true,
+      ...(unsubscribeLink && { unsubscribeLink }),
     };
     if (isRoom)
       await shareDataRoomEmailJob.emit({ ...mail, dataRoom: rec.parent.title });
