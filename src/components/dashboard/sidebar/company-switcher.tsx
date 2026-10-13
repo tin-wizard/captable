@@ -75,9 +75,11 @@ export function CompanySwitcher({
             const nonDynamicSegment = routeSegments.slice(1).join("/");
 
             window.location.assign(
-              `${companySwitchUrl(member.url, canonicalOrigin)}/${
-                nonDynamicSegment ? nonDynamicSegment : ""
-              }`,
+              companySwitchUrl(
+                member.url,
+                canonicalOrigin,
+                `/${nonDynamicSegment}`,
+              ),
             );
           }
         }

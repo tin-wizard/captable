@@ -38,7 +38,7 @@ vi.mock("@/server/auth", () => ({
 }));
 vi.mock("@/server/db", () => ({ db: {} }));
 vi.mock("@/server/company", () => ({ getCompanyList: h.getCompanyList }));
-vi.mock("@/server/domains/links", () => ({ companyHomeUrl: h.homeUrl }));
+vi.mock("@/server/domains/links", () => ({ companyEntryUrl: h.homeUrl }));
 vi.mock("@/components/onboarding/company-chooser", () => ({
   CompanyChooser: () => null,
 }));

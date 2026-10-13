@@ -100,7 +100,10 @@ describe("onboarding with subdomain", () => {
       status: "ACTIVE",
       isPrimary: true,
     });
-    expect(r.url).toBe(`https://${label}.dealroom.tin.info/${r.publicId}`);
+    // signed in on canonical: straight through the handoff, not the company login page
+    expect(r.url).toBe(
+      `https://${label}.dealroom.tin.info/auth/handoff/start?next=%2F${r.publicId}`,
+    );
     expect(
       await db.audit.count({
         where: { companyId: company?.id, action: "company.subdomain-assigned" },

@@ -2,7 +2,7 @@ import { getServerComponentAuthSession } from "@/server/auth";
 import { getCompanyList } from "@/server/company";
 import { chooserDecision } from "@/server/company-chooser";
 import { db } from "@/server/db";
-import { companyHomeUrl } from "@/server/domains/links";
+import { companyEntryUrl } from "@/server/domains/links";
 import { getRequestHost } from "@/server/domains/request-host";
 import { redirect } from "next/navigation";
 
@@ -23,7 +23,7 @@ export default async function HomePage() {
 
   if (session?.user?.companyPublicId) {
     return redirect(
-      await companyHomeUrl(
+      await companyEntryUrl(
         db,
         session.user.companyId,
         session.user.companyPublicId,

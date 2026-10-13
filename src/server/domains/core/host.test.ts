@@ -110,4 +110,18 @@ describe("companySwitchUrl", () => {
   ])("%s from %s -> %s", (url, origin, out) =>
     expect(companySwitchUrl(url, origin)).toBe(out),
   );
+  it("keeps the sub-path: appended, or inside a handoff URL's next", () => {
+    expect(companySwitchUrl("/pubB", null, "/stakeholders")).toBe(
+      "/pubB/stakeholders",
+    );
+    expect(
+      companySwitchUrl(
+        "https://b.dealroom.tin.info/auth/handoff/start?next=%2FpubB",
+        canon,
+        "/stakeholders",
+      ),
+    ).toBe(
+      "https://b.dealroom.tin.info/auth/handoff/start?next=%2FpubB%2Fstakeholders",
+    );
+  });
 });

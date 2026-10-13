@@ -23,7 +23,7 @@ async function continueToCanonicalLogin(page: Page, label: string) {
   await page.waitForURL(new RegExp(`^${esc(ROOT)}/login`));
 }
 
-// first visit to a company host has no tenant session yet: its login page, Continue runs the handoff
+// in-app links enter through the handoff; if a company login page shows anyway, Continue runs it
 async function landOnCompany(page: Page, label: string) {
   await page.waitForURL(new RegExp(`^${esc(host(label))}/`));
   if (new URL(page.url()).pathname === "/login") {
