@@ -1,3 +1,10 @@
+import {
+  RangeTabs,
+  StatCard,
+  analyticsParams,
+  formatCompact,
+  formatCount,
+} from "@/components/analytics";
 import EmptyState from "@/components/common/empty-state";
 import { PageLayout } from "@/components/dashboard/page-layout";
 import { Card } from "@/components/ui/card";
@@ -14,7 +21,10 @@ export const metadata: Metadata = {
   title: "Documents",
 };
 
-const DocumentsPage = async () => {
+const DocumentsPage = async (props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) => {
+  const filters = analyticsParams(await props.searchParams);
   const { allow } = await serverAccessControl();
   const session = await withServerComponentSession();
 
@@ -46,6 +56,21 @@ const DocumentsPage = async () => {
     );
   }
 
+  const canSeeActivity = allow(true, ["audits", "read"]);
+  const rooms = canSeeActivity
+    ? (
+        await api.analytics.documentsSummary.query({
+          kind: "DATA_ROOM",
+          range: filters.range,
+          from: filters.from,
+          to: filters.to,
+        })
+      ).items
+    : null;
+  const views = rooms?.reduce((n, r) => n + r.visits, 0) ?? 0;
+  const unopened = rooms?.reduce((n, r) => n + r.unopened, 0) ?? 0;
+  const viewers = rooms?.reduce((n, r) => n + r.viewers, 0) ?? 0;
+
   return (
     <div className="flex flex-col gap-y-3">
       <PageLayout
@@ -60,6 +85,26 @@ const DocumentsPage = async () => {
           ) : null
         }
       />
+      {rooms && (
+        <section aria-label="Sharing activity" className="mt-3 space-y-3">
+          <RangeTabs />
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatCard label="Documents" value={formatCount(documents.length)} />
+            <StatCard
+              label="Data room views"
+              value={formatCompact(views)}
+              href={`/${session.user.companyPublicId}/activity`}
+            />
+            <StatCard label="Viewers" value={formatCompact(viewers)} />
+            <StatCard
+              label="Not opened yet"
+              value={formatCount(unopened)}
+              upIsGood={false}
+              href={`/${session.user.companyPublicId}/documents/data-rooms`}
+            />
+          </div>
+        </section>
+      )}
       <Card className="mt-3">
         <div className="p-6">
           <DocumentsTable

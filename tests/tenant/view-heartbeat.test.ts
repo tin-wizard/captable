@@ -27,6 +27,8 @@ let bIds: BIds;
 let recA: string;
 let recB: string;
 let visitA: string;
+let bucket2: string;
+let strayBucket: string;
 
 const tokenFor = (recipientId: string, companyId = a.companyId) =>
   encode({ companyId, dataRoomId: aIds.dataRoomId, recipientId });
@@ -45,6 +47,37 @@ beforeAll(async () => {
       data: { email: "b@example.com", dataRoomId: aIds.dataRoomId },
     })
   ).id;
+  // two documents in tenant A's room, one A document outside it
+  await db.dataRoomDocument.create({
+    data: { dataRoomId: aIds.dataRoomId, documentId: aIds.documentId },
+  });
+  const doc = async (name: string) => {
+    const bucket = await db.bucket.create({
+      data: {
+        companyId: a.companyId,
+        name,
+        key: `${name}/${Date.now()}.pdf`,
+        mimeType: "application/pdf",
+        size: 1,
+        tags: [],
+      },
+    });
+    const document = await db.document.create({
+      data: {
+        companyId: a.companyId,
+        publicId: `${name}-${Date.now()}`,
+        name,
+        bucketId: bucket.id,
+      },
+    });
+    return { bucketId: bucket.id, documentId: document.id };
+  };
+  const second = await doc("hb-second");
+  bucket2 = second.bucketId;
+  await db.dataRoomDocument.create({
+    data: { dataRoomId: aIds.dataRoomId, documentId: second.documentId },
+  });
+  strayBucket = (await doc("hb-stray")).bucketId;
   visitA = (
     await db.viewEvent.create({
       data: {
@@ -247,5 +280,176 @@ describe("POST /api/activity/visit", () => {
       ).status,
     ).toBe(400);
     expect((await post("nope")).status).toBe(400);
+  });
+  describe("per-document seconds (docs)", () => {
+    const freshVisit = async (
+      kind: "DATA_ROOM" | "UPDATE" = "DATA_ROOM",
+      targetId = aIds.dataRoomId,
+      recipientId = recA,
+    ) =>
+      (
+        await db.viewEvent.create({
+          data: {
+            companyId: a.companyId,
+            kind,
+            targetId,
+            recipientId,
+            ip: "1.2.3.0",
+            userAgent: "ua",
+          },
+        })
+      ).id;
+    const docsOf = async (id: string) =>
+      (await db.viewEvent.findUniqueOrThrow({ where: { id } })).docSeconds;
+
+    it("stores pages per document; the same page number in two documents does not collide", async () => {
+      const visitId = await freshVisit();
+      const res = await post({
+        kind: "DATA_ROOM",
+        token: await tokenFor(recA),
+        visitId,
+        activeSeconds: 10,
+        pageSeconds: { "3": 7 },
+        docs: [
+          { bucketId: aIds.bucketId, n: 4, p: { "3": 7 } },
+          { bucketId: bucket2, n: 9, p: { "3": 2 } },
+        ],
+      });
+      expect(res.status).toBe(204);
+      expect(await docsOf(visitId)).toEqual({
+        [aIds.bucketId]: { n: 4, p: { "3": 7 } },
+        [bucket2]: { n: 9, p: { "3": 2 } },
+      });
+    });
+
+    it("never lowers a stored value", async () => {
+      const visitId = await freshVisit();
+      const token = await tokenFor(recA);
+      const beat = (p: Record<string, number>) =>
+        post({
+          kind: "DATA_ROOM",
+          token,
+          visitId,
+          activeSeconds: 10,
+          pageSeconds: p,
+          docs: [{ bucketId: aIds.bucketId, n: 4, p }],
+        });
+      await beat({ "1": 9, "2": 5 });
+      await beat({ "1": 2, "4": 3 });
+      expect(await docsOf(visitId)).toEqual({
+        [aIds.bucketId]: { n: 4, p: { "1": 9, "2": 5, "4": 3 } },
+      });
+    });
+
+    it("silently drops a document of another room or another company", async () => {
+      const visitId = await freshVisit();
+      const res = await post({
+        kind: "DATA_ROOM",
+        token: await tokenFor(recA),
+        visitId,
+        activeSeconds: 10,
+        pageSeconds: { "1": 4 },
+        docs: [
+          { bucketId: strayBucket, n: 2, p: { "1": 4 } },
+          { bucketId: bIds.bucketId, n: 2, p: { "1": 4 } },
+          { bucketId: aIds.bucketId, n: 2, p: { "1": 4 } },
+        ],
+      });
+      expect(res.status).toBe(204);
+      expect(await docsOf(visitId)).toEqual({
+        [aIds.bucketId]: { n: 2, p: { "1": 4 } },
+      });
+      // only foreign documents: nothing is written, the column stays null
+      const other = await freshVisit();
+      await post({
+        kind: "DATA_ROOM",
+        token: await tokenFor(recA),
+        visitId: other,
+        activeSeconds: 10,
+        pageSeconds: { "1": 4 },
+        docs: [{ bucketId: bIds.bucketId, n: 2, p: { "1": 4 } }],
+      });
+      expect(await docsOf(other)).toBeNull();
+    });
+
+    it("ignores docs on an update visit", async () => {
+      await db.update.update({
+        where: { id: aIds.updateId },
+        data: { status: "PUBLIC", public: true },
+      });
+      const rec = await db.updateRecipient.create({
+        data: { email: "hb-upd@example.com", updateId: aIds.updateId },
+      });
+      const visitId = await freshVisit("UPDATE", aIds.updateId, rec.id);
+      const update = await db.update.findUniqueOrThrow({
+        where: { id: aIds.updateId },
+      });
+      const token = await encode({
+        companyId: a.companyId,
+        publicId: update.publicId,
+        recipientId: rec.id,
+      });
+      const res = await post({
+        kind: "UPDATE",
+        token,
+        visitId,
+        activeSeconds: 5,
+        pageSeconds: {},
+        docs: [{ bucketId: aIds.bucketId, n: 2, p: { "1": 4 } }],
+      });
+      expect(res.status).toBe(204);
+      const row = await db.viewEvent.findUniqueOrThrow({
+        where: { id: visitId },
+      });
+      expect(row.activeSeconds).toBe(5);
+      expect(row.docSeconds).toBeNull();
+    });
+
+    it("an old client without docs leaves docSeconds null", async () => {
+      const visitId = await freshVisit();
+      await post({
+        kind: "DATA_ROOM",
+        token: await tokenFor(recA),
+        visitId,
+        activeSeconds: 3,
+        pageSeconds: { "1": 3 },
+      });
+      const row = await db.viewEvent.findUniqueOrThrow({
+        where: { id: visitId },
+      });
+      expect(row.pageSeconds).toEqual({ "1": 3 });
+      expect(row.docSeconds).toBeNull();
+    });
+
+    it("rejects oversize or malformed docs with a 400", async () => {
+      const token = await tokenFor(recA);
+      const base = {
+        kind: "DATA_ROOM",
+        token,
+        visitId: visitA,
+        activeSeconds: 1,
+        pageSeconds: {},
+      };
+      const one = { bucketId: aIds.bucketId, n: 2, p: { "1": 1 } };
+      const bad = [
+        Array.from({ length: 21 }, () => one),
+        [{ ...one, n: 0 }],
+        [{ ...one, n: 5001 }],
+        [{ ...one, p: { x: 1 } }],
+        [{ ...one, p: { "1": 3601 } }],
+        [{ ...one, bucketId: "x".repeat(65) }],
+        [
+          {
+            ...one,
+            p: Object.fromEntries(
+              Array.from({ length: 501 }, (_, i) => [String(i + 1), 1]),
+            ),
+          },
+        ],
+      ];
+      for (const docs of bad) {
+        expect((await post({ ...base, docs })).status).toBe(400);
+      }
+    });
   });
 });

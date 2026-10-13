@@ -122,7 +122,7 @@ const DataRoomPage = async (props: {
         </div>
       }
     >
-      <ViewBeacon kind="DATA_ROOM" token={token} />
+      <ViewBeacon kind="DATA_ROOM" token={token} bucketId={file.id} />
       <FilePreview
         name={file.name}
         url={remoteFile.url}

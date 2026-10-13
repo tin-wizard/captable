@@ -27,7 +27,17 @@ const FLUSH_EVERY_S = 15;
 // or two seconds with the tab visible. A bare GET (scanner, preview) never
 // reaches this, so it cannot create a view. Once the view is recorded, active
 // time and per-page seconds are reported by heartbeat.
-export const ViewBeacon = ({ kind, token }: { kind: Kind; token: string }) => {
+// With `bucketId` (a data room document page) the same seconds are also sent
+// per document, with the page count the PDF viewer exposes.
+export const ViewBeacon = ({
+  kind,
+  token,
+  bucketId,
+}: {
+  kind: Kind;
+  token: string;
+  bucketId?: string;
+}) => {
   useEffect(() => {
     let sent = false;
     let cancelled = false;
@@ -50,6 +60,13 @@ export const ViewBeacon = ({ kind, token }: { kind: Kind; token: string }) => {
         const { activeSeconds, pageSeconds } = dwell.snapshot();
         if (activeSeconds === 0 || activeSeconds === lastFlushed) return;
         lastFlushed = activeSeconds;
+        const n = Number(
+          document
+            .querySelector("[data-total-pages]")
+            ?.getAttribute("data-total-pages"),
+        );
+        const docs =
+          bucketId && n >= 1 ? [{ bucketId, n, p: pageSeconds }] : undefined;
         fetch("/api/activity/visit", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -59,6 +76,7 @@ export const ViewBeacon = ({ kind, token }: { kind: Kind; token: string }) => {
             visitId,
             activeSeconds,
             pageSeconds,
+            docs,
           }),
           keepalive: true,
         }).catch(() => undefined);
@@ -131,7 +149,7 @@ export const ViewBeacon = ({ kind, token }: { kind: Kind; token: string }) => {
       off();
       stopTracking?.();
     };
-  }, [kind, token]);
+  }, [kind, token, bucketId]);
 
   return null;
 };

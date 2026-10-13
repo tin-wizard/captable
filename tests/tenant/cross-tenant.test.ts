@@ -792,6 +792,38 @@ const cases: Case[] = [
       }),
   },
 
+  {
+    name: "analytics.document for B's data room",
+    kind: "read",
+    run: (a, { b }) =>
+      a.analytics.document({
+        kind: "DATA_ROOM",
+        targetPublicId: b.dataRoomPublicId,
+      }),
+  },
+  {
+    name: "analytics.viewerVisits for B's data room and recipient",
+    kind: "read",
+    run: (a, { b }) =>
+      a.analytics.viewerVisits({
+        kind: "DATA_ROOM",
+        targetPublicId: b.dataRoomPublicId,
+        recipientId: b.recipientId,
+      }),
+  },
+
+  {
+    name: "analytics.esignEnvelope for B's template",
+    kind: "read",
+    run: (a, { b }) =>
+      a.analytics.esignEnvelope({ templatePublicId: b.templatePublicId }),
+  },
+  {
+    name: "analytics.esign with B's template as cursor",
+    kind: "read",
+    run: (a, { b }) => a.analytics.esign({ cursor: b.templateId }),
+  },
+
   // --- user-scoped credentials and stubs ----------------------------------
   {
     name: "passkey.createAuthenticationOptions with B admin's passkey",

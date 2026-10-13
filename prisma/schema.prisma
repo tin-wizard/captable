@@ -1037,6 +1037,9 @@ model ViewEvent {
   activeSeconds Int     @default(0)
   // { "1": 12, "2": 40 } seconds per PDF page; only ever raised by the heartbeat
   pageSeconds   Json?
+  // DATA_ROOM only: { [bucketId]: { n: pageCount, p: { "1": 12 } } } per document;
+  // null on visits recorded before it existed. Only ever raised by the heartbeat
+  docSeconds    Json?
 
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
