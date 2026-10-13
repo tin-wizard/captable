@@ -792,6 +792,26 @@ const cases: Case[] = [
       }),
   },
 
+  {
+    name: "analytics.document for B's data room",
+    kind: "read",
+    run: (a, { b }) =>
+      a.analytics.document({
+        kind: "DATA_ROOM",
+        targetPublicId: b.dataRoomPublicId,
+      }),
+  },
+  {
+    name: "analytics.viewerVisits for B's data room and recipient",
+    kind: "read",
+    run: (a, { b }) =>
+      a.analytics.viewerVisits({
+        kind: "DATA_ROOM",
+        targetPublicId: b.dataRoomPublicId,
+        recipientId: b.recipientId,
+      }),
+  },
+
   // --- user-scoped credentials and stubs ----------------------------------
   {
     name: "passkey.createAuthenticationOptions with B admin's passkey",

@@ -1,6 +1,7 @@
 import { createTRPCRouter } from "@/trpc/api/trpc";
 import { accessTokenRouter } from "../routers/access-token/router";
 import { activityRouter } from "../routers/activity-router/router";
+import { analyticsRouter } from "../routers/analytics-router/router";
 import { auditRouter } from "../routers/audit-router/router";
 import { authRouter } from "../routers/auth/router";
 import { bankAccountsRouter } from "../routers/bank-accounts/router";
@@ -34,6 +35,7 @@ import { updateRouter } from "../routers/update/router";
  */
 export const appRouter = createTRPCRouter({
   activity: activityRouter,
+  analytics: analyticsRouter,
   overview: overviewRouter,
   audit: auditRouter,
   company: companyRouter,
