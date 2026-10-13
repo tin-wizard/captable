@@ -102,7 +102,10 @@ export const EsignAnalytics = ({
         completed: r.completedAt,
         signed: r.signers.signed,
         signers: r.signers.total,
-        hours_to_complete: r.hoursToComplete,
+        hours_to_complete:
+          r.hoursToComplete === null
+            ? null
+            : Math.round(r.hoursToComplete * 100) / 100,
         waiting_on: r.waitingOn.map((w) => w.email).join(" "),
         stuck: r.stuck ? "yes" : "no",
       })),
