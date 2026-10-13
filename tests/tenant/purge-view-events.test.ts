@@ -1,5 +1,5 @@
 import {
-  RETENTION_MONTHS,
+  DEFAULT_RETENTION_MONTHS,
   purgeViewEventsWorker,
   retentionCutoff,
 } from "@/jobs/purge-view-events";
@@ -31,11 +31,15 @@ const mk = (companyId: string, createdAt: Date, recipientId: string) =>
   });
 
 describe("retention cutoff", () => {
-  it("is exactly 24 calendar months before now", () => {
-    expect(RETENTION_MONTHS).toBe(24);
-    expect(
-      retentionCutoff(new Date("2026-10-12T03:17:00Z")).toISOString(),
-    ).toBe("2024-10-12T03:17:00.000Z");
+  it("is exactly N calendar months before now", () => {
+    expect(DEFAULT_RETENTION_MONTHS).toBe(24);
+    const now = new Date("2026-10-12T03:17:00Z");
+    expect(retentionCutoff(now, 24).toISOString()).toBe(
+      "2024-10-12T03:17:00.000Z",
+    );
+    expect(retentionCutoff(now, 6).toISOString()).toBe(
+      "2026-04-12T03:17:00.000Z",
+    );
   });
 });
 
@@ -58,5 +62,31 @@ describe("purge view events", () => {
       await db.viewEvent.findUnique({ where: { id: newA.id } }),
     ).not.toBeNull();
     expect(await db.member.count()).toBe(members);
+  });
+});
+
+describe("per-company retention", () => {
+  it("purges each company at its own period and keeps 'keep forever'", async () => {
+    await db.company.update({
+      where: { id: a.companyId },
+      data: { viewRetentionMonths: 12 },
+    });
+    await db.company.update({
+      where: { id: b.companyId },
+      data: { viewRetentionMonths: null },
+    });
+    const a13 = await mk(a.companyId, months(13), "a13");
+    const a11 = await mk(a.companyId, months(11), "a11");
+    const b30 = await mk(b.companyId, months(30), "b30");
+
+    await purgeViewEventsWorker.handler([{ data: {} } as never]);
+
+    expect(await db.viewEvent.findUnique({ where: { id: a13.id } })).toBeNull();
+    expect(
+      await db.viewEvent.findUnique({ where: { id: a11.id } }),
+    ).not.toBeNull();
+    expect(
+      await db.viewEvent.findUnique({ where: { id: b30.id } }),
+    ).not.toBeNull();
   });
 });
