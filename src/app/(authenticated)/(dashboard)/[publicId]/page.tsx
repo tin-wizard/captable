@@ -1,8 +1,17 @@
+import { dayjsExt } from "@/common/dayjs";
+import {
+  StatCard,
+  formatCompact,
+  formatCount,
+  formatMoney,
+} from "@/components/analytics";
 import ActivitiesCard from "@/components/dashboard/overview/activities-card";
-import DonutCard from "@/components/dashboard/overview/donut-card";
-import SummaryTable from "@/components/dashboard/overview/summary-table";
-import OverviewCard from "@/components/dashboard/overview/top-card";
+import { OwnershipCard } from "@/components/dashboard/overview/ownership-card";
+import { SummaryTable } from "@/components/dashboard/overview/summary-table";
+import { delta } from "@/server/analytics/range";
+import { api } from "@/trpc/server";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Overview",
@@ -12,42 +21,109 @@ const OverviewPage = async (props: {
   params: Promise<{ publicId: string }>;
 }) => {
   const params = await props.params;
-
   const { publicId } = params;
+
+  const { holdings, stakeholders, engagement, esign } =
+    await api.overview.summary.query();
+  const base = `/${publicId}`;
 
   return (
     <>
-      {/* <EmptyOverview firstName={firstName} publicCompanyId={publicCompanyId} /> */}
-
       <header>
         <h3 className="font-medium">Overview</h3>
         <p className="text-sm text-muted-foreground">
-          View your company{`'`}s captable overview
+          Ownership, activity and what needs your attention
         </p>
       </header>
 
-      <div className="grid gap-8 md:grid-cols-12">
-        <div className="sm:col-span-12 md:col-span-6 lg:col-span-8">
-          {/* Overview */}
-          <section className="mt-6">
-            <div className="grid grid-cols-2 gap-8 md:grid-cols-2 lg:grid-cols-3">
-              <OverviewCard
-                title="Amount raised"
-                amount={28000000}
-                prefix="$"
-              />
-              <OverviewCard title="Diluted shares" amount={7560010} />
-              <OverviewCard title="Stakeholders" amount={28} format={false} />
-            </div>
-          </section>
+      {holdings && (
+        <section
+          aria-label="Key numbers"
+          className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4"
+        >
+          <StatCard
+            label="Issued shares"
+            value={formatCount(holdings.issuedShares)}
+            hint="Shares with status Active."
+          />
+          <StatCard
+            label="Fully diluted"
+            value={formatCount(holdings.fullyDiluted)}
+            hint="Issued shares + active options + the part of each equity plan reserve not yet granted."
+          />
+          <StatCard
+            label="Issued value"
+            value={formatMoney(holdings.issuedValue)}
+            hint="Sum of each active share's capital contribution, or quantity × price per share when no contribution is recorded."
+          />
+          <StatCard
+            label="Investments recorded"
+            value={formatMoney(holdings.investmentsRecorded)}
+            hint={`Sum of recorded investments.${
+              holdings.convertibleCapital
+                ? ` Plus ${formatMoney(
+                    holdings.convertibleCapital,
+                  )} in active SAFEs and notes, not yet converted.`
+                : ""
+            }`}
+          />
+        </section>
+      )}
 
-          {/* Tremor chart */}
-          <section className="mt-6">
-            <DonutCard />
-          </section>
+      <div className="mt-6 grid gap-6 lg:grid-cols-12">
+        <div className="space-y-6 lg:col-span-8">
+          {holdings && (
+            <OwnershipCard
+              byClass={holdings.byClass}
+              byStakeholder={holdings.byStakeholder}
+            />
+          )}
+
+          {engagement && (
+            <section
+              aria-label="This week"
+              className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+            >
+              <StatCard
+                label="Views this week"
+                value={formatCompact(engagement.views7d)}
+                delta={delta(engagement.views7d, engagement.viewsPrev7d)}
+                spark={engagement.series.map((s) => ({
+                  index: s.day,
+                  value: s.views,
+                }))}
+                href={`${base}/activity`}
+              />
+              <StatCard
+                label="Not opened yet"
+                value={formatCount(engagement.unopened)}
+                hint="Recipients who were sent a link at least 3 days ago and have not opened it."
+                upIsGood={false}
+                href={`${base}/documents/data-rooms`}
+              />
+              {esign && (
+                <StatCard
+                  label="Awaiting signatures"
+                  value={formatCount(esign.pending)}
+                  hint={`${esign.completed30d} completed in the last 30 days.`}
+                  upIsGood={false}
+                  href={`${base}/documents/esign`}
+                />
+              )}
+            </section>
+          )}
         </div>
 
-        <div className="mt-6 sm:col-span-12 md:col-span-6 lg:col-span-4">
+        <div className="lg:col-span-4">
+          {stakeholders !== null && (
+            <p className="mb-4 text-sm text-muted-foreground">
+              <Link href={`${base}/stakeholders`} className="underline">
+                {formatCount(stakeholders)} stakeholder
+                {stakeholders === 1 ? "" : "s"}
+              </Link>
+              {" · "}as of {dayjsExt().format("MMM D")}
+            </p>
+          )}
           <ActivitiesCard
             publicId={publicId}
             className="border-none bg-transparent shadow-none"
@@ -55,14 +131,15 @@ const OverviewPage = async (props: {
         </div>
       </div>
 
-      <div className="mt-10">
-        <h4 className="font-medium">Summary</h4>
-        <p className="text-sm text-muted-foreground">
-          Summary of your company{`'`}s captable
-        </p>
-
-        <SummaryTable />
-      </div>
+      {holdings && (
+        <div className="mt-10">
+          <h4 className="font-medium">Summary</h4>
+          <p className="text-sm text-muted-foreground">
+            Issued shares and value by share class
+          </p>
+          <SummaryTable rows={holdings.byClass} />
+        </div>
+      )}
     </>
   );
 };
