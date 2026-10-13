@@ -1,7 +1,7 @@
 import { findUnopened } from "@/server/activity/unopened";
 import { getHoldings } from "@/server/analytics/holdings";
 import { canRead } from "@/server/analytics/permissions";
-import { dayBuckets } from "@/server/analytics/range";
+import { dayBuckets, localDay } from "@/server/analytics/range";
 import { withAccessControl } from "@/trpc/api/trpc";
 
 const DAY = 86_400_000;
@@ -29,10 +29,17 @@ export const summaryProcedure = withAccessControl.query(async ({ ctx }) => {
     });
     const cut = now.getTime() - 7 * DAY;
     const views7d = events.filter((e) => e.createdAt.getTime() >= cut).length;
-    const days = dayBuckets(new Date(now.getTime() - 6 * DAY), now);
+    const { timezone: tz } = await db.company.findUniqueOrThrow({
+      where: { id: companyId },
+      select: { timezone: true },
+    });
+    // the last 7 local calendar days; a 7*24h span can touch 8 across DST
+    const days = dayBuckets(new Date(now.getTime() - 7 * DAY), now, tz).slice(
+      -7,
+    );
     const perDay = new Map(days.map((d) => [d, 0]));
     for (const e of events) {
-      const k = e.createdAt.toISOString().slice(0, 10);
+      const k = localDay(e.createdAt, tz);
       if (perDay.has(k)) perDay.set(k, (perDay.get(k) ?? 0) + 1);
     }
     engagement = {

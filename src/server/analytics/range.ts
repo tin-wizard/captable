@@ -11,57 +11,156 @@ export type RangeInput = {
   to?: string;
 };
 
-const startOfUtcDay = (t: number) => t - (((t % DAY) + DAY) % DAY);
+const dayFmt = new Map<string, Intl.DateTimeFormat>();
+const partsFmt = new Map<string, Intl.DateTimeFormat>();
 
-// Epoch ms of the UTC day containing the value, or null when it is not an ISO date.
-function parseDay(value: string | undefined): number | null {
+function cached(
+  cache: Map<string, Intl.DateTimeFormat>,
+  tz: string,
+  make: () => Intl.DateTimeFormat,
+) {
+  let f = cache.get(tz);
+  if (!f) {
+    f = make();
+    cache.set(tz, f);
+  }
+  return f;
+}
+
+/** `YYYY-MM-DD` of the instant on the wall calendar of `tz`. */
+export function localDay(date: Date, tz = "UTC"): string {
+  if (tz === "UTC") return date.toISOString().slice(0, 10);
+  return cached(
+    dayFmt,
+    tz,
+    () =>
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: tz,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }),
+  ).format(date);
+}
+
+// wall-clock fields of the instant in `tz`
+function wallClock(t: number, tz: string) {
+  const parts = cached(
+    partsFmt,
+    tz,
+    () =>
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        hourCycle: "h23",
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+        second: "numeric",
+      }),
+  ).formatToParts(t);
+  const n = (type: string) =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return {
+    y: n("year"),
+    mo: n("month"),
+    d: n("day"),
+    h: n("hour"),
+    mi: n("minute"),
+    s: n("second"),
+  };
+}
+
+/** Integer wall-clock hour (0-23) of the instant in `tz`. */
+export function localHour(date: Date, tz = "UTC"): number {
+  return tz === "UTC" ? date.getUTCHours() : wallClock(date.getTime(), tz).h;
+}
+
+// ms the wall clock of `tz` is ahead of UTC at instant t (+13 h in Auckland);
+function offsetAt(t: number, tz: string) {
+  const w = wallClock(t, tz);
+  return Date.UTC(w.y, w.mo - 1, w.d, w.h, w.mi, w.s) - t; // t is whole seconds
+}
+
+// calendar arithmetic on the date itself, never on an instant, so DST cannot
+// skip or repeat a day
+const addDays = (day: string, n: number) =>
+  new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY).toISOString().slice(0, 10);
+
+/** The first instant of the local calendar day `day` (`YYYY-MM-DD`) in `tz`. */
+export function localMidnight(day: string, tz = "UTC"): Date {
+  const naive = Date.parse(`${day}T00:00:00Z`);
+  if (tz === "UTC") return new Date(naive);
+  // The offset that applies at local midnight is one of the offsets in force
+  // within 14 h of the naive instant (offsets span -12..+14). Each gives a
+  // candidate; the earliest that falls on `day` is its start, which is also the
+  // right answer when a DST jump skips midnight itself.
+  let best = Number.POSITIVE_INFINITY;
+  for (const probe of [naive - 14 * 3_600_000, naive, naive + 14 * 3_600_000]) {
+    const t = naive - offsetAt(probe, tz);
+    if (t < best && localDay(new Date(t), tz) === day) best = t;
+  }
+  return new Date(best);
+}
+
+// The day (`YYYY-MM-DD` in `tz`) the value names, or null when it is not an ISO date.
+function parseDay(value: string | undefined, tz: string): string | null {
   if (!value) return null;
   const date = DATE_ONLY.test(value);
   if (!date && !FULL_ISO.test(value)) return null;
   const t = Date.parse(date ? `${value}T00:00:00Z` : value);
   if (Number.isNaN(t)) return null;
   // rejects 2026-02-31, which Date.parse would roll over
-  if (date && new Date(t).toISOString().slice(0, 10) !== value) return null;
-  return startOfUtcDay(t);
+  if (date)
+    return new Date(t).toISOString().slice(0, 10) === value ? value : null;
+  return localDay(new Date(t), tz);
 }
 
-export function parseRange(input: RangeInput, now: Date = new Date()) {
-  let fromDay: number;
-  let toDay = startOfUtcDay(now.getTime());
-  fromDay =
-    toDay -
-    ((input.range && input.range !== "custom" ? PRESETS[input.range] : 30) -
-      1) *
-      DAY;
+/**
+ * Whole local days in `tz`: `from` is local midnight of the first day, `to` the
+ * last millisecond of the last day, and the previous period has as many days.
+ */
+export function parseRange(
+  input: RangeInput,
+  now: Date = new Date(),
+  tz = "UTC",
+) {
+  let toDay = localDay(now, tz);
+  let fromDay = addDays(
+    toDay,
+    -(
+      (input.range && input.range !== "custom" ? PRESETS[input.range] : 30) - 1
+    ),
+  );
 
   if (input.range === "custom") {
-    const a = parseDay(input.from);
-    const b = parseDay(input.to);
+    const a = parseDay(input.from, tz);
+    const b = parseDay(input.to, tz);
     if (a !== null && b !== null) {
-      fromDay = Math.min(a, b);
-      toDay = Math.max(a, b);
+      [fromDay, toDay] = a <= b ? [a, b] : [b, a];
       // shortcut: over-long ranges are clamped, not rejected; keep the end
-      fromDay = Math.max(fromDay, toDay - (MAX_DAYS - 1) * DAY);
+      const earliest = addDays(toDay, -(MAX_DAYS - 1));
+      if (fromDay < earliest) fromDay = earliest;
     }
   }
 
-  const days = Math.round((toDay - fromDay) / DAY) + 1;
+  const days = Math.round((Date.parse(toDay) - Date.parse(fromDay)) / DAY) + 1;
+  const from = localMidnight(fromDay, tz);
   return {
-    from: new Date(fromDay),
-    to: new Date(toDay + DAY - 1),
-    previousFrom: new Date(fromDay - days * DAY),
-    previousTo: new Date(fromDay - 1),
+    from,
+    to: new Date(localMidnight(addDays(toDay, 1), tz).getTime() - 1),
+    previousFrom: localMidnight(addDays(fromDay, -days), tz),
+    previousTo: new Date(from.getTime() - 1),
     days,
   };
 }
 
-/** UTC `YYYY-MM-DD` for every day from `from` to `to`, both inclusive. */
-export function dayBuckets(from: Date, to: Date): string[] {
+/** `YYYY-MM-DD` in `tz` for every local day from `from` to `to`, both inclusive. */
+export function dayBuckets(from: Date, to: Date, tz = "UTC"): string[] {
   const out: string[] = [];
-  const end = startOfUtcDay(to.getTime());
-  for (let t = startOfUtcDay(from.getTime()); t <= end; t += DAY) {
-    out.push(new Date(t).toISOString().slice(0, 10));
-  }
+  const end = localDay(to, tz);
+  for (let d = localDay(from, tz); d <= end; d = addDays(d, 1)) out.push(d);
   return out;
 }
 

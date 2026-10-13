@@ -14,13 +14,22 @@ export const companyProcedure = withAccessControl
     const { db, companyId } = ctx.tenant;
     const perms = ctx.permissions;
     const audits = canRead(perms, "audits");
+    const { timezone: tz } = await db.company.findUniqueOrThrow({
+      where: { id: companyId },
+      select: { timezone: true },
+    });
 
     const [engagement, esign, holdings] = await Promise.all([
       audits && (canRead(perms, "data-rooms") || canRead(perms, "updates"))
-        ? getCompanyEngagement(db, companyId, input)
+        ? getCompanyEngagement(db, companyId, { ...input, tz })
         : null,
       canRead(perms, "templates")
-        ? getEsignAnalytics(db, { ...input, limit: 5, canSeeViews: audits })
+        ? getEsignAnalytics(db, {
+            ...input,
+            tz,
+            limit: 5,
+            canSeeViews: audits,
+          })
         : null,
       canRead(perms, "securities") ? getHoldings(db) : null,
     ]);

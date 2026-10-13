@@ -1,5 +1,5 @@
 import type { TPrismaOrTransaction } from "@/server/db";
-import { type RangeInput, dayBuckets, parseRange } from "./range";
+import { type RangeInput, dayBuckets, localDay, parseRange } from "./range";
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
@@ -74,6 +74,8 @@ export type EsignInput = RangeInput & {
   limit?: number;
   canSeeViews: boolean;
   now?: Date;
+  /** IANA zone the day buckets follow */
+  tz?: string;
 };
 
 const median = (xs: number[]) => {
@@ -86,7 +88,6 @@ const median = (xs: number[]) => {
 };
 const avg = (xs: number[]) =>
   xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
-const day = (d: Date) => d.toISOString().slice(0, 10);
 
 type Timing = {
   recipientId: string;
@@ -108,7 +109,8 @@ export async function getEsignAnalytics(
   input: EsignInput,
 ): Promise<EsignAnalytics> {
   const now = input.now ?? new Date();
-  const range = parseRange(input, now);
+  const tz = input.tz ?? "UTC";
+  const range = parseRange(input, now, tz);
   const limit = Math.min(Math.max(input.limit ?? 25, 1), 50);
 
   const templates = await db.template.findMany({
@@ -236,15 +238,18 @@ export async function getEsignAnalytics(
   );
 
   const perDay = new Map(
-    dayBuckets(range.from, range.to).map((d) => [d, { sent: 0, completed: 0 }]),
+    dayBuckets(range.from, range.to, tz).map((d) => [
+      d,
+      { sent: 0, completed: 0 },
+    ]),
   );
   for (const r of inWindow) {
     if (r.sentAt) {
-      const b = perDay.get(day(r.sentAt));
+      const b = perDay.get(localDay(r.sentAt, tz));
       if (b) b.sent += 1;
     }
     if (r.t.completedOn) {
-      const b = perDay.get(day(r.t.completedOn));
+      const b = perDay.get(localDay(r.t.completedOn, tz));
       if (b) b.completed += 1;
     }
   }

@@ -1,6 +1,6 @@
 import type { TPrismaOrTransaction } from "@/server/db";
 import { type DocumentsSummaryItem, getDocumentsSummary } from "./document";
-import { type RangeInput, dayBuckets, parseRange } from "./range";
+import { type RangeInput, dayBuckets, localDay, parseRange } from "./range";
 
 const MAX_EVENTS = 50_000;
 const TOP_ITEMS = 50;
@@ -25,9 +25,10 @@ export type CompanyEngagement = {
 export async function getCompanyEngagement(
   db: TPrismaOrTransaction,
   companyId: string,
-  input: RangeInput & { now?: Date },
+  input: RangeInput & { now?: Date; tz?: string },
 ): Promise<CompanyEngagement> {
-  const range = parseRange(input, input.now);
+  const tz = input.tz ?? "UTC";
+  const range = parseRange(input, input.now, tz);
   const events = await db.viewEvent.findMany({
     where: {
       isBot: false,
@@ -53,11 +54,13 @@ export async function getCompanyEngagement(
       : 0,
   });
 
-  const perDay = new Map(dayBuckets(range.from, range.to).map((d) => [d, 0]));
+  const perDay = new Map(
+    dayBuckets(range.from, range.to, tz).map((d) => [d, 0]),
+  );
   const byKind = { DATA_ROOM: 0, UPDATE: 0, ESIGN: 0 };
   const countries = new Map<string, number>();
   for (const e of current) {
-    const k = e.createdAt.toISOString().slice(0, 10);
+    const k = localDay(e.createdAt, tz);
     if (perDay.has(k)) perDay.set(k, (perDay.get(k) ?? 0) + 1);
     byKind[e.kind] += 1;
     if (e.country)
