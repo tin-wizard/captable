@@ -1,4 +1,5 @@
 import FilePreview from "@/components/file/preview";
+import { DownloadButton } from "@/components/share/download-button";
 import { ExpiredLink } from "@/components/share/expired-link";
 import { SharePageLayout } from "@/components/share/page-layout";
 import { ViewBeacon } from "@/components/share/view-beacon";
@@ -127,6 +128,11 @@ const DataRoomPage = async (props: {
         name={file.name}
         url={remoteFile.url}
         mimeType={file.mimeType}
+        downloadButton={
+          dataRoom.allowDownload ? (
+            <DownloadButton token={token} bucketId={file.id} />
+          ) : undefined
+        }
       />
     </SharePageLayout>
   );

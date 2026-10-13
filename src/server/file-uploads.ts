@@ -106,12 +106,23 @@ export const getPresignedPutUrl = async ({
   };
 };
 
-export const getPresignedGetUrl = async (key: string) => {
+// Safe inside a quoted Content-Disposition filename: no quotes, control
+// characters, backslashes or path separators.
+export const attachmentFilename = (name: string) =>
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping them is the point
+  name.replace(/["\\/\u0000-\u001f\u007f]/g, "").trim() || "download";
+
+export const getPresignedGetUrl = async (
+  key: string,
+  opts?: { attachmentName?: string },
+) => {
   const getObjectCommand = new GetObjectCommand({
     Bucket: PrivateBucket,
     Key: key,
-    // ResponseContentDisposition: `attachment; filename="${key}"`,
-    ResponseContentDisposition: "inline",
+    ResponseContentDisposition:
+      opts?.attachmentName === undefined
+        ? "inline"
+        : `attachment; filename="${attachmentFilename(opts.attachmentName)}"`,
   });
 
   const url = await getSignedUrl(S3, getObjectCommand, {

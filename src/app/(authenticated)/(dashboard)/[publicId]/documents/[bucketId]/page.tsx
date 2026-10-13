@@ -67,6 +67,11 @@ const DocumentPreview = async (props: {
           name={file.name}
           url={remoteFile.url}
           mimeType={file.mimeType}
+          downloadButton={
+            <a href={remoteFile.url} target="_blank" rel="noopener noreferrer">
+              <Button>Download {file.name}</Button>
+            </a>
+          }
         />
       </Card>
     </Fragment>
