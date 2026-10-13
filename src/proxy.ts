@@ -26,6 +26,7 @@ const CANONICAL_ONLY = [
   "/onboarding",
   "/company/new",
   "/logout",
+  "/choose-company",
 ];
 
 export function isSameOrigin(
@@ -43,10 +44,7 @@ export function isSameOrigin(
   }
 }
 
-export function tenantAuthRedirect(
-  pathname: string,
-  _search: URLSearchParams,
-): string | null {
+export function tenantAuthRedirect(pathname: string): string | null {
   // "/login" reaches the page: a company host renders its own login view there.
   if (
     CANONICAL_ONLY.some((p) => pathname === p || pathname.startsWith(`${p}/`))
@@ -59,7 +57,7 @@ const log = logger.child({ module: "middleware" });
 
 export function proxy(request: NextRequest) {
   const host = request.headers.get("host") ?? "";
-  const { pathname, searchParams, search } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
 
   if (env.LOGS || env.NODE_ENV === "production" || env.NODE_ENV === "staging") {
     const ip = request.headers.get("x-real-ip") ?? "";
@@ -84,14 +82,13 @@ export function proxy(request: NextRequest) {
     return new NextResponse("Not found", { status: 404 });
   }
   if (cls.kind === "platform") {
-    const target = tenantAuthRedirect(pathname, searchParams);
+    const target = tenantAuthRedirect(pathname);
     if (target?.startsWith("canonical:")) {
       return NextResponse.redirect(
         `${cfg.canonicalOrigin}${target.slice("canonical:".length)}${search}`,
         307,
       );
     }
-    if (target) return NextResponse.redirect(new URL(target, request.url), 307);
   }
 
   const headers = new Headers(request.headers);

@@ -87,32 +87,23 @@ describe("isSameOrigin", () => {
 
 describe("tenantAuthRedirect", () => {
   it("login is left to the page (company login view)", () =>
-    expect(
-      tenantAuthRedirect(
-        "/login",
-        new URLSearchParams("callbackUrl=%2Fabc%2Fx"),
-      ),
-    ).toBeNull());
+    expect(tenantAuthRedirect("/login")).toBeNull());
   it("signup goes to canonical", () =>
-    expect(tenantAuthRedirect("/signup", new URLSearchParams())).toBe(
-      "canonical:/signup",
-    ));
+    expect(tenantAuthRedirect("/signup")).toBe("canonical:/signup"));
   it("sub-paths of canonical-only pages go to canonical", () =>
-    expect(
-      tenantAuthRedirect("/reset-password/tok", new URLSearchParams()),
-    ).toBe("canonical:/reset-password/tok"));
+    expect(tenantAuthRedirect("/reset-password/tok")).toBe(
+      "canonical:/reset-password/tok",
+    ));
   it("logout goes to canonical", () =>
-    expect(tenantAuthRedirect("/logout", new URLSearchParams())).toBe(
-      "canonical:/logout",
+    expect(tenantAuthRedirect("/logout")).toBe("canonical:/logout"));
+  it("the company chooser goes to canonical", () =>
+    expect(tenantAuthRedirect("/choose-company")).toBe(
+      "canonical:/choose-company",
     ));
   it("ordinary pages are untouched", () =>
-    expect(
-      tenantAuthRedirect("/abc/stakeholders", new URLSearchParams()),
-    ).toBeNull());
+    expect(tenantAuthRedirect("/abc/stakeholders")).toBeNull());
   it("prefix look-alikes are untouched", () =>
-    expect(
-      tenantAuthRedirect("/newsletter", new URLSearchParams()),
-    ).toBeNull());
+    expect(tenantAuthRedirect("/newsletter")).toBeNull());
 });
 
 describe("proxy", () => {
@@ -133,6 +124,13 @@ describe("proxy", () => {
     expect(signup.headers.get("location")).toBe(
       "https://dealroom.tin.info/signup?ref=1",
     );
+  });
+  it("sends the company chooser on a company host to canonical", () => {
+    expect(
+      proxy(req("https://acme.dealroom.tin.info/choose-company")).headers.get(
+        "location",
+      ),
+    ).toBe("https://dealroom.tin.info/choose-company");
   });
   it("overwrites inbound x-dr-path and marks platform hosts noindex", () => {
     const res = proxy(

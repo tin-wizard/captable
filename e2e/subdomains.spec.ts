@@ -23,6 +23,15 @@ async function continueToCanonicalLogin(page: Page, label: string) {
   await page.waitForURL(new RegExp(`^${esc(ROOT)}/login`));
 }
 
+// first visit to a company host has no tenant session yet: its login page, Continue runs the handoff
+async function landOnCompany(page: Page, label: string) {
+  await page.waitForURL(new RegExp(`^${esc(host(label))}/`));
+  if (new URL(page.url()).pathname === "/login") {
+    await page.getByRole("link", { name: "Continue" }).click();
+  }
+  await page.waitForURL(new RegExp(`^${esc(host(label))}/(?!login)[^/?]+`));
+}
+
 async function login(page: Page, email: string) {
   await page.goto(`${ROOT}/login`);
   await submitLogin(page, email);
@@ -67,7 +76,7 @@ async function adminWithCompany(browser: Browser, label: string, name: string) {
   const page = await ctx.newPage();
   await login(page, "admin@e2e.test");
   await createCompany(page, name, label);
-  await page.waitForURL(new RegExp(`^${esc(host(label))}/[^/]+`));
+  await landOnCompany(page, label);
   return { ctx, page, url: page.url() };
 }
 
@@ -81,7 +90,7 @@ test("mandatory: company creation provisions a working, isolated subdomain", asy
   await login(page, "admin@e2e.test"); // step 1
 
   await createCompany(page, `Botski ${RUN}`, botski); // steps 2-4
-  await page.waitForURL(new RegExp(`^${esc(host(botski))}/[^/]+`)); // step 5
+  await landOnCompany(page, botski); // step 5
   await expect(page.getByText(`Botski ${RUN}`).first()).toBeVisible(); // step 6
   const botskiUrl = page.url();
 
@@ -102,7 +111,10 @@ test("mandatory: company creation provisions a working, isolated subdomain", asy
 
   const outsider = await browser.newContext(); // step 7
   const op = await outsider.newPage();
-  await login(op, "outsider@e2e.test");
+  await op.goto(`${ROOT}/login`);
+  await submitLogin(op, "outsider@e2e.test");
+  // one company: straight to its own host, no chooser
+  await op.waitForURL((u) => u.origin !== new URL(ROOT).origin);
   await op.goto(botskiUrl);
   await op.waitForURL(new RegExp(`^${esc(host(botski))}/login`));
   await op.getByRole("link", { name: "Continue" }).click(); // canonical session, not a member
@@ -148,7 +160,7 @@ test("two tabs: each tab keeps its own company after reloading both", async ({
   const first = await adminWithCompany(browser, a, `TabsA ${RUN}`);
   const p2 = await first.ctx.newPage();
   await createCompany(p2, `TabsB ${RUN}`, b);
-  await p2.waitForURL(new RegExp(`^${esc(host(b))}/`));
+  await landOnCompany(p2, b);
   const second = p2.url();
 
   await first.page.reload();
@@ -167,7 +179,7 @@ test("sign-out on one company host signs out every host", async ({
   const first = await adminWithCompany(browser, a, `OutA ${RUN}`);
   const p2 = await first.ctx.newPage();
   await createCompany(p2, `OutB ${RUN}`, b);
-  await p2.waitForURL(new RegExp(`^${esc(host(b))}/`));
+  await landOnCompany(p2, b);
 
   // what the user menu's "Sign out" does on a company host
   await p2.evaluate(() => {
@@ -257,9 +269,9 @@ test("company login page shows the name only when the company opts in", async ({
   // default off: only the (already public) address
   await visitor.goto(`${host(label)}/login`);
   await expect(
-    visitor.getByRole("heading", { name: `${label}.${BASE}` }),
+    visitor.getByRole("heading", { name: `${label}.${BASE}`, exact: true }),
   ).toBeVisible();
-  await expect(visitor.getByText(name)).toHaveCount(0);
+  await expect(visitor.locator("img")).toHaveCount(0); // no logo
 
   await page.goto(`${url}/settings/company`);
   await page.getByLabel("Show our name and logo on the login page").click();
@@ -268,4 +280,24 @@ test("company login page shows the name only when the company opts in", async ({
 
   await visitor.reload();
   await expect(visitor.getByRole("heading", { name })).toBeVisible();
+});
+
+test("several companies: login shows the chooser, picking one opens its host", async ({
+  browser,
+}) => {
+  // admin@e2e.test is seeded with Seed Co and Legacy Co, so always has two or more
+  const legacy = process.env.E2E_LEGACY_PUBLIC_ID as string;
+  const legacyLabel = process.env.E2E_LEGACY_LABEL as string;
+  expect(legacy, "E2E_LEGACY_PUBLIC_ID (run e2e/seed.ts)").toBeTruthy();
+  const page = await (await browser.newContext()).newPage();
+  await login(page, "admin@e2e.test");
+  await expect(page).toHaveURL(`${ROOT}/choose-company`);
+  await expect(
+    page.getByRole("heading", { name: "Choose a company" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Legacy Co" }).click();
+  await landOnCompany(page, legacyLabel);
+  await expect(page).toHaveURL(
+    new RegExp(`^${esc(host(legacyLabel))}/${legacy}`),
+  );
 });
