@@ -23,13 +23,14 @@ import { toCsv } from "@/server/analytics/csv";
 import { api } from "@/trpc/react";
 import type { RouterOutputs } from "@/trpc/shared";
 import { BarChart } from "@tremor/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { formatPct, formatUsd } from "./holders-table";
 import {
   type RoundFormValues,
   type RoundInputErrors,
   type RoundInputValue,
   formatDilution,
+  latestGuard,
   sortHolders,
   validateRoundInput,
 } from "./round-input";
@@ -65,12 +66,13 @@ export const RoundModel = () => {
     result: Proforma;
     inputs: RoundInputValue;
   } | null>(null);
-  // bumped on every edit/calculate so a slow response cannot resurrect old figures
-  const seq = useRef(0);
+  // so a slow response cannot resurrect old figures after an edit
+  const [guard] = useState(latestGuard);
 
   const set =
     (k: keyof RoundFormValues) => (e: { target: { value: string } }) => {
-      seq.current++;
+      guard.invalidate();
+      setLoading(false);
       setShown(null);
       setFailure(null);
       setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -78,8 +80,7 @@ export const RoundModel = () => {
 
   const calculate = async () => {
     const parsed = validateRoundInput(form);
-    seq.current++;
-    const mine = seq.current;
+    const mine = guard.begin();
     setShown(null);
     setFailure(null);
     if (!parsed.ok) {
@@ -90,9 +91,9 @@ export const RoundModel = () => {
     setLoading(true);
     try {
       const result = await utils.captable.proforma.fetch(parsed.value);
-      if (mine === seq.current) setShown({ result, inputs: parsed.value });
+      if (guard.isCurrent(mine)) setShown({ result, inputs: parsed.value });
     } catch (e) {
-      if (mine === seq.current) {
+      if (guard.isCurrent(mine)) {
         setFailure(
           friendlyError(
             e instanceof Error ? e.message : "Could not run the model.",
@@ -100,7 +101,7 @@ export const RoundModel = () => {
         );
       }
     } finally {
-      if (mine === seq.current) setLoading(false);
+      if (guard.isCurrent(mine)) setLoading(false);
     }
   };
 
@@ -177,9 +178,18 @@ export const RoundModel = () => {
         </form>
       </Card>
 
-      <p className="text-sm text-muted-foreground" role="note">
-        Estimate, not legal advice. Check against your counsel's model.
-      </p>
+      <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+        <p role="note">
+          Estimate, not legal advice. Check against your counsel's model.
+        </p>
+        <p>
+          Pre-money is the fully diluted pre-money valuation, including
+          converting SAFEs and notes and the option pool top-up. The pool target
+          is the unallocated pool after the round, as a share of post-money
+          shares. Note interest is simple (compounding is ignored). The as-of
+          date only affects note interest; holdings are as of today.
+        </p>
+      </div>
 
       {failure && (
         <Card className="p-4 text-sm" role="alert">

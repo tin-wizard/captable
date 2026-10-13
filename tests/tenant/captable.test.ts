@@ -29,6 +29,7 @@ const AS_OF = "2026-10-13";
 let a: Tenant;
 let b: Tenant;
 let empty: Tenant;
+let nonConv: Tenant;
 const extraUsers: string[] = [];
 let common: string;
 let seriesA: string;
@@ -146,6 +147,7 @@ beforeAll(async () => {
   a = await seedTenant("ct-a");
   b = await seedTenant("ct-b");
   empty = await seedTenant("ct-empty");
+  nonConv = await seedTenant("ct-nc");
 
   common = await shareClass(a, "Common", 1);
   seriesA = await shareClass(a, "Series A", 2);
@@ -235,12 +237,43 @@ beforeAll(async () => {
   const bClass = await shareClass(b, "B Common", 1);
   bHolder = await stakeholder(b, "Bea");
   await share(b, bClass, bHolder, 777_777);
+  await db.safe.create({
+    data: {
+      companyId: b.companyId,
+      stakeholderId: bHolder,
+      publicId: "B-SAFE-01",
+      status: "ACTIVE",
+      type: "POST_MONEY",
+      capital: 123_456,
+      valuationCap: 5_000_000,
+      issueDate: new Date(),
+      boardApprovalDate: new Date(),
+    },
+  });
+
+  // a post-money SAFE at 95 % of its cap: the solver does not converge
+  const ncClass = await shareClass(nonConv, "NC Common", 1);
+  const ncHolder = await stakeholder(nonConv, "Nina");
+  await share(nonConv, ncClass, ncHolder, 1_000);
+  await db.safe.create({
+    data: {
+      companyId: nonConv.companyId,
+      stakeholderId: ncHolder,
+      publicId: "NC-SAFE-01",
+      status: "ACTIVE",
+      type: "POST_MONEY",
+      capital: 950_000,
+      valuationCap: 1_000_000,
+      issueDate: new Date(),
+      boardApprovalDate: new Date(),
+    },
+  });
 });
 
 afterAll(async () => {
   await db.member.deleteMany({ where: { userId: { in: extraUsers } } });
   await db.customRole.deleteMany({ where: { companyId: a.companyId } });
-  await cleanupTenants(a, b, empty);
+  await cleanupTenants(a, b, empty, nonConv);
   await db.user.deleteMany({ where: { id: { in: extraUsers } } });
 });
 
@@ -266,8 +299,15 @@ describe("captable.table", () => {
     const names = rows.map((r) => r.name);
     expect(names.slice(0, 2)).toEqual(["Alice", "Bob"]);
     expect(names.slice(2, 4).sort()).toEqual(["Acme", "Dan"]);
-    expect(names[4]).toBe("Erin");
-    expect(names).not.toContain("Carol"); // convertible only, no shares/options
+    // zero-issued holders sort last: Erin (options only), Carol (SAFE only)
+    expect(names.slice(4).sort()).toEqual(["Carol", "Erin"]);
+    expect(rows.find((r) => r.name === "Carol")).toMatchObject({
+      issued: 0,
+      options: 0,
+      fullyDiluted: 0,
+      byClass: {},
+      convertibleCapital: 50_000,
+    });
 
     const alice = rows.find((r) => r.name === "Alice");
     expect(alice).toMatchObject({
@@ -299,6 +339,19 @@ describe("captable.table", () => {
           1,
       ),
     ).toBeLessThan(1e-9);
+  });
+
+  it("row convertible capital over all pages equals the footer total", async () => {
+    const c = callerFor(a);
+    let total = 0;
+    let cursor: string | undefined;
+    for (let i = 0; i < 10; i++) {
+      const page = await c.captable.table({ limit: 2, cursor });
+      total += page.rows.reduce((n, r) => n + r.convertibleCapital, 0);
+      if (!page.nextCursor) break;
+      cursor = page.nextCursor;
+    }
+    expect(total).toBe(60_000);
   });
 
   it("filters by class, holder type and search without changing totals or pct", async () => {
@@ -455,6 +508,18 @@ describe("captable.proforma", () => {
       expect(r.dilutionPts).toBeCloseTo((r.pctAfter - r.pctBefore) * 100, 9);
     }
     expect(JSON.stringify(res)).not.toContain("Bea");
+  });
+
+  it("reports non-convergence with no figures to the caller", async () => {
+    const res = await callerFor(nonConv).captable.proforma(round);
+    expect(res.converged).toBe(false);
+    expect(res.holders).toEqual([]);
+  });
+
+  it("never converts another tenant's SAFEs", async () => {
+    const res = await callerFor(a).captable.proforma({ ...round, asOf: AS_OF });
+    expect(res.conversions.map((c) => c.amount)).not.toContain(123_456);
+    expect(res.conversions).toHaveLength(2);
   });
 
   it("refuses an empty company", async () => {

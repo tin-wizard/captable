@@ -21,7 +21,14 @@ export const formatPct = (ratio: number) => `${(ratio * 100).toFixed(2)}%`;
 
 const num = "text-right tabular-nums";
 
-export const HoldersTable = ({ data }: { data: CapTableData }) => {
+export const HoldersTable = ({
+  data,
+  showPool = false,
+}: {
+  data: CapTableData;
+  // only when no filter is active and this is the last page, so rows + pool = 100 %
+  showPool?: boolean;
+}) => {
   const { classes, rows, totals } = data;
   return (
     <Card className="overflow-x-auto">
@@ -80,6 +87,30 @@ export const HoldersTable = ({ data }: { data: CapTableData }) => {
           ))}
         </TableBody>
         <TableFooter>
+          {showPool && (
+            <TableRow className="text-muted-foreground">
+              <TableCell className="font-normal">
+                Unallocated option pool
+              </TableCell>
+              {classes.map((c) => (
+                <TableCell key={c.id} />
+              ))}
+              <TableCell />
+              <TableCell />
+              <TableCell />
+              <TableCell className={num}>
+                {formatCount(totals.unallocatedPool)}
+              </TableCell>
+              <TableCell className={num}>
+                {formatPct(
+                  totals.fullyDiluted > 0
+                    ? totals.unallocatedPool / totals.fullyDiluted
+                    : 0,
+                )}
+              </TableCell>
+              <TableCell />
+            </TableRow>
+          )}
           <TableRow>
             <TableCell className="font-medium">Company total</TableCell>
             {classes.map((c) => (

@@ -87,3 +87,16 @@ export function sortHolders<
     );
   return [...people, ...rows.filter((r) => r.stakeholderId === null)];
 }
+
+// Lets only the newest request touch the screen: an edit or a new Calculate
+// invalidates every earlier one.
+export function latestGuard() {
+  let n = 0;
+  return {
+    begin: () => ++n,
+    invalidate: () => {
+      n++;
+    },
+    isCurrent: (token: number) => token === n,
+  };
+}

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatDilution, sortHolders, validateRoundInput } from "./round-input";
+import {
+  formatDilution,
+  latestGuard,
+  sortHolders,
+  validateRoundInput,
+} from "./round-input";
 
 const ok = {
   preMoney: "10,000,000",
@@ -90,5 +95,19 @@ describe("sortHolders", () => {
       "Unallocated pool",
       "New investors",
     ]);
+  });
+});
+
+describe("latestGuard", () => {
+  it("an edit or a newer request makes earlier tokens stale", () => {
+    const g = latestGuard();
+    const first = g.begin();
+    expect(g.isCurrent(first)).toBe(true);
+    g.invalidate(); // input edited while in flight
+    expect(g.isCurrent(first)).toBe(false);
+    const second = g.begin();
+    const third = g.begin();
+    expect(g.isCurrent(second)).toBe(false);
+    expect(g.isCurrent(third)).toBe(true);
   });
 });

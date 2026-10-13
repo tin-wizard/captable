@@ -153,6 +153,35 @@ describe("modelRound", () => {
     expect(r.newInvestorShares).toBeCloseTo(100_000_000, 0);
   });
 
+  it("I: post-money SAFE at its cap with a pool top-up (hand-computed)", () => {
+    const r = modelRound({
+      preRoundFD: 9_500_000,
+      existingUnallocatedPool: 500_000,
+      preMoney: 20_000_000,
+      newMoney: 5_000_000,
+      poolTargetPct: 0.1,
+      convertibles: [
+        {
+          id: "s1",
+          holder: "Angel",
+          kind: "SAFE",
+          type: "POST_MONEY",
+          capital: 1_000_000,
+          cap: 10_000_000,
+          discount: 0.2,
+        },
+      ],
+    });
+    expect(r.converged).toBe(true);
+    expect(r.price).toBeCloseTo(1.7403315, 5);
+    expect(r.postFD).toBeCloseTo(14_365_079.36, 0);
+    expect(r.poolTopUpShares).toBeCloseTo(936_507.94, 0);
+    expect(r.conversions[0]?.shares).toBeCloseTo(1_055_555.56, 0);
+    expect(r.conversions[0]?.bound).toBe("cap");
+    expect(r.newInvestorPct).toBeCloseTo(0.2, 6);
+    expect(r.postMoney).toBeCloseTo(25_000_000, 0); // solver tolerance 1e-9
+  });
+
   it("guards: zero/negative/non-finite inputs give finite zeroed numbers", () => {
     const cases: RoundInput[] = [
       { ...base, preRoundFD: 0, preMoney: 1_000_000, newMoney: 100_000 },

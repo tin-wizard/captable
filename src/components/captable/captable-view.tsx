@@ -105,7 +105,15 @@ export const CapTableView = ({
             <ExportButton data={data} filters={filters} />
           </div>
         </div>
-        <HoldersTable data={data} />
+        <HoldersTable
+          data={data}
+          showPool={
+            !filters.classId &&
+            !filters.holderType &&
+            !filters.search &&
+            !data.nextCursor
+          }
+        />
         <Pager nextCursor={data.nextCursor} hasCursor={hasCursor} />
       </section>
       <RoundModel />

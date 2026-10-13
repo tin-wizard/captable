@@ -135,7 +135,15 @@ export async function getCapTable(db: TPrismaOrTransaction, f: CapTableFilter) {
   const search = f.search?.trim();
   const people = await db.stakeholder.findMany({
     where: {
-      id: { in: [...holders.keys()] },
+      // holders with only a convertible appear too (0 shares, their capital)
+      id: {
+        in: [
+          ...new Set([
+            ...holders.keys(),
+            ...[...convertible].filter(([, c]) => c > 0).map(([id]) => id),
+          ]),
+        ],
+      },
       ...(f.holderType && { stakeholderType: f.holderType }),
       ...(search && {
         OR: [
@@ -148,7 +156,10 @@ export async function getCapTable(db: TPrismaOrTransaction, f: CapTableFilter) {
   });
 
   const ordered = people
-    .map((p) => ({ p, h: holders.get(p.id) as Holder }))
+    .map((p) => ({
+      p,
+      h: holders.get(p.id) ?? { byClass: {}, issued: 0, options: 0 },
+    }))
     .filter(({ h }) => !f.classId || (h.byClass[f.classId] ?? 0) > 0)
     .sort((x, y) => y.h.issued - x.h.issued || (x.p.id < y.p.id ? -1 : 1))
     .filter(
