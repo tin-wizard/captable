@@ -1,5 +1,5 @@
 import { Audit } from "@/server/audit";
-import { companyHomeUrl } from "@/server/domains/links";
+import { companyEntryUrl } from "@/server/domains/links";
 import { checkVerificationToken } from "@/server/member";
 import { withAuth } from "@/trpc/api/trpc";
 import { TRPCError } from "@trpc/server";
@@ -96,6 +96,6 @@ export const acceptMemberProcedure = withAuth
     return {
       success: true,
       publicId,
-      url: await companyHomeUrl(ctx.db, companyId, publicId),
+      url: await companyEntryUrl(ctx.db, companyId, publicId),
     };
   });

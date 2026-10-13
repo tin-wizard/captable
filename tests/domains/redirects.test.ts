@@ -134,7 +134,10 @@ describe("layoutRedirect", () => {
         routePublicId: "legacyPub",
         routeCompanyPrimaryHost: "legacy.dealroom.tin.info",
       },
-      { redirect: "https://legacy.dealroom.tin.info/legacyPub/stakeholders" },
+      {
+        redirect:
+          "https://legacy.dealroom.tin.info/auth/handoff/start?next=%2FlegacyPub%2Fstakeholders",
+      },
     ],
     [
       "canonical, no primary (flag off) → stay",

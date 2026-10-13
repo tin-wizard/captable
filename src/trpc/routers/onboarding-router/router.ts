@@ -4,7 +4,7 @@ import { ZodOnboardingMutationSchema } from "./schema";
 
 import { Audit } from "@/server/audit";
 import { domainConfig } from "@/server/domains/config";
-import { companyHomeUrl } from "@/server/domains/links";
+import { companyEntryUrl } from "@/server/domains/links";
 import {
   DomainTakenError,
   InvalidLabelError,
@@ -117,7 +117,7 @@ export const onboardingRouter = createTRPCRouter({
           },
         );
 
-        const url = await companyHomeUrl(ctx.db, companyId, publicId);
+        const url = await companyEntryUrl(ctx.db, companyId, publicId);
         return {
           success: true as const,
           message: "successfully onboarded",

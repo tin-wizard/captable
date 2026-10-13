@@ -6,6 +6,9 @@ import { expect, test } from "@playwright/test";
 // documented SQL cleanup.
 const ROOT = process.env.E2E_ROOT as string;
 const BASE = new URL(ROOT).hostname;
+// a one-company user lands on its host's /login (company login page), so check the origin too
+const leftCanonicalLogin = (u: URL) =>
+  u.origin !== new URL(ROOT).origin || !u.pathname.startsWith("/login");
 const RUN = process.env.E2E_RUN ?? Date.now().toString(36);
 
 for (const k of [
@@ -29,7 +32,7 @@ test("smoke: create a company and land on its subdomain", async ({
     .getByLabel("Password", { exact: true })
     .fill(process.env.E2E_SMOKE_PASSWORD as string);
   await page.getByRole("button", { name: "Log in with email" }).click();
-  await page.waitForURL((u) => !u.pathname.startsWith("/login"));
+  await page.waitForURL(leftCanonicalLogin);
 
   await page.goto(`${ROOT}/company/new`);
   await page.getByLabel("Company name").fill(`Smoke ${RUN}`);
@@ -67,7 +70,9 @@ test("smoke: create a company and land on its subdomain", async ({
     .getByLabel("Password", { exact: true })
     .fill(process.env.E2E_OUTSIDER_PASSWORD as string);
   await op.getByRole("button", { name: "Log in with email" }).click();
-  await op.waitForURL((u) => !u.pathname.startsWith("/login"));
+  await op.waitForURL(leftCanonicalLogin);
   await op.goto(url);
+  // company login page first; Continue runs the handoff with the canonical session
+  await op.getByRole("link", { name: "Continue" }).click();
   await expect(op.getByText(/don.t have access/i)).toBeVisible();
 });

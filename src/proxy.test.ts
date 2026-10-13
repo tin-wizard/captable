@@ -86,40 +86,24 @@ describe("isSameOrigin", () => {
 });
 
 describe("tenantAuthRedirect", () => {
-  it("login goes to handoff with a safe next", () =>
-    expect(
-      tenantAuthRedirect(
-        "/login",
-        new URLSearchParams("callbackUrl=%2Fabc%2Fx"),
-      ),
-    ).toBe("/auth/handoff/start?next=%2Fabc%2Fx"));
-  it("login with a foreign callback falls back to /", () =>
-    expect(
-      tenantAuthRedirect(
-        "/login",
-        new URLSearchParams("callbackUrl=https://evil.com"),
-      ),
-    ).toBe("/auth/handoff/start?next=%2F"));
+  it("login is left to the page (company login view)", () =>
+    expect(tenantAuthRedirect("/login")).toBeNull());
   it("signup goes to canonical", () =>
-    expect(tenantAuthRedirect("/signup", new URLSearchParams())).toBe(
-      "canonical:/signup",
-    ));
+    expect(tenantAuthRedirect("/signup")).toBe("canonical:/signup"));
   it("sub-paths of canonical-only pages go to canonical", () =>
-    expect(
-      tenantAuthRedirect("/reset-password/tok", new URLSearchParams()),
-    ).toBe("canonical:/reset-password/tok"));
+    expect(tenantAuthRedirect("/reset-password/tok")).toBe(
+      "canonical:/reset-password/tok",
+    ));
   it("logout goes to canonical", () =>
-    expect(tenantAuthRedirect("/logout", new URLSearchParams())).toBe(
-      "canonical:/logout",
+    expect(tenantAuthRedirect("/logout")).toBe("canonical:/logout"));
+  it("the company chooser goes to canonical", () =>
+    expect(tenantAuthRedirect("/choose-company")).toBe(
+      "canonical:/choose-company",
     ));
   it("ordinary pages are untouched", () =>
-    expect(
-      tenantAuthRedirect("/abc/stakeholders", new URLSearchParams()),
-    ).toBeNull());
+    expect(tenantAuthRedirect("/abc/stakeholders")).toBeNull());
   it("prefix look-alikes are untouched", () =>
-    expect(
-      tenantAuthRedirect("/newsletter", new URLSearchParams()),
-    ).toBeNull());
+    expect(tenantAuthRedirect("/newsletter")).toBeNull());
 });
 
 describe("proxy", () => {
@@ -127,18 +111,26 @@ describe("proxy", () => {
     expect(proxy(req("https://a--b.dealroom.tin.info/")).status).toBe(404);
     expect(proxy(req("https://a.b.dealroom.tin.info/")).status).toBe(404);
   });
-  it("redirects tenant login to handoff and signup to canonical", () => {
+  it("lets tenant login through to the page and redirects signup to canonical", () => {
     const login = proxy(
       req("https://acme.dealroom.tin.info/login?callbackUrl=%2Fx"),
     );
-    expect(login.status).toBe(307);
-    expect(login.headers.get("location")).toBe(
-      "https://acme.dealroom.tin.info/auth/handoff/start?next=%2Fx",
+    expect(login.status).toBe(200);
+    expect(login.headers.get("location")).toBeNull();
+    expect(login.headers.get("x-middleware-request-x-dr-path")).toBe(
+      "/login?callbackUrl=%2Fx",
     );
     const signup = proxy(req("https://acme.dealroom.tin.info/signup?ref=1"));
     expect(signup.headers.get("location")).toBe(
       "https://dealroom.tin.info/signup?ref=1",
     );
+  });
+  it("sends the company chooser on a company host to canonical", () => {
+    expect(
+      proxy(req("https://acme.dealroom.tin.info/choose-company")).headers.get(
+        "location",
+      ),
+    ).toBe("https://dealroom.tin.info/choose-company");
   });
   it("overwrites inbound x-dr-path and marks platform hosts noindex", () => {
     const res = proxy(

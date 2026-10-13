@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { companyHomeUrl } from "./domains/links";
+import { companyEntryUrl } from "./domains/links";
 
 export const getCompanyList = async (userId: string) => {
   const data = await db.member.findMany({
@@ -23,7 +23,7 @@ export const getCompanyList = async (userId: string) => {
   return Promise.all(
     data.map(async (m) => ({
       ...m,
-      url: await companyHomeUrl(db, m.company.id, m.company.publicId),
+      url: await companyEntryUrl(db, m.company.id, m.company.publicId),
     })),
   );
 };

@@ -56,6 +56,16 @@ export function safeNextPath(next: string | null | undefined): string {
 
 // A company without a primary host has a relative home URL; from a company host that
 // would resolve on the wrong host (404), so send it to the canonical origin instead.
-export function companySwitchUrl(url: string, canonicalOrigin: string | null) {
-  return canonicalOrigin && url.startsWith("/") ? canonicalOrigin + url : url;
+// A handoff entry URL (getCompanyList) keeps the sub-path inside its encoded `next`.
+export function companySwitchUrl(
+  url: string,
+  canonicalOrigin: string | null,
+  subPath = "",
+) {
+  const base =
+    canonicalOrigin && url.startsWith("/") ? canonicalOrigin + url : url;
+  // `next` is the last query param of a handoff URL
+  return base.includes("/auth/handoff/start?next=")
+    ? base + encodeURIComponent(subPath)
+    : base + subPath;
 }

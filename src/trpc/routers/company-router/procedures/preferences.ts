@@ -13,6 +13,7 @@ export const preferencesProcedure = withAccessControl
         viewRetentionMonths: true,
         autoNudge: true,
         ndaText: true,
+        showNameOnLogin: true,
       },
     }),
   );
@@ -33,6 +34,7 @@ export const updatePreferencesProcedure = withAccessControl
       autoNudge: z.boolean().optional(),
       // empty string clears it (stored as null); omitted leaves it alone
       ndaText: z.string().max(5000).nullable().optional(),
+      showNameOnLogin: z.boolean().optional(),
     }),
   )
   .mutation(async ({ ctx, input }) => {

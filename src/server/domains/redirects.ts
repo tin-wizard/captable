@@ -1,6 +1,13 @@
 import { domainConfig, tenantOrigin } from "./config";
 import type { RequestHost } from "./request-host";
 
+/** Enter a company host with the canonical session (start validates `next`). */
+export function handoffStartUrl(hostname: string, next: string) {
+  return `${tenantOrigin(
+    hostname,
+  )}/auth/handoff/start?next=${encodeURIComponent(next)}`;
+}
+
 // Profile/security belong to the user, not a company: they live on the canonical host.
 export function isUserLevelPath(path: string): boolean {
   return /^\/[^/]+\/settings\/(profile|security)(\/|$|\?)/.test(path);
@@ -35,7 +42,9 @@ export function layoutRedirect(input: {
         : null;
     case "canonical":
       return !userLevel && routeCompanyPrimaryHost
-        ? { redirect: tenantOrigin(routeCompanyPrimaryHost) + path }
+        ? // enter via the handoff, not the company login page; a logged-out visitor
+          // goes start -> issue -> canonical /login and returns here after login
+          { redirect: handoffStartUrl(routeCompanyPrimaryHost, path) }
         : null;
     default:
       return { notFound: true };

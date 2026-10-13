@@ -149,7 +149,8 @@ describe("view digest job", () => {
   });
 
   it("ignores visits older than 24 h and bot visits", async () => {
-    await visit(10, new Date(Date.now() - 30 * 3600_000));
+    // relative to the frozen job clock, not real time (else it fails after 13:00 UTC)
+    await visit(10, new Date(clock.now().getTime() - 30 * 3600_000));
     await visit(10, new Date(), true);
     await run();
     expect(await sentTo(a.userId)).toHaveLength(0);
