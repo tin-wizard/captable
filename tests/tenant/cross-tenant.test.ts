@@ -555,6 +555,32 @@ const cases: Case[] = [
       }),
   },
   {
+    name: "update.setAutoNudge B's update",
+    kind: "update",
+    run: (a, { b }) =>
+      a.update.setAutoNudge({ updateId: b.updateId, enabled: true }),
+  },
+  {
+    name: "update.stopReminders B's recipient on B's update",
+    kind: "update",
+    run: (a, { b }) =>
+      a.update.stopReminders({
+        updateId: b.updateId,
+        recipientId: b.updateRecipientId,
+        stopped: true,
+      }),
+  },
+  {
+    name: "update.stopReminders B's recipient via A's update",
+    kind: "update",
+    run: (a, { a: own, b }) =>
+      a.update.stopReminders({
+        updateId: own.updateId,
+        recipientId: b.updateRecipientId,
+        stopped: true,
+      }),
+  },
+  {
     name: "update.toggleVisibility B's update",
     kind: "update",
     run: (a, { b }) => a.update.toggleVisibility({ updateId: b.updateId }),
@@ -672,6 +698,33 @@ const cases: Case[] = [
       a.dataRoom.nudge({
         dataRoomId: own.dataRoomId,
         recipientId: b.dataRoomRecipientId,
+      }),
+  },
+
+  {
+    name: "dataRoom.setAutoNudge B's room",
+    kind: "update",
+    run: (a, { b }) =>
+      a.dataRoom.setAutoNudge({ dataRoomId: b.dataRoomId, enabled: true }),
+  },
+  {
+    name: "dataRoom.stopReminders B's recipient on B's room",
+    kind: "update",
+    run: (a, { b }) =>
+      a.dataRoom.stopReminders({
+        dataRoomId: b.dataRoomId,
+        recipientId: b.dataRoomRecipientId,
+        stopped: true,
+      }),
+  },
+  {
+    name: "dataRoom.stopReminders B's recipient via A's room",
+    kind: "update",
+    run: (a, { a: own, b }) =>
+      a.dataRoom.stopReminders({
+        dataRoomId: own.dataRoomId,
+        recipientId: b.dataRoomRecipientId,
+        stopped: true,
       }),
   },
 

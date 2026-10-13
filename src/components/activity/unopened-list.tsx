@@ -1,6 +1,7 @@
 "use client";
 
 import { dayjsExt } from "@/common/dayjs";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -37,6 +38,12 @@ export const UnopenedList = ({ kind, targetPublicId, canNudge }: Props) => {
   };
   const nudgeDataRoom = api.dataRoom.nudge.useMutation(options);
   const nudgeUpdate = api.update.nudge.useMutation(options);
+  const stopOptions = {
+    onError: (e: { message: string }) => toast.error(e.message),
+    onSuccess: () => utils.activity.unopened.invalidate(),
+  };
+  const stopDataRoom = api.dataRoom.stopReminders.useMutation(stopOptions);
+  const stopUpdate = api.update.stopReminders.useMutation(stopOptions);
   // only the row being reminded is disabled
   const [sending, setSending] = useState<string | null>(null);
 
@@ -62,8 +69,43 @@ export const UnopenedList = ({ kind, targetPublicId, canNudge }: Props) => {
               </TableCell>
               <TableCell>
                 Waiting {dayjsExt().to(item.waitingSince, true)}
+                {item.lastNudgedAt && (
+                  <span className="block text-xs text-muted-foreground">
+                    Reminded {dayjsExt().to(item.lastNudgedAt)}
+                    {item.nudgeCount > 0 && ` · ${item.nudgeCount} of 2`}
+                  </span>
+                )}
+                {item.nudgeOptOut && (
+                  <Badge variant="secondary" className="mt-1">
+                    Stopped
+                  </Badge>
+                )}
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="space-x-2 text-right">
+                {canNudge && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={stopDataRoom.isLoading || stopUpdate.isLoading}
+                    onClick={() => {
+                      const stopped = !item.nudgeOptOut;
+                      if (kind === "DATA_ROOM")
+                        stopDataRoom.mutate({
+                          dataRoomId: item.targetId,
+                          recipientId: item.recipientId,
+                          stopped,
+                        });
+                      else
+                        stopUpdate.mutate({
+                          updateId: item.targetId,
+                          recipientId: item.recipientId,
+                          stopped,
+                        });
+                    }}
+                  >
+                    {item.nudgeOptOut ? "Resume" : "Stop reminders"}
+                  </Button>
+                )}
                 {canNudge && (
                   <Button
                     variant="outline"

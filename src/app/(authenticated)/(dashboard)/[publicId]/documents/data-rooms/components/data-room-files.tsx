@@ -1,5 +1,6 @@
 "use client";
 
+import { AutoNudgeSwitch } from "@/components/activity/auto-nudge-switch";
 import EmptyState from "@/components/common/empty-state";
 import type { ExtendedDataRoomRecipientType } from "@/components/common/share-modal";
 import DataRoomFileExplorer from "@/components/documents/data-room/explorer";
@@ -26,6 +27,7 @@ type DataRoomFilesProps = {
   documents: Bucket[];
   companyPublicId: string;
   contacts: ShareContactType[];
+  canEditSettings?: boolean;
 };
 
 const DataRoomFiles = ({
@@ -33,6 +35,7 @@ const DataRoomFiles = ({
   documents,
   contacts,
   companyPublicId,
+  canEditSettings = false,
 }: DataRoomFilesProps) => {
   const { mutateAsync: saveDataRoomMutation } = api.dataRoom.save.useMutation();
 
@@ -76,6 +79,13 @@ const DataRoomFiles = ({
               </div>
             </div>
           </form>
+
+          <AutoNudgeSwitch
+            kind="DATA_ROOM"
+            targetId={dataRoom.id}
+            initial={dataRoom.autoNudge}
+            canEdit={canEditSettings}
+          />
 
           {documents.length > 0 && (
             <div className="flex gap-3">

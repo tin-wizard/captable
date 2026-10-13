@@ -374,6 +374,23 @@ const cases: Case[] = [
       }),
   },
 
+  {
+    proc: "update.setAutoNudge",
+    perm: ["updates", "update"],
+    run: (c, f) =>
+      c.update.setAutoNudge({ updateId: f.updateId, enabled: true }),
+  },
+  {
+    proc: "update.stopReminders",
+    perm: ["updates", "update"],
+    run: (c, f) =>
+      c.update.stopReminders({
+        updateId: f.updateId,
+        recipientId: f.nudgeUpdateRecipientId,
+        stopped: true,
+      }),
+  },
+
   // --- data rooms ---------------------------------------------------------
   {
     proc: "dataRoom.save",
@@ -399,6 +416,22 @@ const cases: Case[] = [
       c.dataRoom.nudge({
         dataRoomId: f.dataRoomId,
         recipientId: f.dataRoomRecipientId,
+      }),
+  },
+  {
+    proc: "dataRoom.setAutoNudge",
+    perm: ["data-rooms", "update"],
+    run: (c, f) =>
+      c.dataRoom.setAutoNudge({ dataRoomId: f.dataRoomId, enabled: true }),
+  },
+  {
+    proc: "dataRoom.stopReminders",
+    perm: ["data-rooms", "update"],
+    run: (c, f) =>
+      c.dataRoom.stopReminders({
+        dataRoomId: f.dataRoomId,
+        recipientId: f.dataRoomRecipientId,
+        stopped: true,
       }),
   },
   {

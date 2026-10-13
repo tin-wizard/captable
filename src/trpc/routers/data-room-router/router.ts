@@ -451,4 +451,90 @@ export const dataRoomRouter = createTRPCRouter({
       );
       return { success: true };
     }),
+
+  setAutoNudge: withAccessControl
+    .input(z.object({ dataRoomId: z.string(), enabled: z.boolean() }))
+    .meta({ policies: { "data-rooms": { allow: ["update"] } } })
+    .mutation(async ({ ctx, input }) => {
+      const { db, companyId } = ctx.tenant;
+      const { user } = ctx.session;
+      const room = await db.dataRoom.findFirst({
+        where: { id: input.dataRoomId, companyId },
+        select: { id: true, name: true },
+      });
+      if (!room) throw new TRPCError({ code: "NOT_FOUND" });
+
+      await db.$transaction(async (tx) => {
+        await tx.dataRoom.update({
+          where: { id: room.id },
+          data: { autoNudge: input.enabled },
+        });
+        await Audit.create(
+          {
+            action: "dataroom.updated",
+            companyId,
+            actor: { type: "user", id: user.id },
+            context: { userAgent: ctx.userAgent, requestIp: ctx.requestIp },
+            target: [{ type: "dataroom", id: room.id }],
+            summary: `${user.name} turned automatic reminders ${
+              input.enabled ? "on" : "off"
+            } for the data room ${room.name}`,
+          },
+          tx,
+        );
+      });
+      return { enabled: input.enabled };
+    }),
+
+  stopReminders: withAccessControl
+    .input(
+      z.object({
+        dataRoomId: z.string(),
+        recipientId: z.string(),
+        stopped: z.boolean(),
+      }),
+    )
+    .meta({ policies: { "data-rooms": { allow: ["update"] } } })
+    .mutation(async ({ ctx, input }) => {
+      const { db, companyId } = ctx.tenant;
+      const { user } = ctx.session;
+      const rec = await db.dataRoomRecipient.findFirst({
+        where: {
+          id: input.recipientId,
+          dataRoomId: input.dataRoomId,
+          dataRoom: { companyId },
+        },
+        select: {
+          id: true,
+          email: true,
+          updatedAt: true,
+          dataRoom: { select: { id: true, name: true } },
+        },
+      });
+      if (!rec) throw new TRPCError({ code: "NOT_FOUND" });
+
+      await db.$transaction(async (tx) => {
+        await tx.dataRoomRecipient.update({
+          where: { id: rec.id },
+          // updatedAt is passed so the 3-day wait of the reminder claim is not restarted
+          data: { nudgeOptOut: input.stopped, updatedAt: rec.updatedAt },
+        });
+        await Audit.create(
+          {
+            action: "dataroom.updated",
+            companyId,
+            actor: { type: "user", id: user.id },
+            context: { userAgent: ctx.userAgent, requestIp: ctx.requestIp },
+            target: [{ type: "dataroom", id: rec.dataRoom.id }],
+            summary: `${user.name} ${
+              input.stopped ? "stopped" : "resumed"
+            } automatic reminders to ${rec.email} for the data room ${
+              rec.dataRoom.name
+            }`,
+          },
+          tx,
+        );
+      });
+      return { stopped: input.stopped };
+    }),
 });
