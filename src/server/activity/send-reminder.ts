@@ -1,6 +1,7 @@
 import { shareDataRoomEmailJob } from "@/jobs/share-data-room-email";
 import { shareUpdateEmailJob } from "@/jobs/share-update-email";
 import { encode } from "@/lib/jwt";
+import { MAX_AUTO_NUDGES } from "@/server/activity/cadence";
 import { effectiveExpiry, isExpired } from "@/server/activity/link-state";
 import {
   NUDGE_COOLDOWN_MS,
@@ -42,7 +43,7 @@ const REFUSALS: Record<Refusal, [TRPCError["code"], string]> = {
     "Wait a few days after sharing before sending a reminder.",
   ],
   cooldown: ["TOO_MANY_REQUESTS", "A reminder was sent in the last 24 hours."],
-  // not produced yet: only automatic reminders honour the opt-out (Task 2)
+  // only automatic reminders honour the opt-out, so the manual path never gets it
   "opted-out": ["BAD_REQUEST", "They have opted out of reminders."],
 };
 
@@ -73,7 +74,8 @@ export async function sendReminder(
   const isRoom = kind === "DATA_ROOM";
   const now = new Date();
   const waitedEnough = new Date(
-    now.getTime() - UNOPENED_AFTER_DAYS * 86_400_000,
+    now.getTime() -
+      (args.auto?.minWaitDays ?? UNOPENED_AFTER_DAYS) * 86_400_000,
   );
 
   const recipientSelect = {
@@ -83,6 +85,8 @@ export async function sendReminder(
     expiresAt: true,
     updatedAt: true,
     lastNudgedAt: true,
+    nudgeCount: true,
+    nudgeOptOut: true,
   } as const;
   const parentSelect = {
     id: true,
@@ -120,6 +124,9 @@ export async function sendReminder(
         })
         .then((r) => r && { ...r, parent: r.update });
   if (!rec) return { sent: false, reason: "not-found" };
+  if (args.auto && rec.nudgeOptOut) return { sent: false, reason: "opted-out" };
+  if (args.auto && rec.nudgeCount >= MAX_AUTO_NUDGES)
+    return { sent: false, reason: "cooldown" };
   if (isExpired(effectiveExpiry(rec.expiresAt, rec.updatedAt), now))
     return { sent: false, reason: "expired" };
   if (
@@ -139,6 +146,8 @@ export async function sendReminder(
     where: {
       id: rec.id,
       updatedAt: { lte: waitedEnough },
+      // the per-recipient cap is enforced here, not only in the job's query
+      ...(args.auto && { nudgeCount: { lt: MAX_AUTO_NUDGES } }),
       OR: [
         { lastNudgedAt: null },
         {
@@ -148,7 +157,8 @@ export async function sendReminder(
         },
       ],
     },
-    data: { lastNudgedAt: now },
+    // a manual reminder counts as one of the automatic two
+    data: { lastNudgedAt: now, nudgeCount: { increment: 1 } },
   };
   const claimed = await runSerializable((options) =>
     db.$transaction(
@@ -211,7 +221,11 @@ export async function sendReminder(
   } catch (e) {
     const release = {
       where: { id: rec.id, lastNudgedAt: now },
-      data: { lastNudgedAt: rec.lastNudgedAt, updatedAt: rec.updatedAt },
+      data: {
+        lastNudgedAt: rec.lastNudgedAt,
+        updatedAt: rec.updatedAt,
+        nudgeCount: rec.nudgeCount,
+      },
     };
     await (isRoom
       ? db.dataRoomRecipient.updateMany(release)

@@ -142,11 +142,13 @@ model Company {
   country       String
 
   // IANA name used for day buckets, the digest hour and quiet hours
-  timezone            String @default("UTC")
+  timezone            String  @default("UTC")
   // null = keep view data until the company deletes it
-  viewRetentionMonths Int?   @default(24)
+  viewRetentionMonths Int?    @default(24)
   // local date of the last digest run, so an hourly job sends once a day
   lastDigestOn        String?
+  // master switch for automatic reminders to people who have not opened a share
+  autoNudge           Boolean @default(false)
 
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
@@ -497,6 +499,8 @@ model DataRoom {
   company     Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   // Member.id of the creator; null for rooms created before this column existed
   createdById String?
+  // automatic reminders for this room; also needs Company.autoNudge
+  autoNudge   Boolean             @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -537,6 +541,10 @@ model DataRoomRecipient {
   // null = only the 30-day signed-link lifetime applies (links sent before Phase 3)
   expiresAt    DateTime?
   lastNudgedAt DateTime?
+  // reminders sent (manual or automatic); automatic ones stop at 2
+  nudgeCount   Int       @default(0)
+  // the recipient asked for no more automatic reminders
+  nudgeOptOut  Boolean   @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -564,6 +572,10 @@ model UpdateRecipient {
   // null = only the 30-day signed-link lifetime applies (links sent before Phase 3)
   expiresAt    DateTime?
   lastNudgedAt DateTime?
+  // reminders sent (manual or automatic); automatic ones stop at 2
+  nudgeCount   Int       @default(0)
+  // the recipient asked for no more automatic reminders
+  nudgeOptOut  Boolean   @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -967,13 +979,15 @@ enum UpdateStatusEnum {
 }
 
 model Update {
-  id       String           @id @default(cuid())
-  publicId String
-  title    String
-  content  Json
-  html     String
-  public   Boolean          @default(false)
-  status   UpdateStatusEnum @default(DRAFT)
+  id        String           @id @default(cuid())
+  publicId  String
+  title     String
+  content   Json
+  html      String
+  public    Boolean          @default(false)
+  status    UpdateStatusEnum @default(DRAFT)
+  // automatic reminders for this update; also needs Company.autoNudge
+  autoNudge Boolean          @default(false)
 
   authorId  String
   companyId String

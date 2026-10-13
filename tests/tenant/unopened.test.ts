@@ -223,6 +223,17 @@ describe("findUnopened", () => {
     expect(item?.nudgeable).toBe(false);
   });
 
+  it("carries nudgeCount and nudgeOptOut", async () => {
+    const r = await mk(aIds.dataRoomId, "count@example.com", {
+      nudgeCount: 1,
+      nudgeOptOut: true,
+    });
+    const item = (await findUnopened(db, a.companyId)).find(
+      (i) => i.recipientId === r.id,
+    );
+    expect(item).toMatchObject({ nudgeCount: 1, nudgeOptOut: true });
+  });
+
   it("nudgeable flips at exactly 24 h", async () => {
     const r1 = await room();
     const nudged = new Date();
