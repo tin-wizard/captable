@@ -1,4 +1,5 @@
 import { ActivityTable } from "@/components/activity/activity-table";
+import { SignerProgress } from "@/components/analytics/esign/signer-progress";
 import { PdfCanvas } from "@/components/template/pdf-canvas";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -36,20 +37,23 @@ export default async function TemplateDetailViewPage(props: {
     return <UnAuthorizedState />;
   }
 
-  const [{ name, status, url, fields }, auditsData] = await Promise.all([
-    api.template.get.query({
-      publicId: templatePublicId,
-      isDraftOnly: false,
-    }),
-
-    allow(
-      api.audit.allEsignAudits.query({
-        templatePublicId: templatePublicId,
+  const [{ name, status, url, fields }, auditsData, detail] = await Promise.all(
+    [
+      api.template.get.query({
+        publicId: templatePublicId,
+        isDraftOnly: false,
       }),
-      ["audits", "read"],
-      undefined,
-    ),
-  ]);
+
+      allow(
+        api.audit.allEsignAudits.query({
+          templatePublicId: templatePublicId,
+        }),
+        ["audits", "read"],
+        undefined,
+      ),
+      api.analytics.esignEnvelope.query({ templatePublicId }),
+    ],
+  );
 
   return (
     <TemplateSigningFieldProvider fields={fields}>
@@ -64,6 +68,11 @@ export default async function TemplateDetailViewPage(props: {
             </span>
           </div>
           <div className="mx-auto min-h-full w-full  py-10  2xl:max-w-screen-xl">
+            {detail && detail.signers.length > 0 && (
+              <div className="mb-6">
+                <SignerProgress detail={detail} />
+              </div>
+            )}
             <div className="grid grid-cols-12">
               <PdfCanvas mode="readonly" url={url} />
             </div>

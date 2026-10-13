@@ -1,6 +1,7 @@
+import { esignParams } from "@/components/analytics";
+import { EsignAnalytics } from "@/components/analytics/esign/esign-analytics";
 import EmptyState from "@/components/common/empty-state";
 import { PageLayout } from "@/components/dashboard/page-layout";
-import { Card } from "@/components/ui/card";
 import { UnAuthorizedState } from "@/components/ui/un-authorized-state";
 import { serverAccessControl } from "@/lib/rbac/access-control";
 import { withServerComponentSession } from "@/server/auth";
@@ -8,19 +9,22 @@ import { api } from "@/trpc/server";
 import { RiUploadCloudLine } from "@remixicon/react";
 import type { Metadata } from "next";
 import { AddEsignDocumentButton } from "./components/add-esign-doc-button";
-import { ESignTable } from "./components/table";
 
 export const metadata: Metadata = {
   title: "Documents",
 };
 
-const EsignDocumentPage = async () => {
+const EsignDocumentPage = async (props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) => {
+  const filters = esignParams(await props.searchParams);
   const { allow } = await serverAccessControl();
   if (!allow(true, ["templates", "read"])) {
     return <UnAuthorizedState />;
   }
   const session = await withServerComponentSession();
   const { documents } = await api.template.all.query();
+  const analytics = await api.analytics.esign.query(filters);
 
   if (documents.length === 0) {
     return (
@@ -50,14 +54,13 @@ const EsignDocumentPage = async () => {
         />
       }
     >
-      <Card className="mt-3">
-        <div className="p-6">
-          <ESignTable
-            companyPublicId={session.user.companyPublicId}
-            documents={documents}
-          />
-        </div>
-      </Card>
+      <div className="mt-3">
+        <EsignAnalytics
+          data={analytics}
+          filters={filters}
+          companyPublicId={session.user.companyPublicId}
+        />
+      </div>
     </PageLayout>
   );
 };

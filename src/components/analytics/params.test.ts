@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyticsParams } from "./params";
+import { analyticsParams, esignParams } from "./params";
 
 describe("analyticsParams", () => {
   it("reads the kit's URL state", () => {
@@ -35,5 +35,24 @@ describe("analyticsParams", () => {
     expect(p.viewerStatus).toBeUndefined();
     expect(p.includeBots).toBe(false);
     expect(p.country).toBeUndefined();
+  });
+});
+
+describe("esignParams", () => {
+  it("reads status list, stuck and signer", () => {
+    expect(
+      esignParams({
+        status: "PENDING,BOGUS,COMPLETE",
+        stuck: "1",
+        signer: " ann ",
+        q: "nda",
+      }),
+    ).toMatchObject({
+      status: ["PENDING", "COMPLETE"],
+      stuck: true,
+      signer: "ann",
+      search: "nda",
+    });
+    expect(esignParams({ stuck: "0" }).stuck).toBeUndefined();
   });
 });

@@ -28,3 +28,30 @@ export function analyticsParams(sp: RawSearchParams) {
     cursor: cursor || undefined,
   };
 }
+
+const TEMPLATE_STATUSES = [
+  "DRAFT",
+  "PENDING",
+  "COMPLETE",
+  "CANCELLED",
+] as const;
+
+// The e-sign list reads the same URL state plus status, stuck and signer.
+export function esignParams(sp: RawSearchParams) {
+  const base = analyticsParams(sp);
+  const status = (first(sp.status) ?? "")
+    .split(",")
+    .filter((s): s is (typeof TEMPLATE_STATUSES)[number] =>
+      (TEMPLATE_STATUSES as readonly string[]).includes(s),
+    );
+  return {
+    range: base.range,
+    from: base.from,
+    to: base.to,
+    status: status.length ? status : undefined,
+    stuck: first(sp.stuck) === "1" ? true : undefined,
+    signer: first(sp.signer)?.trim().slice(0, 100) || undefined,
+    search: base.search,
+    cursor: base.cursor,
+  };
+}
