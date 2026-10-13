@@ -141,6 +141,11 @@ model Company {
   zipcode       String
   country       String
 
+  // IANA name used for day buckets, the digest hour and quiet hours
+  timezone            String @default("UTC")
+  // null = keep view data until the company deletes it
+  viewRetentionMonths Int?   @default(24)
+
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   updates          Update[]

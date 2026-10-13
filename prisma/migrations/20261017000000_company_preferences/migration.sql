@@ -1,0 +1,2 @@
+ALTER TABLE "Company" ADD COLUMN "timezone" TEXT NOT NULL DEFAULT 'UTC',
+ADD COLUMN "viewRetentionMonths" INTEGER DEFAULT 24;

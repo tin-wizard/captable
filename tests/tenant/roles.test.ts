@@ -559,6 +559,15 @@ const cases: Case[] = [
     run: (c) => c.company.updateCompany(companyInput),
   },
   {
+    proc: "company.updatePreferences",
+    perm: ["company", "update"],
+    run: (c) =>
+      c.company.updatePreferences({
+        timezone: "Europe/Berlin",
+        viewRetentionMonths: 12,
+      }),
+  },
+  {
     proc: "domain.rename",
     perm: ["company", "update"],
     // NOT_FOUND past the ACL while DOMAINS_ENABLED is off in tests
