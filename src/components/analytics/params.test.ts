@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyticsParams, esignParams } from "./params";
+import { analyticsParams, captableParams, esignParams } from "./params";
 
 describe("analyticsParams", () => {
   it("reads the kit's URL state", () => {
@@ -54,5 +54,26 @@ describe("esignParams", () => {
       search: "nda",
     });
     expect(esignParams({ stuck: "0" }).stuck).toBeUndefined();
+  });
+});
+
+describe("captableParams", () => {
+  it("reads class, holder type, search and cursor", () => {
+    expect(
+      captableParams({
+        class: "c1",
+        type: "INSTITUTION",
+        q: " fund ",
+        cursor: "s9",
+      }),
+    ).toEqual({
+      classId: "c1",
+      holderType: "INSTITUTION",
+      search: "fund",
+      cursor: "s9",
+    });
+  });
+  it("drops an unknown holder type", () => {
+    expect(captableParams({ type: "ROBOT" }).holderType).toBeUndefined();
   });
 });

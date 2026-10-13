@@ -55,3 +55,18 @@ export function esignParams(sp: RawSearchParams) {
     cursor: base.cursor,
   };
 }
+
+const HOLDER_TYPES = ["INDIVIDUAL", "INSTITUTION"] as const;
+
+// The cap table reads ?class= (share class id), ?type= (holder type), ?q and
+// the keyset cursor from the same URL the kit writes.
+export function captableParams(sp: RawSearchParams) {
+  const base = analyticsParams(sp);
+  const type = first(sp.type);
+  return {
+    classId: first(sp.class)?.slice(0, 64) || undefined,
+    holderType: HOLDER_TYPES.find((t) => t === type),
+    search: base.search,
+    cursor: base.cursor,
+  };
+}

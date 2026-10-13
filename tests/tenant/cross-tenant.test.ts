@@ -832,6 +832,18 @@ const cases: Case[] = [
     run: (a, { b }) => a.rbac.deleteRole({ roleId: b.customRoleId }),
   },
 
+  // --- cap table ----------------------------------------------------------
+  {
+    name: "captable.table filtered to B's share class",
+    kind: "read",
+    run: (a, { b }) => a.captable.table({ classId: b.shareClassId }),
+  },
+  {
+    name: "captable.table paged from B's stakeholder",
+    kind: "read",
+    run: (a, { b }) => a.captable.table({ cursor: b.stakeholderId }),
+  },
+
   // --- activity -----------------------------------------------------------
   {
     name: "activity.list filtered to B's data room",
