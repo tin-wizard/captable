@@ -3,6 +3,7 @@ import { env } from "@/env";
 import { logger } from "@/lib/logger";
 import { describeTarget } from "@/server/activity/describe";
 import { UNOPENED_AFTER_DAYS, findUnopened } from "@/server/activity/unopened";
+import { localDay, localHour } from "@/server/analytics/range";
 import { db } from "@/server/db";
 import { sendMail } from "@/server/mailer";
 import { render } from "@react-email/components";
@@ -16,6 +17,12 @@ const config = defineWorkerConfig({
 export const viewDigestEmailJob = defineJob(config);
 
 const DAY = 86_400_000;
+
+// local hour at which a company's digest goes out
+export const DIGEST_HOUR = 7;
+
+// injectable so tests can pin the clock
+export const clock = { now: () => new Date() };
 
 type DigestMember = {
   id: string;
@@ -134,8 +141,11 @@ async function digestForCompany(
   }
 }
 
+// Runs every hour. A company's digest goes out in the hour its local time is
+// DIGEST_HOUR, once per local date (lastDigestOn).
+// shortcut: zones with a :30 offset are reached at local 07:30.
 export const viewDigestEmailWorker = defineWorker(config, async () => {
-  const now = new Date();
+  const now = clock.now();
   const digestMembers = await db.member.findMany({
     where: { status: "ACTIVE", notifyOnView: true, viewDigest: true },
     select: {
@@ -146,20 +156,31 @@ export const viewDigestEmailWorker = defineWorker(config, async () => {
     },
   });
   const companyIds = [...new Set(digestMembers.map((m) => m.companyId))];
+  const companies = await db.company.findMany({
+    where: { id: { in: companyIds } },
+    select: { id: true, timezone: true, lastDigestOn: true },
+  });
 
-  for (const companyId of companyIds) {
+  for (const c of companies) {
+    const today = localDay(now, c.timezone);
+    if (localHour(now, c.timezone) !== DIGEST_HOUR || c.lastDigestOn === today)
+      continue;
     try {
       await digestForCompany(
-        companyId,
-        digestMembers.filter((m) => m.companyId === companyId),
+        c.id,
+        digestMembers.filter((m) => m.companyId === c.id),
         now,
       );
+      await db.company.update({
+        where: { id: c.id },
+        data: { lastDigestOn: today },
+      });
     } catch (error) {
       // one company's failure must not stop the others
       logger
         .child({ module: "queue" })
-        .error(`view digest failed for company ${companyId}`, { error });
+        .error(`view digest failed for company ${c.id}`, { error });
     }
   }
 });
-// shortcut: 07:00 UTC for everyone; add a per-member hour when someone asks.
+// shortcut: the day's activity window is the 24 h before the run.

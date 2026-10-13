@@ -43,7 +43,7 @@ export async function registerJobs() {
 
   // a restart during the 07:00 UTC run makes pg-boss retry the whole job: members can get a duplicate; avoid deploying then
   await queue
-    .schedule("email.view-digest", "0 7 * * *", {})
+    .schedule("email.view-digest", "0 * * * *", {})
     .catch(() =>
       logger
         .child({ module: "queue" })

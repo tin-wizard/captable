@@ -24,7 +24,7 @@ const sendMail = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock("@/server/mailer", () => ({ sendMail }));
 
 import { viewAlertEmailWorker } from "@/jobs/view-alert-email";
-import { viewDigestEmailWorker } from "@/jobs/view-digest-email";
+import { clock, viewDigestEmailWorker } from "@/jobs/view-digest-email";
 
 let a: Tenant;
 let b: Tenant;
@@ -59,7 +59,20 @@ afterAll(async () => {
   await cleanupFixtures(aIds, bIds, [a, b]);
 });
 
+// today at 07:00 UTC: the digest hour for companies on UTC
+const at = (hhmm: string) => {
+  const d = new Date();
+  const [h, m] = hhmm.split(":").map(Number);
+  d.setUTCHours(h as number, m as number, 0, 0);
+  return d;
+};
+
 beforeEach(async () => {
+  clock.now = () => at("07:00");
+  await db.company.updateMany({
+    where: { id: { in: [a.companyId, b.companyId] } },
+    data: { timezone: "UTC", lastDigestOn: null },
+  });
   sendMail.mockClear();
   await db.viewEvent.deleteMany({
     where: { companyId: { in: [a.companyId, b.companyId] } },
@@ -255,5 +268,56 @@ describe("view digest job", () => {
     expect(toA).toHaveLength(2);
     await db.member.delete({ where: { id: m.id } });
     await db.user.delete({ where: { id: u.id } });
+  });
+});
+
+describe("digest hour follows the company timezone", () => {
+  const sentTo = () =>
+    sendMail.mock.calls.map((c) => String(c[0].subject)).join("|");
+
+  const seedVisit = () =>
+    db.viewEvent.create({
+      data: {
+        companyId: a.companyId,
+        kind: "DATA_ROOM",
+        targetId: aIds.dataRoomId,
+        recipientId,
+        ip: "1.2.3.0",
+        userAgent: "ua",
+        activeSeconds: 20,
+      },
+    });
+
+  it("a UTC company is sent at 07:00 UTC, not at 02:00 UTC", async () => {
+    await seedVisit();
+    clock.now = () => at("02:00");
+    await viewDigestEmailWorker.handler([{ data: {} } as never]);
+    expect(sendMail).not.toHaveBeenCalled();
+    clock.now = () => at("07:00");
+    await viewDigestEmailWorker.handler([{ data: {} } as never]);
+    expect(sendMail).toHaveBeenCalled();
+  });
+
+  it("an Asia/Kolkata company is sent at 07:30 local (02:00 UTC) and not at 07:00 UTC", async () => {
+    await db.company.update({
+      where: { id: a.companyId },
+      data: { timezone: "Asia/Kolkata" },
+    });
+    await seedVisit();
+    clock.now = () => at("07:00");
+    await viewDigestEmailWorker.handler([{ data: {} } as never]);
+    expect(sendMail).not.toHaveBeenCalled();
+    clock.now = () => at("02:00");
+    await viewDigestEmailWorker.handler([{ data: {} } as never]);
+    expect(sentTo()).toContain("activity in the last 24 hours");
+  });
+
+  it("sends once per local day when the job runs twice in the same hour", async () => {
+    await seedVisit();
+    await viewDigestEmailWorker.handler([{ data: {} } as never]);
+    const first = sendMail.mock.calls.length;
+    expect(first).toBeGreaterThan(0);
+    await viewDigestEmailWorker.handler([{ data: {} } as never]);
+    expect(sendMail.mock.calls.length).toBe(first);
   });
 });
