@@ -25,6 +25,7 @@ import {
   formatPct,
   formatUsd,
 } from "./holders-table";
+import { RoundModel } from "./round-model";
 import { topHolders } from "./top-holders";
 
 const EXPORT_LIMIT = 5000;
@@ -107,6 +108,7 @@ export const CapTableView = ({
         <HoldersTable data={data} />
         <Pager nextCursor={data.nextCursor} hasCursor={hasCursor} />
       </section>
+      <RoundModel />
     </div>
   );
 };
