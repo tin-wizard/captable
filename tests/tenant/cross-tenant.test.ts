@@ -812,6 +812,18 @@ const cases: Case[] = [
       }),
   },
 
+  {
+    name: "analytics.esignEnvelope for B's template",
+    kind: "read",
+    run: (a, { b }) =>
+      a.analytics.esignEnvelope({ templatePublicId: b.templatePublicId }),
+  },
+  {
+    name: "analytics.esign with B's template as cursor",
+    kind: "read",
+    run: (a, { b }) => a.analytics.esign({ cursor: b.templateId }),
+  },
+
   // --- user-scoped credentials and stubs ----------------------------------
   {
     name: "passkey.createAuthenticationOptions with B admin's passkey",
