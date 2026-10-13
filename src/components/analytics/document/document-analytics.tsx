@@ -202,9 +202,10 @@ export const DocumentAnalytics = ({
 
       <ChartCard
         title="Views over time"
-        description={`${dayjsExt(data.range.from).format("MMM D")} – ${dayjsExt(
+        description={`${utcDay(data.range.from, false)} – ${utcDay(
           data.range.to,
-        ).format("MMM D, YYYY")}`}
+          true,
+        )}`}
         state={noVisits ? "empty" : "ready"}
         emptyHint="No views in this period. Recipients who haven't opened it appear below."
         tableAlt={{
