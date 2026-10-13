@@ -2,6 +2,7 @@ import { PageLayout } from "@/components/dashboard/page-layout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import type { DocumentsSummaryItem } from "@/server/analytics/document";
 import type { DataRoom } from "@prisma/client";
 import {
   RiFolder3Fill as FolderIcon,
@@ -10,6 +11,7 @@ import {
 } from "@remixicon/react";
 import Link from "next/link";
 import DataRoomPopover from "./data-room-popover";
+import { RoomStats } from "./room-stats";
 
 interface DataRoomProps extends DataRoom {
   _count: {
@@ -20,9 +22,11 @@ interface DataRoomProps extends DataRoom {
 type FolderProps = {
   companyPublicId: string;
   folders: DataRoomProps[];
+  // keyed by data room id; empty when the caller cannot read activity
+  stats?: Record<string, DocumentsSummaryItem>;
 };
 
-const Folders = ({ companyPublicId, folders }: FolderProps) => {
+const Folders = ({ companyPublicId, folders, stats = {} }: FolderProps) => {
   return (
     <div className="flex flex-col gap-y-3">
       <PageLayout
@@ -45,7 +49,10 @@ const Folders = ({ companyPublicId, folders }: FolderProps) => {
       <Card className="mt-3 border-none bg-transparent shadow-none">
         <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
           {folders.map((folder) => (
-            <li key={folder.id}>
+            <li
+              key={folder.id}
+              className="overflow-hidden rounded-md shadow-sm"
+            >
               <Link
                 href={`/${companyPublicId}/documents/data-rooms/${folder.publicId}`}
                 className="col-span-1 flex cursor-pointer rounded-md shadow-sm hover:shadow-lg"
@@ -82,6 +89,11 @@ const Folders = ({ companyPublicId, folders }: FolderProps) => {
                   </div>
                 </div>
               </Link>
+              {stats[folder.id] && (
+                <div className="rounded-b-md border-x border-b border-gray-200 bg-white">
+                  <RoomStats stats={stats[folder.id] as DocumentsSummaryItem} />
+                </div>
+              )}
             </li>
           ))}
         </ul>
