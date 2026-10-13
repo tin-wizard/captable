@@ -195,6 +195,41 @@ beforeAll(async () => {
       data: { dataRoomId: br.id, name: "SecretB", email: "b@b.io" },
     })
   ).id;
+  // downloads: Ann twice in range and once long ago, Ben once; B has one
+  const dl = (
+    t: Tenant,
+    targetId: string,
+    recipientId: string,
+    createdAt: Date,
+  ) =>
+    db.downloadEvent.create({
+      data: {
+        companyId: t.companyId,
+        kind: "DATA_ROOM",
+        targetId,
+        recipientId,
+        bucketId: doc1,
+        ip: "1.2.3.0",
+        userAgent: "ua",
+        createdAt,
+      },
+    });
+  await dl(a, roomId, ann, ago(2));
+  await dl(a, roomId, ann, ago(1));
+  await dl(a, roomId, ann, ago(40));
+  await dl(a, roomId, ben, ago(3));
+  await dl(b, br.id, bRecipientId, ago(1));
+  await db.ndaAcceptance.create({
+    data: {
+      companyId: a.companyId,
+      kind: "DATA_ROOM",
+      targetId: roomId,
+      recipientId: ann,
+      text: "nda",
+      ip: "1.2.3.0",
+      userAgent: "ua",
+    },
+  });
   await visit(b, br.id, bRecipientId, {
     createdAt: ago(1),
     activeSeconds: 999,
@@ -367,6 +402,37 @@ describe("analytics.document", () => {
     });
     const admin = await q();
     expect(admin?.viewers.items[0]?.stakeholder?.shares).toBe(250);
+  });
+});
+
+describe("analytics.document downloads and NDA", () => {
+  it("counts downloads per viewer and in total, inside the range", async () => {
+    const r = await q({ includeBots: true });
+    expect(r?.kpis.downloads).toBe(3);
+    const by = Object.fromEntries(
+      r?.viewers.items.map((v) => [v.recipientId, v.downloads]) ?? [],
+    );
+    expect(by[ann]).toBe(2);
+    expect(by[ben]).toBe(1);
+  });
+
+  it("is zero for viewers who did not download and never counts B's", async () => {
+    const r = await q({ viewerStatus: "unopened" });
+    expect(r?.viewers.items.every((v) => v.downloads === 0)).toBe(true);
+    const b2 = await callerFor(b).analytics.document({
+      kind: "DATA_ROOM",
+      targetPublicId: bRoomPublicId,
+    });
+    expect(b2?.kpis.downloads).toBe(1);
+  });
+
+  it("flags who accepted the NDA", async () => {
+    const r = await q({ includeBots: true });
+    const by = Object.fromEntries(
+      r?.viewers.items.map((v) => [v.recipientId, v.ndaAccepted]) ?? [],
+    );
+    expect(by[ann]).toBe(true);
+    expect(by[ben]).toBe(false);
   });
 });
 

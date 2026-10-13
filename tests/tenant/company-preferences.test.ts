@@ -71,6 +71,7 @@ describe("company.preferences / updatePreferences", () => {
       timezone: "UTC",
       viewRetentionMonths: 24,
       autoNudge: false,
+      ndaText: null,
     });
   });
 
@@ -87,6 +88,7 @@ describe("company.preferences / updatePreferences", () => {
       timezone: "Europe/Berlin",
       viewRetentionMonths: 12,
       autoNudge: false,
+      ndaText: null,
     });
     const audit = await db.audit.findFirst({
       where: { companyId: a.companyId, action: "company.updated" },

@@ -90,3 +90,59 @@ describe("per-company retention", () => {
     ).not.toBeNull();
   });
 });
+
+describe("download events and NDA acceptances", () => {
+  it("purges download events at the company's period and never touches acceptances", async () => {
+    await db.company.update({
+      where: { id: a.companyId },
+      data: { viewRetentionMonths: 12 },
+    });
+    await db.company.update({
+      where: { id: b.companyId },
+      data: { viewRetentionMonths: null },
+    });
+    const dl = (companyId: string, createdAt: Date, recipientId: string) =>
+      db.downloadEvent.create({
+        data: {
+          companyId,
+          kind: "DATA_ROOM",
+          targetId: "t",
+          recipientId,
+          bucketId: "bk",
+          ip: "1.2.3.0",
+          userAgent: "ua",
+          createdAt,
+        },
+      });
+    const a13 = await dl(a.companyId, months(13), "dl-a13");
+    const a11 = await dl(a.companyId, months(11), "dl-a11");
+    const b30 = await dl(b.companyId, months(30), "dl-b30");
+    const nda = await db.ndaAcceptance.create({
+      data: {
+        companyId: a.companyId,
+        kind: "DATA_ROOM",
+        targetId: "t",
+        recipientId: "nda-old",
+        text: "x",
+        ip: "1.2.3.0",
+        userAgent: "ua",
+        createdAt: months(40),
+      },
+    });
+
+    await purgeViewEventsWorker.handler([{ data: {} } as never]);
+
+    expect(
+      await db.downloadEvent.findUnique({ where: { id: a13.id } }),
+    ).toBeNull();
+    expect(
+      await db.downloadEvent.findUnique({ where: { id: a11.id } }),
+    ).not.toBeNull();
+    expect(
+      await db.downloadEvent.findUnique({ where: { id: b30.id } }),
+    ).not.toBeNull();
+    expect(
+      await db.ndaAcceptance.findUnique({ where: { id: nda.id } }),
+    ).not.toBeNull();
+  });
+});

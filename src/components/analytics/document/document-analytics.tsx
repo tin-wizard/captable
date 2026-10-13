@@ -51,6 +51,10 @@ type Props = {
     cursor?: string;
   };
   roomName: string;
+  // show the Downloads KPI when downloads are on (or any happened)
+  allowDownload?: boolean;
+  // show the NDA column and CSV field
+  requireNda?: boolean;
 };
 
 const LABEL_STYLE = {
@@ -85,6 +89,8 @@ export const DocumentAnalytics = ({
   targetPublicId,
   filters,
   roomName,
+  allowDownload = false,
+  requireNda = false,
 }: Props) => {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -94,6 +100,7 @@ export const DocumentAnalytics = ({
 
   const { kpis } = data;
   const noVisits = kpis.visits === 0;
+  const showDownloads = allowDownload || kpis.downloads > 0;
   const doc =
     data.documents?.find((d) => d.bucketId === selectedDoc) ??
     data.documents?.[0] ??
@@ -130,6 +137,8 @@ export const DocumentAnalytics = ({
         first_seen: r.firstSeen,
         last_seen: r.lastSeen,
         countries: r.countries.join(" "),
+        downloads: r.downloads,
+        nda_accepted: r.ndaAccepted ? "yes" : "no",
       })),
       [
         { key: "viewer", label: "Viewer" },
@@ -142,6 +151,8 @@ export const DocumentAnalytics = ({
         { key: "first_seen", label: "First seen" },
         { key: "last_seen", label: "Last seen" },
         { key: "countries", label: "Countries" },
+        { key: "downloads", label: "Downloads" },
+        ...(requireNda ? [{ key: "nda_accepted", label: "NDA accepted" }] : []),
       ],
     );
     const slug = roomName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
@@ -198,6 +209,13 @@ export const DocumentAnalytics = ({
           value={formatPercent(kpis.completionRate)}
           hint="Share of viewers who reached the last page of a document. Shown once page detail has been recorded."
         />
+        {showDownloads && (
+          <StatCard
+            label="Downloads"
+            value={formatCompact(kpis.downloads)}
+            hint="Files downloaded with the Download button in this period."
+          />
+        )}
       </section>
 
       <ChartCard
@@ -447,13 +465,14 @@ export const DocumentAnalytics = ({
                 <TableHead>Pages</TableHead>
                 <TableHead>Last seen</TableHead>
                 <TableHead>Where</TableHead>
+                <TableHead>Downloads</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.viewers.items.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     className="text-center text-sm text-muted-foreground"
                   >
                     No viewers match these filters.
@@ -499,6 +518,14 @@ export const DocumentAnalytics = ({
                   </TableCell>
                   <TableCell>
                     {v.countries.map((c) => countryName(c)).join(", ") || "—"}
+                  </TableCell>
+                  <TableCell>
+                    {v.downloads}
+                    {requireNda && v.ndaAccepted && (
+                      <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                        NDA accepted
+                      </span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

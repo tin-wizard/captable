@@ -381,6 +381,12 @@ const cases: Case[] = [
       c.update.setAutoNudge({ updateId: f.updateId, enabled: true }),
   },
   {
+    proc: "update.setAccess",
+    perm: ["updates", "update"],
+    run: (c, f) =>
+      c.update.setAccess({ updateId: f.updateId, requireNda: true }),
+  },
+  {
     proc: "update.stopReminders",
     perm: ["updates", "update"],
     run: (c, f) =>
@@ -423,6 +429,12 @@ const cases: Case[] = [
     perm: ["data-rooms", "update"],
     run: (c, f) =>
       c.dataRoom.setAutoNudge({ dataRoomId: f.dataRoomId, enabled: true }),
+  },
+  {
+    proc: "dataRoom.setAccess",
+    perm: ["data-rooms", "update"],
+    run: (c, f) =>
+      c.dataRoom.setAccess({ dataRoomId: f.dataRoomId, allowDownload: true }),
   },
   {
     proc: "dataRoom.stopReminders",

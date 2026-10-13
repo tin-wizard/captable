@@ -561,6 +561,12 @@ const cases: Case[] = [
       a.update.setAutoNudge({ updateId: b.updateId, enabled: true }),
   },
   {
+    name: "update.setAccess B's update",
+    kind: "update",
+    run: (a, { b }) =>
+      a.update.setAccess({ updateId: b.updateId, requireNda: true }),
+  },
+  {
     name: "update.stopReminders B's recipient on B's update",
     kind: "update",
     run: (a, { b }) =>
@@ -706,6 +712,12 @@ const cases: Case[] = [
     kind: "update",
     run: (a, { b }) =>
       a.dataRoom.setAutoNudge({ dataRoomId: b.dataRoomId, enabled: true }),
+  },
+  {
+    name: "dataRoom.setAccess B's room",
+    kind: "update",
+    run: (a, { b }) =>
+      a.dataRoom.setAccess({ dataRoomId: b.dataRoomId, allowDownload: true }),
   },
   {
     name: "dataRoom.stopReminders B's recipient on B's room",

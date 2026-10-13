@@ -1,5 +1,6 @@
 import { dayjsExt } from "@/common/dayjs";
 import { ExpiredLink } from "@/components/share/expired-link";
+import { NdaGate } from "@/components/share/nda-gate";
 import { SharePageLayout } from "@/components/share/page-layout";
 import { ViewBeacon } from "@/components/share/view-beacon";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
@@ -7,6 +8,7 @@ import UpdateRenderer from "@/components/update/renderer";
 import { type JWTVerifyResult, decode } from "@/lib/jwt";
 import { UpdateStatusEnum } from "@/prisma/enums";
 import { isExpired } from "@/server/activity/link-state";
+import { getNdaState } from "@/server/activity/nda";
 import { db } from "@/server/db";
 import { assertHostOwns } from "@/server/domains/links";
 import { render } from "@react-email/components";
@@ -112,6 +114,30 @@ const PublicUpdatePage = async (props: {
   }
 
   const company = update?.company;
+
+  // after the expiry check, before the update body or beacon
+  const nda = await getNdaState(db, {
+    kind: "UPDATE",
+    targetId: update.id,
+    recipientId: recipients.id,
+    companyId: update.companyId,
+  });
+  if (nda.required && !nda.accepted) {
+    return (
+      <SharePageLayout
+        company={{ name: company.name, logo: company.logo }}
+        title={null}
+      >
+        <NdaGate
+          kind="UPDATE"
+          token={token}
+          companyName={company.name}
+          text={nda.text}
+        />
+      </SharePageLayout>
+    );
+  }
+
   const author = update?.author;
   const html = await render(<UpdateRenderer html={update.html} />);
 

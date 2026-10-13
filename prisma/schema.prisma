@@ -149,6 +149,8 @@ model Company {
   lastDigestOn        String?
   // master switch for automatic reminders to people who have not opened a share
   autoNudge           Boolean @default(false)
+  // shown on the NDA gate; null = DEFAULT_NDA_TEXT (src/server/activity/nda.ts)
+  ndaText             String?
 
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
@@ -171,9 +173,11 @@ model Company {
   billingCustomers BillingCustomer[]
   customRoles      CustomRole[]
 
-  BankAccount BankAccount[]
-  domains     CompanyDomain[]
-  viewEvents  ViewEvent[]
+  BankAccount    BankAccount[]
+  domains        CompanyDomain[]
+  viewEvents     ViewEvent[]
+  ndaAcceptances NdaAcceptance[]
+  downloadEvents DownloadEvent[]
 
   @@unique([publicId])
 }
@@ -489,18 +493,22 @@ model Document {
 }
 
 model DataRoom {
-  id          String              @id @default(cuid())
-  name        String
-  publicId    String
-  public      Boolean             @default(false)
-  documents   DataRoomDocument[]
-  recipients  DataRoomRecipient[]
-  companyId   String
-  company     Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id            String              @id @default(cuid())
+  name          String
+  publicId      String
+  public        Boolean             @default(false)
+  documents     DataRoomDocument[]
+  recipients    DataRoomRecipient[]
+  companyId     String
+  company       Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   // Member.id of the creator; null for rooms created before this column existed
-  createdById String?
+  createdById   String?
   // automatic reminders for this room; also needs Company.autoNudge
-  autoNudge   Boolean             @default(false)
+  autoNudge     Boolean             @default(false)
+  // tracked Download button on the public pages
+  allowDownload Boolean             @default(false)
+  // recipients accept Company.ndaText before seeing anything
+  requireNda    Boolean             @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -979,15 +987,17 @@ enum UpdateStatusEnum {
 }
 
 model Update {
-  id        String           @id @default(cuid())
-  publicId  String
-  title     String
-  content   Json
-  html      String
-  public    Boolean          @default(false)
-  status    UpdateStatusEnum @default(DRAFT)
+  id         String           @id @default(cuid())
+  publicId   String
+  title      String
+  content    Json
+  html       String
+  public     Boolean          @default(false)
+  status     UpdateStatusEnum @default(DRAFT)
   // automatic reminders for this update; also needs Company.autoNudge
-  autoNudge Boolean          @default(false)
+  autoNudge  Boolean          @default(false)
+  // recipients accept Company.ndaText before seeing the update
+  requireNda Boolean          @default(false)
 
   authorId  String
   companyId String
@@ -1068,6 +1078,44 @@ model ViewEvent {
   @@index([companyId])
   @@index([companyId, createdAt])
   @@index([kind, targetId, recipientId, createdAt])
+}
+
+// Consent record: the exact text a recipient accepted. Never purged with view data.
+model NdaAcceptance {
+  id          String   @id @default(cuid())
+  kind        ViewKind
+  // DataRoom.id | Update.id
+  targetId    String
+  // DataRoomRecipient.id | UpdateRecipient.id (two tables, so no FK)
+  recipientId String
+  text        String
+  // truncated at write, like ViewEvent.ip
+  ip          String
+  userAgent   String
+  createdAt   DateTime @default(now())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([kind, targetId, recipientId])
+  @@index([companyId])
+}
+
+// One click on the tracked Download button. Purged with the company's view retention.
+model DownloadEvent {
+  id          String   @id @default(cuid())
+  kind        ViewKind
+  targetId    String
+  recipientId String
+  bucketId    String
+  ip          String
+  userAgent   String
+  createdAt   DateTime @default(now())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, createdAt])
 }
 
 enum PricingType {

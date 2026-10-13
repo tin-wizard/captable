@@ -1,6 +1,7 @@
 import { createTRPCRouter } from "@/trpc/api/trpc";
 import {
   setAutoNudgeProcedure,
+  setUpdateAccessProcedure,
   stopUpdateRemindersProcedure,
 } from "./procedures/auto-nudge";
 import { cloneUpdateProcedure } from "./procedures/clone-update";
@@ -25,6 +26,7 @@ export const updateRouter = createTRPCRouter({
   unShare: unshareUpdateProcedure,
   nudge: nudgeUpdateProcedure,
   setAutoNudge: setAutoNudgeProcedure,
+  setAccess: setUpdateAccessProcedure,
   stopReminders: stopUpdateRemindersProcedure,
   toggleVisibility: toggleUpdateVisibilityProcedure,
 });

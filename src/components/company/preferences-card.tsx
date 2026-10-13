@@ -9,6 +9,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { DEFAULT_NDA_TEXT } from "@/server/activity/nda";
 import { api } from "@/trpc/react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -29,12 +31,14 @@ export const PreferencesCard = () => {
   const [timezone, setTimezone] = useState("UTC");
   const [retention, setRetention] = useState("24");
   const [autoNudge, setAutoNudge] = useState(false);
+  const [ndaText, setNdaText] = useState(DEFAULT_NDA_TEXT);
 
   useEffect(() => {
     if (data) {
       setTimezone(data.timezone);
       setRetention(toValue(data.viewRetentionMonths));
       setAutoNudge(data.autoNudge);
+      setNdaText(data.ndaText ?? DEFAULT_NDA_TEXT);
     }
   }, [data]);
 
@@ -117,6 +121,25 @@ export const PreferencesCard = () => {
           </p>
         </div>
       </div>
+      <div className="mt-4">
+        <label htmlFor="nda-text" className="text-sm font-medium">
+          Confidentiality notice shown to recipients
+        </label>
+        <Textarea
+          id="nda-text"
+          className="mt-1"
+          rows={5}
+          maxLength={5000}
+          value={ndaText}
+          placeholder={DEFAULT_NDA_TEXT}
+          onChange={(e) => setNdaText(e.target.value)}
+          disabled={!data}
+        />
+        <p className="mt-1 text-sm text-muted-foreground">
+          Shown when a data room or update requires acceptance. This is not
+          legal advice; replace it with your own wording.
+        </p>
+      </div>
       <Button
         className="mt-4"
         disabled={!data || save.isLoading}
@@ -124,6 +147,8 @@ export const PreferencesCard = () => {
           save.mutate({
             timezone,
             autoNudge,
+            // the untouched default is not saved as the company's own text
+            ndaText: ndaText.trim() === DEFAULT_NDA_TEXT ? null : ndaText,
             viewRetentionMonths:
               retention === "keep"
                 ? null
