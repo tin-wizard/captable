@@ -69,5 +69,7 @@ test("smoke: create a company and land on its subdomain", async ({
   await op.getByRole("button", { name: "Log in with email" }).click();
   await op.waitForURL((u) => !u.pathname.startsWith("/login"));
   await op.goto(url);
+  // company login page first; Continue runs the handoff with the canonical session
+  await op.getByRole("link", { name: "Continue" }).click();
   await expect(op.getByText(/don.t have access/i)).toBeVisible();
 });

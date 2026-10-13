@@ -1,6 +1,6 @@
 import { logger } from "@/lib/logger";
 import { domainConfig } from "@/server/domains/config";
-import { classifyHost, safeNextPath } from "@/server/domains/core/host";
+import { classifyHost } from "@/server/domains/core/host";
 import { validateLabel } from "@/server/domains/core/subdomain";
 import { NextResponse } from "next/server";
 import { type NextRequest, userAgent } from "next/server";
@@ -45,13 +45,9 @@ export function isSameOrigin(
 
 export function tenantAuthRedirect(
   pathname: string,
-  search: URLSearchParams,
+  _search: URLSearchParams,
 ): string | null {
-  if (pathname === "/login") {
-    return `/auth/handoff/start?next=${encodeURIComponent(
-      safeNextPath(search.get("callbackUrl")),
-    )}`;
-  }
+  // "/login" reaches the page: a company host renders its own login view there.
   if (
     CANONICAL_ONLY.some((p) => pathname === p || pathname.startsWith(`${p}/`))
   )

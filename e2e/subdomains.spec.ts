@@ -16,6 +16,13 @@ async function submitLogin(page: Page, email: string) {
   await page.getByRole("button", { name: "Log in with email" }).click();
 }
 
+// company-host login page: "Continue" starts the handoff, which signs in on the canonical host
+async function continueToCanonicalLogin(page: Page, label: string) {
+  await page.waitForURL(new RegExp(`^${esc(host(label))}/login`));
+  await page.getByRole("link", { name: "Continue" }).click();
+  await page.waitForURL(new RegExp(`^${esc(ROOT)}/login`));
+}
+
 async function login(page: Page, email: string) {
   await page.goto(`${ROOT}/login`);
   await submitLogin(page, email);
@@ -97,6 +104,8 @@ test("mandatory: company creation provisions a working, isolated subdomain", asy
   const op = await outsider.newPage();
   await login(op, "outsider@e2e.test");
   await op.goto(botskiUrl);
+  await op.waitForURL(new RegExp(`^${esc(host(botski))}/login`));
+  await op.getByRole("link", { name: "Continue" }).click(); // canonical session, not a member
   await expect(op.getByText(/don.t have access/i)).toBeVisible();
   await expect(op.getByText(`Botski ${RUN}`)).toHaveCount(0);
 
@@ -115,11 +124,11 @@ test("mandatory: company creation provisions a working, isolated subdomain", asy
   );
   await expect(page.getByText("Legacy Co").first()).toBeVisible();
 
-  // logged-out deep link survives login + handoff
+  // logged-out deep link: company login page, Continue, login, handoff, back on the deep path
   const fresh = await browser.newContext();
   const fp = await fresh.newPage();
   await fp.goto(`${botskiUrl}/stakeholders`);
-  await fp.waitForURL(/\/login/);
+  await continueToCanonicalLogin(fp, botski);
   await submitLogin(fp, "admin@e2e.test");
   await fp.waitForURL(new RegExp(`^${esc(botskiUrl)}/stakeholders`));
 });
@@ -232,7 +241,31 @@ test("alias: the old company URL follows a rename, logged out", async ({
   const fp = await fresh.newPage();
   const publicPath = new URL(url).pathname;
   await fp.goto(`${host(old)}${publicPath}`);
-  await fp.waitForURL(/\/login/);
+  await continueToCanonicalLogin(fp, renamed);
   await submitLogin(fp, "admin@e2e.test");
   await fp.waitForURL(new RegExp(`^${esc(host(renamed))}${esc(publicPath)}`));
+});
+
+test("company login page shows the name only when the company opts in", async ({
+  browser,
+}) => {
+  const label = `named-${RUN}`;
+  const name = `Named ${RUN}`;
+  const { page, url } = await adminWithCompany(browser, label, name);
+  const visitor = await (await browser.newContext()).newPage();
+
+  // default off: only the (already public) address
+  await visitor.goto(`${host(label)}/login`);
+  await expect(
+    visitor.getByRole("heading", { name: `${label}.${BASE}` }),
+  ).toBeVisible();
+  await expect(visitor.getByText(name)).toHaveCount(0);
+
+  await page.goto(`${url}/settings/company`);
+  await page.getByLabel("Show our name and logo on the login page").click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Preferences saved")).toBeVisible();
+
+  await visitor.reload();
+  await expect(visitor.getByRole("heading", { name })).toBeVisible();
 });

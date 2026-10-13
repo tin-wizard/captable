@@ -86,20 +86,13 @@ describe("isSameOrigin", () => {
 });
 
 describe("tenantAuthRedirect", () => {
-  it("login goes to handoff with a safe next", () =>
+  it("login is left to the page (company login view)", () =>
     expect(
       tenantAuthRedirect(
         "/login",
         new URLSearchParams("callbackUrl=%2Fabc%2Fx"),
       ),
-    ).toBe("/auth/handoff/start?next=%2Fabc%2Fx"));
-  it("login with a foreign callback falls back to /", () =>
-    expect(
-      tenantAuthRedirect(
-        "/login",
-        new URLSearchParams("callbackUrl=https://evil.com"),
-      ),
-    ).toBe("/auth/handoff/start?next=%2F"));
+    ).toBeNull());
   it("signup goes to canonical", () =>
     expect(tenantAuthRedirect("/signup", new URLSearchParams())).toBe(
       "canonical:/signup",
@@ -127,13 +120,14 @@ describe("proxy", () => {
     expect(proxy(req("https://a--b.dealroom.tin.info/")).status).toBe(404);
     expect(proxy(req("https://a.b.dealroom.tin.info/")).status).toBe(404);
   });
-  it("redirects tenant login to handoff and signup to canonical", () => {
+  it("lets tenant login through to the page and redirects signup to canonical", () => {
     const login = proxy(
       req("https://acme.dealroom.tin.info/login?callbackUrl=%2Fx"),
     );
-    expect(login.status).toBe(307);
-    expect(login.headers.get("location")).toBe(
-      "https://acme.dealroom.tin.info/auth/handoff/start?next=%2Fx",
+    expect(login.status).toBe(200);
+    expect(login.headers.get("location")).toBeNull();
+    expect(login.headers.get("x-middleware-request-x-dr-path")).toBe(
+      "/login?callbackUrl=%2Fx",
     );
     const signup = proxy(req("https://acme.dealroom.tin.info/signup?ref=1"));
     expect(signup.headers.get("location")).toBe(
