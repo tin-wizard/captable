@@ -4,3 +4,6 @@ export { RangeTabs } from "./range-tabs";
 export { FilterChips, type ChipGroup } from "./filter-chips";
 export { CsvButton } from "./csv-button";
 export * from "./chart-theme";
+export { SearchBox } from "./search-box";
+export { Pager } from "./pager";
+export { analyticsParams, type RawSearchParams } from "./params";
