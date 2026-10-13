@@ -23,11 +23,12 @@ import { toCsv } from "@/server/analytics/csv";
 import { api } from "@/trpc/react";
 import type { RouterOutputs } from "@/trpc/shared";
 import { BarChart } from "@tremor/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatPct, formatUsd } from "./holders-table";
 import {
   type RoundFormValues,
   type RoundInputErrors,
+  type RoundInputValue,
   formatDilution,
   sortHolders,
   validateRoundInput,
@@ -45,7 +46,7 @@ const BOUND_LABEL = {
 const CHART_HOLDERS = 8;
 
 const friendlyError = (message: string) =>
-  message === "Add shares first"
+  message.includes("Add shares first")
     ? "Add shares first. The model needs issued shares to work from."
     : message;
 
@@ -60,32 +61,46 @@ export const RoundModel = () => {
   const [errors, setErrors] = useState<RoundInputErrors>({});
   const [loading, setLoading] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
-  const [result, setResult] = useState<Proforma | null>(null);
+  const [shown, setShown] = useState<{
+    result: Proforma;
+    inputs: RoundInputValue;
+  } | null>(null);
+  // bumped on every edit/calculate so a slow response cannot resurrect old figures
+  const seq = useRef(0);
 
   const set =
-    (k: keyof RoundFormValues) => (e: { target: { value: string } }) =>
+    (k: keyof RoundFormValues) => (e: { target: { value: string } }) => {
+      seq.current++;
+      setShown(null);
+      setFailure(null);
       setForm((f) => ({ ...f, [k]: e.target.value }));
+    };
 
   const calculate = async () => {
     const parsed = validateRoundInput(form);
+    seq.current++;
+    const mine = seq.current;
+    setShown(null);
+    setFailure(null);
     if (!parsed.ok) {
       setErrors(parsed.errors);
       return;
     }
     setErrors({});
-    setFailure(null);
     setLoading(true);
     try {
-      setResult(await utils.captable.proforma.fetch(parsed.value));
+      const result = await utils.captable.proforma.fetch(parsed.value);
+      if (mine === seq.current) setShown({ result, inputs: parsed.value });
     } catch (e) {
-      setResult(null);
-      setFailure(
-        friendlyError(
-          e instanceof Error ? e.message : "Could not run the model.",
-        ),
-      );
+      if (mine === seq.current) {
+        setFailure(
+          friendlyError(
+            e instanceof Error ? e.message : "Could not run the model.",
+          ),
+        );
+      }
     } finally {
-      setLoading(false);
+      if (mine === seq.current) setLoading(false);
     }
   };
 
@@ -171,7 +186,7 @@ export const RoundModel = () => {
           {failure}
         </Card>
       )}
-      {result && <Results result={result} />}
+      {shown && <Results result={shown.result} inputs={shown.inputs} />}
     </section>
   );
 };
@@ -198,7 +213,10 @@ const Field = ({
   </div>
 );
 
-const Results = ({ result }: { result: Proforma }) => {
+const Results = ({
+  result,
+  inputs,
+}: { result: Proforma; inputs: RoundInputValue }) => {
   if (!result.converged) {
     return (
       <Card className="p-4 text-sm" role="alert">
@@ -220,6 +238,11 @@ const Results = ({ result }: { result: Proforma }) => {
 
   return (
     <div className="flex flex-col gap-4">
+      <p className="text-sm text-muted-foreground">
+        Results for pre-money {formatUsd(inputs.preMoney)}, new money{" "}
+        {formatUsd(inputs.newMoney)}, pool{" "}
+        {Math.round(inputs.poolTargetPct * 10000) / 100}%, as of {result.asOf}
+      </p>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           label="Price per share"

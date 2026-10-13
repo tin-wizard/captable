@@ -38,6 +38,8 @@ describe("validateRoundInput", () => {
     ["poolTargetPct", { poolTargetPct: "-1" }],
     ["asOf", { asOf: "2026-13-45" }],
     ["asOf", { asOf: "tomorrow" }],
+    ["asOf", { asOf: "2026-02-30" }],
+    ["poolTargetPct", { poolTargetPct: "50.01" }],
   ])("rejects a bad %s", (field, patch) => {
     const r = validateRoundInput({ ...ok, ...patch });
     expect(r.ok).toBe(false);
@@ -45,9 +47,13 @@ describe("validateRoundInput", () => {
   });
 
   it("accepts the boundaries 0 new money and 50 % pool", () => {
-    expect(
-      validateRoundInput({ ...ok, newMoney: "0", poolTargetPct: "50" }).ok,
-    ).toBe(true);
+    const r = validateRoundInput({ ...ok, newMoney: "0", poolTargetPct: "50" });
+    expect(r.ok && r.value.poolTargetPct).toBe(0.5);
+  });
+
+  it("an explicit 0 pool gives 0", () => {
+    const r = validateRoundInput({ ...ok, poolTargetPct: "0" });
+    expect(r.ok && r.value.poolTargetPct).toBe(0);
   });
 });
 
