@@ -5,6 +5,10 @@ import {
   withTenant,
 } from "@/trpc/api/trpc";
 import { ZodOnboardingMutationSchema } from "../onboarding-router/schema";
+import {
+  preferencesProcedure,
+  updatePreferencesProcedure,
+} from "./procedures/preferences";
 import { switchCompanyProcedure } from "./procedures/switch-company";
 
 export const companyRouter = createTRPCRouter({
@@ -41,6 +45,8 @@ export const companyRouter = createTRPCRouter({
     return company;
   }),
   switchCompany: switchCompanyProcedure,
+  preferences: preferencesProcedure,
+  updatePreferences: updatePreferencesProcedure,
   updateCompany: withAccessControl
     .meta({ policies: { company: { allow: ["update"] } } })
     .input(ZodOnboardingMutationSchema)

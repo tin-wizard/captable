@@ -12,7 +12,7 @@ export const documentProcedure = withAccessControl
   .input(ZodDocumentAnalyticsSchema)
   .query(async ({ ctx, input }): Promise<DocumentAnalytics | null> => {
     assertSourceRead(ctx.permissions, input.kind);
-    const { db } = ctx.tenant;
+    const { db, companyId } = ctx.tenant;
     // unknown or foreign targets look exactly like "no data"
     const targetId = await resolveTarget(
       db as never,
@@ -20,10 +20,15 @@ export const documentProcedure = withAccessControl
       input.targetPublicId,
     );
     if (!targetId) return null;
+    const { timezone: tz } = await db.company.findUniqueOrThrow({
+      where: { id: companyId },
+      select: { timezone: true },
+    });
 
     return getDocumentAnalytics(db, {
       ...input,
       targetId,
+      tz,
       canSeeHoldings: canRead(ctx.permissions, "securities"),
     });
   });

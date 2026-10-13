@@ -3,6 +3,7 @@
 import Modal from "@/components/common/push-modal";
 
 import { ACTIONS, type TActions } from "@/lib/rbac/actions";
+import { VIEWER_PRESET, presetToPermissions } from "@/lib/rbac/presets";
 import { SUBJECTS, type TSubjects } from "@/lib/rbac/subjects";
 import { api } from "@/trpc/react";
 import {
@@ -132,6 +133,38 @@ function RoleForm(props: FormProps) {
         onSubmit={form.handleSubmit(onSubmit)}
       >
         <div>
+          {props.type === "create" ? (
+            <div className="mb-3">
+              <label
+                htmlFor="role-preset"
+                className="text-sm font-medium leading-none"
+              >
+                Start from
+              </label>
+              <select
+                id="role-preset"
+                defaultValue="blank"
+                className="mt-2 block w-full rounded-md border bg-background px-3 py-2 text-sm"
+                onChange={(e) => {
+                  const viewer = e.target.value === "viewer";
+                  form.setValue(
+                    "permissions",
+                    (viewer
+                      ? presetToPermissions(VIEWER_PRESET, ACTIONS)
+                      : defaultInputPermissionInputs) as TFormSchema["permissions"],
+                  );
+                  if (viewer && !form.getValues("name"))
+                    form.setValue("name", "Viewer");
+                }}
+              >
+                <option value="blank">Blank</option>
+                <option value="viewer">
+                  Viewer (read-only: data rooms, updates, documents, e-sign,
+                  activity)
+                </option>
+              </select>
+            </div>
+          ) : null}
           {props.type !== "view" ? (
             <FormField
               control={form.control}

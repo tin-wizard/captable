@@ -8,9 +8,15 @@ import { ZodEsignAnalyticsSchema } from "../schema";
 export const esignProcedure = withAccessControl
   .meta({ policies: { templates: { allow: ["read"] } } })
   .input(ZodEsignAnalyticsSchema)
-  .query(({ ctx, input }) =>
-    getEsignAnalytics(ctx.tenant.db, {
+  .query(async ({ ctx, input }) => {
+    const { db, companyId } = ctx.tenant;
+    const { timezone: tz } = await db.company.findUniqueOrThrow({
+      where: { id: companyId },
+      select: { timezone: true },
+    });
+    return getEsignAnalytics(db, {
       ...input,
+      tz,
       canSeeViews: canRead(ctx.permissions, "audits"),
-    }),
-  );
+    });
+  });

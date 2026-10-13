@@ -396,3 +396,36 @@ describe("analytics.documentsSummary and viewerVisits", () => {
     expect(foreign.items).toEqual([]);
   });
 });
+
+describe("analytics.document in the company timezone", () => {
+  it("puts a 23:30 UTC visit into the next day's bucket in Auckland", async () => {
+    const t = await seedTenant("an-tz");
+    try {
+      await db.company.update({
+        where: { id: t.companyId },
+        data: { timezone: "Pacific/Auckland" },
+      });
+      const r = await room(t, "TZ room", []);
+      const rec = await db.dataRoomRecipient.create({
+        data: { dataRoomId: r.id, name: "Tz", email: "tz@x.io" },
+      });
+      // 23:30 UTC two days ago is the next calendar day in Auckland (+12/+13)
+      const at = new Date(Date.now() - 2 * DAY);
+      at.setUTCHours(23, 30, 0, 0);
+      await visit(t, r.id, rec.id, { createdAt: at, activeSeconds: 5 });
+      const utcDay = at.toISOString().slice(0, 10);
+      const nextDay = new Date(at.getTime() + DAY).toISOString().slice(0, 10);
+
+      const res = await callerFor(t).analytics.document({
+        kind: "DATA_ROOM",
+        targetPublicId: r.publicId,
+        range: "7d",
+      });
+      expect(res?.series).toHaveLength(7);
+      expect(res?.series.find((p) => p.day === nextDay)?.visits).toBe(1);
+      expect(res?.series.find((p) => p.day === utcDay)?.visits ?? 0).toBe(0);
+    } finally {
+      await cleanupTenants(t);
+    }
+  });
+});

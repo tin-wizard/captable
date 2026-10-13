@@ -9,7 +9,11 @@ export const documentsSummaryProcedure = withAccessControl
   .query(async ({ ctx, input }) => {
     assertSourceRead(ctx.permissions, input.kind);
     const { db, companyId } = ctx.tenant;
+    const { timezone: tz } = await db.company.findUniqueOrThrow({
+      where: { id: companyId },
+      select: { timezone: true },
+    });
     return {
-      items: await getDocumentsSummary(db, companyId, input),
+      items: await getDocumentsSummary(db, companyId, { ...input, tz }),
     };
   });

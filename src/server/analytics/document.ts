@@ -2,7 +2,7 @@ import type { DocSeconds } from "@/server/activity/doc-seconds";
 import { findUnopened } from "@/server/activity/unopened";
 import type { TPrismaOrTransaction } from "@/server/db";
 import { engagement } from "./engagement";
-import { type RangeInput, dayBuckets, parseRange } from "./range";
+import { type RangeInput, dayBuckets, localDay, parseRange } from "./range";
 
 // shortcut: at most 50,000 visits are read per call (a year of a very busy
 // room is far below that); add SQL aggregation when a company reaches it.
@@ -64,6 +64,8 @@ export type DocumentInput = RangeInput & {
   limit?: number;
   canSeeHoldings: boolean;
   now?: Date;
+  /** IANA zone the day buckets follow */
+  tz?: string;
 };
 
 type Row = {
@@ -76,7 +78,6 @@ type Row = {
   isBot: boolean;
 };
 
-const day = (d: Date) => d.toISOString().slice(0, 10);
 const mean = (n: number, d: number) => (d ? n / d : 0);
 const sumValues = (p: Record<string, number>) =>
   Object.values(p).reduce((a, b) => a + b, 0);
@@ -88,7 +89,8 @@ export async function getDocumentAnalytics(
   db: TPrismaOrTransaction,
   input: DocumentInput,
 ): Promise<DocumentAnalytics> {
-  const range = parseRange(input, input.now);
+  const tz = input.tz ?? "UTC";
+  const range = parseRange(input, input.now, tz);
   const limit = Math.min(Math.max(input.limit ?? 25, 1), 50);
 
   const [events, recipients, everOpened] = await Promise.all([
@@ -149,10 +151,10 @@ export async function getDocumentAnalytics(
 
   // per-day series, zero filled
   const perDay = new Map<string, { visits: number; viewers: Set<string> }>();
-  for (const d of dayBuckets(range.from, range.to))
+  for (const d of dayBuckets(range.from, range.to, tz))
     perDay.set(d, { visits: 0, viewers: new Set() });
   for (const e of current) {
-    const bucket = perDay.get(day(e.createdAt));
+    const bucket = perDay.get(localDay(e.createdAt, tz));
     if (bucket) {
       bucket.visits += 1;
       bucket.viewers.add(e.recipientId);
@@ -285,7 +287,7 @@ export async function getDocumentAnalytics(
     }
     completionRate = opened ? reached / opened : null;
     if (withDocs.length < current.length)
-      legacyDetailFrom = day(withDocs[0]?.createdAt ?? range.from);
+      legacyDetailFrom = localDay(withDocs[0]?.createdAt ?? range.from, tz);
   }
 
   // recipients, names and (when allowed) holdings
@@ -505,9 +507,10 @@ export type DocumentsSummaryItem = {
 export async function getDocumentsSummary(
   db: TPrismaOrTransaction,
   companyId: string,
-  input: RangeInput & { kind: "DATA_ROOM" | "UPDATE"; now?: Date },
+  input: RangeInput & { kind: "DATA_ROOM" | "UPDATE"; now?: Date; tz?: string },
 ): Promise<DocumentsSummaryItem[]> {
-  const range = parseRange(input, input.now);
+  const tz = input.tz ?? "UTC";
+  const range = parseRange(input, input.now, tz);
   const targets =
     input.kind === "DATA_ROOM"
       ? (
@@ -545,13 +548,13 @@ export async function getDocumentsSummary(
     findUnopened(db, companyId, { kind: input.kind }),
   ]);
 
-  const days = dayBuckets(range.from, range.to);
+  const days = dayBuckets(range.from, range.to, tz);
   return targets.map((t) => {
     const mine = events.filter((e) => e.targetId === t.id);
     const perDay = new Map(days.map((d) => [d, 0]));
     let last: Date | null = null;
     for (const e of mine) {
-      const k = day(e.createdAt);
+      const k = localDay(e.createdAt, tz);
       perDay.set(k, (perDay.get(k) ?? 0) + 1);
       if (!last || e.createdAt > last) last = e.createdAt;
     }

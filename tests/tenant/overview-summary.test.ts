@@ -1,3 +1,4 @@
+import { localDay } from "@/server/analytics/range";
 import { db } from "@/server/db";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -12,6 +13,8 @@ import {
  * overview.summary: real holdings from ACTIVE securities only, each block
  * behind its own permission, and nothing from another company.
  */
+
+const DAY = 86_400_000;
 
 let a: Tenant;
 let b: Tenant;
@@ -258,6 +261,39 @@ describe("overview.summary", () => {
     });
     expect(res.engagement?.views7d).toBe(0);
     expect(res.engagement?.series).toHaveLength(7);
+  });
+
+  it("buckets the engagement series by the company timezone", async () => {
+    const t = await seedTenant("ov-tz");
+    try {
+      await db.company.update({
+        where: { id: t.companyId },
+        data: { timezone: "Pacific/Auckland" },
+      });
+      // 23:30 UTC yesterday is the next calendar day in Auckland (+12/+13)
+      const at = new Date(Date.now() - DAY);
+      at.setUTCHours(23, 30, 0, 0);
+      await db.viewEvent.create({
+        data: {
+          companyId: t.companyId,
+          kind: "DATA_ROOM",
+          targetId: "room",
+          recipientId: "rec",
+          ip: "1.2.3.0",
+          userAgent: "ua",
+          createdAt: at,
+        },
+      });
+      const nextDay = new Date(at.getTime() + DAY).toISOString().slice(0, 10);
+      const { engagement } = await callerFor(t).overview.summary();
+      const series = must(engagement).series;
+      expect(series).toHaveLength(7);
+      expect(series.at(-1)?.day).toBe(localDay(new Date(), "Pacific/Auckland"));
+      expect(series.find((p) => p.day === nextDay)?.views).toBe(1);
+      expect(series.reduce((n, p) => n + p.views, 0)).toBe(1);
+    } finally {
+      await cleanupTenants(t);
+    }
   });
 
   it("gives audits-only roles no holdings, and securities-only roles no engagement", async () => {
