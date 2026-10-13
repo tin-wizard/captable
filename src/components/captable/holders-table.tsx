@@ -25,7 +25,7 @@ export const HoldersTable = ({ data }: { data: CapTableData }) => {
   const { classes, rows, totals } = data;
   return (
     <Card className="overflow-x-auto">
-      <Table>
+      <Table aria-label="Cap table by holder">
         <TableHeader>
           <TableRow>
             <TableHead>Holder</TableHead>
@@ -49,7 +49,7 @@ export const HoldersTable = ({ data }: { data: CapTableData }) => {
                 colSpan={classes.length + 7}
                 className="py-8 text-center text-sm text-muted-foreground"
               >
-                No holders match these filters.
+                No shareholders yet, or none match these filters.
               </TableCell>
             </TableRow>
           )}
@@ -84,8 +84,7 @@ export const HoldersTable = ({ data }: { data: CapTableData }) => {
             <TableCell className="font-medium">Company total</TableCell>
             {classes.map((c) => (
               <TableCell key={c.id} className={num}>
-                <span aria-hidden>—</span>
-                <span className="sr-only">not shown</span>
+                {formatCount(totals.byClass[c.id] ?? 0)}
               </TableCell>
             ))}
             <TableCell className={num}>{formatCount(totals.options)}</TableCell>

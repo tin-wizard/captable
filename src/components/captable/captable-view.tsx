@@ -18,6 +18,7 @@ import { RiPieChartFill } from "@remixicon/react";
 import { BarChart } from "@tremor/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
   type CapTableData,
   HoldersTable,
@@ -54,7 +55,12 @@ export const CapTableView = ({
 }: Props) => {
   const { totals, classes } = data;
 
-  if (totals.issued === 0) {
+  if (
+    totals.issued === 0 &&
+    totals.options === 0 &&
+    totals.unallocatedPool === 0 &&
+    totals.convertibleCapital === 0
+  ) {
     return (
       <EmptyState
         icon={<RiPieChartFill />}
@@ -166,7 +172,11 @@ const OwnershipBar = ({
       emptyHint="Issue shares to see ownership by holder."
       tableAlt={{
         columns: ["Holder", "Shares", "% of issued"],
-        rows: slices.map((s) => [s.name, s.shares, formatPct(s.pct)]),
+        rows: slices.map((s) => [
+          s.name,
+          formatCount(s.shares),
+          formatPct(s.pct),
+        ]),
       }}
     >
       {mounted && (
@@ -196,6 +206,7 @@ const ExportButton = ({
   const onExport = async () => {
     const rows: CapTableData["rows"] = [];
     let cursor: string | undefined;
+    let more = false;
     while (rows.length < EXPORT_LIMIT) {
       const page = await utils.captable.table.fetch({
         ...filters,
@@ -203,10 +214,18 @@ const ExportButton = ({
         limit: PAGE,
       });
       rows.push(...page.rows);
+      more = Boolean(page.nextCursor);
       if (!page.nextCursor) break;
       cursor = page.nextCursor;
     }
     const exported = rows.slice(0, EXPORT_LIMIT);
+    if (more) {
+      toast.warning(
+        `Exported the first ${formatCount(
+          EXPORT_LIMIT,
+        )} holders. Narrow the filters to export the rest.`,
+      );
+    }
     return {
       filename: "cap-table.csv",
       csv: toCsv(

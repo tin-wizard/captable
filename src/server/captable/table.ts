@@ -113,6 +113,10 @@ export async function getCapTable(db: TPrismaOrTransaction, f: CapTableFilter) {
     unallocatedPool: holdings.planReserveUnallocated,
     fullyDiluted: holdings.fullyDiluted,
     convertibleCapital: holdings.convertibleCapital,
+    // ACTIVE issued shares per class id, company-wide
+    byClass: Object.fromEntries(
+      holdings.byClass.map((c) => [c.shareClassId, c.shares]),
+    ) as Record<string, number>,
   };
   const empty = {
     classes,

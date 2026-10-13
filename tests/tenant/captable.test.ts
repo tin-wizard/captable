@@ -253,7 +253,11 @@ describe("captable.table", () => {
       unallocatedPool: 350,
       fullyDiluted: 1900,
       convertibleCapital: 60_000,
+      byClass: { [common]: 1100, [seriesA]: 300 },
     });
+    expect(Object.values(t.totals.byClass).reduce((x, y) => x + y, 0)).toBe(
+      t.totals.issued,
+    );
     expect(t.classes.map((c) => c.name)).toEqual(["Common", "Series A"]);
   });
 
@@ -359,6 +363,7 @@ describe("captable.table", () => {
         unallocatedPool: 0,
         fullyDiluted: 0,
         convertibleCapital: 0,
+        byClass: {},
       },
     });
   });
