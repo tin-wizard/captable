@@ -88,3 +88,37 @@ export const stopUpdateRemindersProcedure = withAccessControl
     });
     return { stopped: input.stopped };
   });
+
+export const setUpdateAccessProcedure = withAccessControl
+  .input(z.object({ updateId: z.string(), requireNda: z.boolean() }))
+  .meta({ policies: { updates: { allow: ["update"] } } })
+  .mutation(async ({ ctx, input }) => {
+    const { db, companyId } = ctx.tenant;
+    const { user } = ctx.session;
+    const update = await db.update.findFirst({
+      where: { id: input.updateId, companyId },
+      select: { id: true, title: true },
+    });
+    if (!update) throw new TRPCError({ code: "NOT_FOUND" });
+
+    await db.$transaction(async (tx) => {
+      await tx.update.update({
+        where: { id: update.id },
+        data: { requireNda: input.requireNda },
+      });
+      await Audit.create(
+        {
+          action: "update.updated",
+          companyId,
+          actor: { type: "user", id: user.id },
+          context: { userAgent: ctx.userAgent, requestIp: ctx.requestIp },
+          target: [{ type: "update", id: update.id }],
+          summary: `${user.name} turned the NDA requirement ${
+            input.requireNda ? "on" : "off"
+          } for the update ${update.title}`,
+        },
+        tx,
+      );
+    });
+    return { requireNda: input.requireNda };
+  });

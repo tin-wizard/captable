@@ -61,6 +61,8 @@ const DataRoomSettinsPage = async (props: {
               targetPublicId={dataRoomPublicId}
               filters={filters}
               roomName={(dataRoom as DataRoom).name}
+              allowDownload={(dataRoom as DataRoom).allowDownload}
+              requireNda={(dataRoom as DataRoom).requireNda}
             />
           )}
           <Card>

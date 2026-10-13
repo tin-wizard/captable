@@ -452,6 +452,57 @@ export const dataRoomRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  setAccess: withAccessControl
+    .input(
+      z.object({
+        dataRoomId: z.string(),
+        allowDownload: z.boolean().optional(),
+        requireNda: z.boolean().optional(),
+      }),
+    )
+    .meta({ policies: { "data-rooms": { allow: ["update"] } } })
+    .mutation(async ({ ctx, input }) => {
+      const { db, companyId } = ctx.tenant;
+      const { user } = ctx.session;
+      const room = await db.dataRoom.findFirst({
+        where: { id: input.dataRoomId, companyId },
+        select: { id: true, name: true },
+      });
+      if (!room) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const data = {
+        ...(input.allowDownload !== undefined && {
+          allowDownload: input.allowDownload,
+        }),
+        ...(input.requireNda !== undefined && { requireNda: input.requireNda }),
+      };
+      const onOff = (v: boolean) => (v ? "on" : "off");
+      const changes = [
+        input.allowDownload !== undefined &&
+          `downloads ${onOff(input.allowDownload)}`,
+        input.requireNda !== undefined &&
+          `the NDA requirement ${onOff(input.requireNda)}`,
+      ].filter(Boolean);
+
+      await db.$transaction(async (tx) => {
+        await tx.dataRoom.update({ where: { id: room.id }, data });
+        await Audit.create(
+          {
+            action: "dataroom.updated",
+            companyId,
+            actor: { type: "user", id: user.id },
+            context: { userAgent: ctx.userAgent, requestIp: ctx.requestIp },
+            target: [{ type: "dataroom", id: room.id }],
+            summary: `${user.name} turned ${changes.join(
+              " and ",
+            )} for the data room ${room.name}`,
+          },
+          tx,
+        );
+      });
+      return data;
+    }),
+
   setAutoNudge: withAccessControl
     .input(z.object({ dataRoomId: z.string(), enabled: z.boolean() }))
     .meta({ policies: { "data-rooms": { allow: ["update"] } } })

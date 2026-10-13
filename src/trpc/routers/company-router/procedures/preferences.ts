@@ -8,7 +8,12 @@ export const preferencesProcedure = withAccessControl
   .query(({ ctx }) =>
     ctx.tenant.db.company.findFirstOrThrow({
       where: { id: ctx.tenant.companyId },
-      select: { timezone: true, viewRetentionMonths: true, autoNudge: true },
+      select: {
+        timezone: true,
+        viewRetentionMonths: true,
+        autoNudge: true,
+        ndaText: true,
+      },
     }),
   );
 
@@ -26,6 +31,8 @@ export const updatePreferencesProcedure = withAccessControl
       ]),
       // optional so callers from before the switch keep working
       autoNudge: z.boolean().optional(),
+      // empty string clears it (stored as null); omitted leaves it alone
+      ndaText: z.string().max(5000).nullable().optional(),
     }),
   )
   .mutation(async ({ ctx, input }) => {
@@ -34,7 +41,10 @@ export const updatePreferencesProcedure = withAccessControl
 
     const company = await db.company.update({
       where: { id: companyId },
-      data: input,
+      data: {
+        ...input,
+        ...(input.ndaText !== undefined && { ndaText: input.ndaText || null }),
+      },
       select: { name: true },
     });
 

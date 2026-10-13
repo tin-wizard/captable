@@ -1,5 +1,6 @@
 "use client";
 
+import { AccessSwitches } from "@/components/activity/access-switches";
 import { AutoNudgeSwitch } from "@/components/activity/auto-nudge-switch";
 import EmptyState from "@/components/common/empty-state";
 import type { ExtendedDataRoomRecipientType } from "@/components/common/share-modal";
@@ -80,12 +81,21 @@ const DataRoomFiles = ({
             </div>
           </form>
 
-          <AutoNudgeSwitch
-            kind="DATA_ROOM"
-            targetId={dataRoom.id}
-            initial={dataRoom.autoNudge}
-            canEdit={canEditSettings}
-          />
+          <div className="flex flex-col gap-y-3">
+            <AutoNudgeSwitch
+              kind="DATA_ROOM"
+              targetId={dataRoom.id}
+              initial={dataRoom.autoNudge}
+              canEdit={canEditSettings}
+            />
+            <AccessSwitches
+              kind="DATA_ROOM"
+              targetId={dataRoom.id}
+              initialAllowDownload={dataRoom.allowDownload}
+              initialRequireNda={dataRoom.requireNda}
+              canEdit={canEditSettings}
+            />
+          </div>
 
           {documents.length > 0 && (
             <div className="flex gap-3">

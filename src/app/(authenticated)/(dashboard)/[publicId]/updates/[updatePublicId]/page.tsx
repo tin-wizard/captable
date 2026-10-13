@@ -1,3 +1,4 @@
+import { AccessSwitches } from "@/components/activity/access-switches";
 import { ActivityTable } from "@/components/activity/activity-table";
 import { AutoNudgeSwitch } from "@/components/activity/auto-nudge-switch";
 import { UnopenedList } from "@/components/activity/unopened-list";
@@ -38,11 +39,17 @@ const UpdatePage = async (props: {
 
   return (
     <>
-      <div className="mb-4">
+      <div className="mb-4 space-y-3">
         <AutoNudgeSwitch
           kind="UPDATE"
           targetId={update.id}
           initial={update.autoNudge}
+          canEdit={allow(true, ["updates", "update"])}
+        />
+        <AccessSwitches
+          kind="UPDATE"
+          targetId={update.id}
+          initialRequireNda={update.requireNda}
           canEdit={allow(true, ["updates", "update"])}
         />
       </div>
@@ -56,6 +63,7 @@ const UpdatePage = async (props: {
             targetPublicId={updatePublicId}
             filters={filters}
             roomName={update.title}
+            requireNda={update.requireNda}
           />
         </section>
       )}

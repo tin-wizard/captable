@@ -22,6 +22,8 @@ export type ViewerRow = {
   score: number;
   engagementLabel: "hot" | "warm" | "cold";
   countries: string[];
+  downloads: number;
+  ndaAccepted: boolean;
 };
 
 export type DocumentAnalytics = {
@@ -34,6 +36,7 @@ export type DocumentAnalytics = {
     returnRate: number;
     previous: { visits: number; viewers: number; avgActiveSeconds: number };
     botsHidden: number;
+    downloads: number;
   };
   series: { day: string; visits: number; viewers: number }[];
   documents:
@@ -93,42 +96,62 @@ export async function getDocumentAnalytics(
   const range = parseRange(input, input.now, tz);
   const limit = Math.min(Math.max(input.limit ?? 25, 1), 50);
 
-  const [events, recipients, everOpened] = await Promise.all([
-    db.viewEvent.findMany({
-      where: {
-        kind: input.kind,
-        targetId: input.targetId,
-        createdAt: { gte: range.previousFrom, lte: range.to },
-      },
-      select: {
-        id: true,
-        recipientId: true,
-        createdAt: true,
-        activeSeconds: true,
-        docSeconds: true,
-        country: true,
-        isBot: true,
-      },
-      orderBy: { createdAt: "asc" },
-      take: MAX_EVENTS,
-    }),
-    input.kind === "DATA_ROOM"
-      ? db.dataRoomRecipient.findMany({
-          where: { dataRoomId: input.targetId },
-          select: { id: true, name: true, email: true, stakeholderId: true },
-          take: 2000,
-        })
-      : db.updateRecipient.findMany({
-          where: { updateId: input.targetId },
-          select: { id: true, name: true, email: true, stakeholderId: true },
-          take: 2000,
-        }),
-    db.viewEvent.findMany({
-      where: { kind: input.kind, targetId: input.targetId, isBot: false },
-      select: { recipientId: true },
-      distinct: ["recipientId"],
-    }),
-  ]);
+  const [events, recipients, everOpened, downloadGroups, accepted] =
+    await Promise.all([
+      db.viewEvent.findMany({
+        where: {
+          kind: input.kind,
+          targetId: input.targetId,
+          createdAt: { gte: range.previousFrom, lte: range.to },
+        },
+        select: {
+          id: true,
+          recipientId: true,
+          createdAt: true,
+          activeSeconds: true,
+          docSeconds: true,
+          country: true,
+          isBot: true,
+        },
+        orderBy: { createdAt: "asc" },
+        take: MAX_EVENTS,
+      }),
+      input.kind === "DATA_ROOM"
+        ? db.dataRoomRecipient.findMany({
+            where: { dataRoomId: input.targetId },
+            select: { id: true, name: true, email: true, stakeholderId: true },
+            take: 2000,
+          })
+        : db.updateRecipient.findMany({
+            where: { updateId: input.targetId },
+            select: { id: true, name: true, email: true, stakeholderId: true },
+            take: 2000,
+          }),
+      db.viewEvent.findMany({
+        where: { kind: input.kind, targetId: input.targetId, isBot: false },
+        select: { recipientId: true },
+        distinct: ["recipientId"],
+      }),
+      input.kind === "DATA_ROOM"
+        ? db.downloadEvent.groupBy({
+            by: ["recipientId"],
+            where: {
+              kind: input.kind,
+              targetId: input.targetId,
+              createdAt: { gte: range.from, lte: range.to },
+            },
+            _count: { _all: true },
+          })
+        : Promise.resolve([]),
+      db.ndaAcceptance.findMany({
+        where: { kind: input.kind, targetId: input.targetId },
+        select: { recipientId: true },
+      }),
+    ]);
+  const downloadsBy = new Map(
+    downloadGroups.map((g) => [g.recipientId, g._count._all]),
+  );
+  const ndaBy = new Set(accepted.map((n) => n.recipientId));
 
   const fromMs = range.from.getTime();
   const all = events as Row[];
@@ -359,6 +382,8 @@ export async function getDocumentAnalytics(
       score: a ? e.score : 0,
       engagementLabel: a ? e.label : "cold",
       countries: a ? [...a.countries] : [],
+      downloads: downloadsBy.get(recipientId) ?? 0,
+      ndaAccepted: ndaBy.has(recipientId),
     };
   };
 
@@ -403,6 +428,7 @@ export async function getDocumentAnalytics(
         perDay,
         mix,
         completionRate,
+        [...downloadsBy.values()].reduce((n, c) => n + c, 0),
       );
     start = at + 1;
   }
@@ -433,6 +459,7 @@ export async function getDocumentAnalytics(
       returnRate: cur.viewers ? returned / cur.viewers : 0,
       previous: prev,
       botsHidden,
+      downloads: [...downloadsBy.values()].reduce((n, c) => n + c, 0),
     },
     series: [...perDay.entries()].map(([d, v]) => ({
       day: d,
@@ -460,6 +487,7 @@ function empty(
   perDay: Map<string, { visits: number; viewers: Set<string> }>,
   mix: DocumentAnalytics["engagementMix"],
   completionRate: number | null,
+  downloads: number,
 ): DocumentAnalytics {
   return {
     range: {
@@ -477,6 +505,7 @@ function empty(
         avgActiveSeconds: 0,
       },
       botsHidden,
+      downloads,
     },
     series: [...perDay.entries()].map(([d, v]) => ({
       day: d,
