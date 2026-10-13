@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { api } from "@/trpc/react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -27,11 +28,13 @@ export const PreferencesCard = () => {
   const { data } = api.company.preferences.useQuery();
   const [timezone, setTimezone] = useState("UTC");
   const [retention, setRetention] = useState("24");
+  const [autoNudge, setAutoNudge] = useState(false);
 
   useEffect(() => {
     if (data) {
       setTimezone(data.timezone);
       setRetention(toValue(data.viewRetentionMonths));
+      setAutoNudge(data.autoNudge);
     }
   }, [data]);
 
@@ -95,12 +98,32 @@ export const PreferencesCard = () => {
           )}
         </div>
       </div>
+      <div className="mt-4 flex items-start gap-x-3">
+        <Switch
+          id="auto-nudge"
+          checked={autoNudge}
+          onCheckedChange={setAutoNudge}
+          disabled={!data}
+        />
+        <div>
+          <label htmlFor="auto-nudge" className="text-sm font-medium">
+            Automatic reminders
+          </label>
+          <p className="text-sm text-muted-foreground">
+            Remind recipients who have not opened a shared data room or update:
+            once after 3 days and once after 7, only between 09:00 and 18:00 in
+            your timezone. Turn it on per data room and update as well.
+            Recipients can opt out.
+          </p>
+        </div>
+      </div>
       <Button
         className="mt-4"
         disabled={!data || save.isLoading}
         onClick={() =>
           save.mutate({
             timezone,
+            autoNudge,
             viewRetentionMonths:
               retention === "keep"
                 ? null

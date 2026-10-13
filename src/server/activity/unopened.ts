@@ -109,6 +109,8 @@ export async function findUnopened(
               updatedAt: true,
               expiresAt: true,
               lastNudgedAt: true,
+              nudgeCount: true,
+              nudgeOptOut: true,
               dataRoom: {
                 select: {
                   id: true,
@@ -138,6 +140,8 @@ export async function findUnopened(
               updatedAt: true,
               expiresAt: true,
               lastNudgedAt: true,
+              nudgeCount: true,
+              nudgeOptOut: true,
               update: {
                 select: {
                   id: true,
@@ -179,6 +183,8 @@ export async function findUnopened(
       name: r.name,
       waitingSince: r.updatedAt,
       lastNudgedAt: r.lastNudgedAt,
+      nudgeCount: r.nudgeCount,
+      nudgeOptOut: r.nudgeOptOut,
       nudgeable: nudgeable(r),
     })),
     ...updates.map((r) => ({
@@ -192,6 +198,8 @@ export async function findUnopened(
       name: r.name,
       waitingSince: r.updatedAt,
       lastNudgedAt: r.lastNudgedAt,
+      nudgeCount: r.nudgeCount,
+      nudgeOptOut: r.nudgeOptOut,
       nudgeable: nudgeable(r),
     })),
   ];
@@ -208,6 +216,8 @@ export type Unopened = {
   name: string | null;
   waitingSince: Date;
   lastNudgedAt: Date | null;
+  nudgeCount: number;
+  nudgeOptOut: boolean;
   nudgeable: boolean;
 };
 // shortcut: capped at 200 unopened per kind and "waiting since" is the row's

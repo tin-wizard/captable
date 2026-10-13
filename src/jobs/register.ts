@@ -1,6 +1,7 @@
 import { logger } from "@/lib/logger";
 import { queue, queueManager } from "../lib/queue";
 import { authVerificationEmailWorker } from "./auth-verification-email";
+import { autoNudgeEmailWorker } from "./auto-nudge";
 import { eSignCompletePDFWorker } from "./esign-complete-pdf";
 import { eSignConfirmationEmailWorker } from "./esign-confirmation-email";
 import { eSignNotificationEmailWorker } from "./esign-email";
@@ -18,6 +19,7 @@ export async function registerJobs() {
   queueManager.register(shareUpdateEmailWorker);
   queueManager.register(viewAlertEmailWorker);
   queueManager.register(viewDigestEmailWorker);
+  queueManager.register(autoNudgeEmailWorker);
   queueManager.register(passwordResetEmailWorker);
   queueManager.register(sendMemberInviteEmailWorker);
   queueManager.register(eSignNotificationEmailWorker);
@@ -48,5 +50,14 @@ export async function registerJobs() {
       logger
         .child({ module: "queue" })
         .warn("could not schedule email.view-digest"),
+    );
+
+  // a retried run is safe: each reminder is claimed before it is sent
+  await queue
+    .schedule("email.auto-nudge", "0 * * * *", {})
+    .catch(() =>
+      logger
+        .child({ module: "queue" })
+        .warn("could not schedule email.auto-nudge"),
     );
 }

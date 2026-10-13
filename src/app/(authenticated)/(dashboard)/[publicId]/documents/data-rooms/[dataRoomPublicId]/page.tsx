@@ -49,6 +49,7 @@ const DataRoomSettinsPage = async (props: {
         dataRoom={dataRoom as DataRoom}
         documents={documents as Bucket[]}
         companyPublicId={publicId}
+        canEditSettings={allow(true, ["data-rooms", "update"])}
       />
       {canViewActivity && (
         <section aria-label="Analytics" className="mt-6 space-y-6">

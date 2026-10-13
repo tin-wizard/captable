@@ -8,7 +8,7 @@ export const preferencesProcedure = withAccessControl
   .query(({ ctx }) =>
     ctx.tenant.db.company.findFirstOrThrow({
       where: { id: ctx.tenant.companyId },
-      select: { timezone: true, viewRetentionMonths: true },
+      select: { timezone: true, viewRetentionMonths: true, autoNudge: true },
     }),
   );
 
@@ -24,6 +24,8 @@ export const updatePreferencesProcedure = withAccessControl
         z.literal(36),
         z.null(),
       ]),
+      // optional so callers from before the switch keep working
+      autoNudge: z.boolean().optional(),
     }),
   )
   .mutation(async ({ ctx, input }) => {

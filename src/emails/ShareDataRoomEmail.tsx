@@ -21,6 +21,8 @@ interface ShareDataRoomEmailProps {
   companyName: string;
   dataRoom: string;
   link: string;
+  // set only on automatic reminders
+  unsubscribeLink?: string;
 }
 
 export const ShareDataRoomEmail = ({
@@ -29,6 +31,7 @@ export const ShareDataRoomEmail = ({
   companyName,
   dataRoom,
   link,
+  unsubscribeLink,
 }: ShareDataRoomEmailProps) => {
   const recipientFirstName = recipientName?.split(" ")[0] || "there";
   const previewText = `${senderName} at ${companyName} shared ${dataRoom} with you.`;
@@ -72,6 +75,18 @@ export const ShareDataRoomEmail = ({
             </Text>
 
             <Hr className="mx-0 my-[26px] w-full border border-solid border-neutral-200" />
+            {unsubscribeLink && (
+              <Text className="text-[12px] leading-[20px] text-gray-500">
+                Don&apos;t want these reminders?{" "}
+                <Link
+                  href={unsubscribeLink}
+                  className="text-gray-500 underline"
+                >
+                  Unsubscribe
+                </Link>
+                .
+              </Text>
+            )}
             <Link href={constants.url} className="text-sm no-underline">
               <span className="text-xs !text-gray-400">Powered by</span>
               <span>{` ${constants.title}`}</span>

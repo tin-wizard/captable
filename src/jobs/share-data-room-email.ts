@@ -15,6 +15,7 @@ const config = defineWorkerConfig({
     recipientName: z.string().nullish(),
     senderEmail: z.string().email().nullish(),
     reminder: z.boolean().optional(),
+    unsubscribeLink: z.string().url().optional(),
   }),
 });
 
@@ -30,6 +31,7 @@ export const shareDataRoomEmailWorker = defineWorker(config, async (job) => {
     email,
     senderEmail,
     reminder,
+    unsubscribeLink,
   } = job.data;
   await sendMail({
     to: email,
@@ -44,6 +46,7 @@ export const shareDataRoomEmailWorker = defineWorker(config, async (job) => {
         companyName,
         dataRoom,
         link,
+        unsubscribeLink: reminder ? unsubscribeLink : undefined,
       }),
     ),
 

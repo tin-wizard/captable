@@ -1,4 +1,5 @@
 import { ActivityTable } from "@/components/activity/activity-table";
+import { AutoNudgeSwitch } from "@/components/activity/auto-nudge-switch";
 import { UnopenedList } from "@/components/activity/unopened-list";
 import { analyticsParams } from "@/components/analytics";
 import { DocumentAnalytics } from "@/components/analytics/document/document-analytics";
@@ -37,6 +38,14 @@ const UpdatePage = async (props: {
 
   return (
     <>
+      <div className="mb-4">
+        <AutoNudgeSwitch
+          kind="UPDATE"
+          targetId={update.id}
+          initial={update.autoNudge}
+          canEdit={allow(true, ["updates", "update"])}
+        />
+      </div>
       <Editor companyPublicId={publicId} update={update} mode="edit" />
       {analytics && (
         <section aria-label="Analytics" className="mt-6">

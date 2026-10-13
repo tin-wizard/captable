@@ -70,6 +70,7 @@ describe("company.preferences / updatePreferences", () => {
     expect(await callerFor(a).company.preferences()).toEqual({
       timezone: "UTC",
       viewRetentionMonths: 24,
+      autoNudge: false,
     });
   });
 
@@ -85,6 +86,7 @@ describe("company.preferences / updatePreferences", () => {
     expect(await callerFor(a).company.preferences()).toEqual({
       timezone: "Europe/Berlin",
       viewRetentionMonths: 12,
+      autoNudge: false,
     });
     const audit = await db.audit.findFirst({
       where: { companyId: a.companyId, action: "company.updated" },
