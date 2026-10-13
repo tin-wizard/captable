@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import * as z from "zod";
 import { AuthFormHeader } from "../auth-form-header";
 import { AuthShell } from "../auth-shell";
+import { CompanyAddressForm } from "../company-address-form";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -37,9 +38,18 @@ const loginSchema = z.object({
 
 interface LoginFormProps {
   isGoogleAuthEnabled: boolean;
+  // set only when company addresses are enabled
+  companyAddress?: {
+    baseDomain: string;
+    scheme: "http" | "https";
+    port: string;
+  };
 }
 
-const SignInForm = ({ isGoogleAuthEnabled }: LoginFormProps) => {
+const SignInForm = ({
+  isGoogleAuthEnabled,
+  companyAddress,
+}: LoginFormProps) => {
   const next = safeNextPath(useSearchParams().get("callbackUrl"));
   // deep links and the handoff's issue step resume after login
   const callbackUrl = next === "/" ? "/onboarding" : next;
@@ -117,6 +127,9 @@ const SignInForm = ({ isGoogleAuthEnabled }: LoginFormProps) => {
     <AuthShell>
       <AuthFormHeader page="signin" />
       <>
+        {companyAddress && (
+          <CompanyAddressForm {...companyAddress} next={next} />
+        )}
         <Button
           variant="outline"
           disabled={isSubmitting}

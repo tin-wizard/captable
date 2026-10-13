@@ -2,6 +2,7 @@ import SignInForm from "@/components/onboarding/signin";
 import { IS_GOOGLE_AUTH_ENABLED } from "@/constants/auth";
 import { constants } from "@/lib/constants";
 import { getServerComponentAuthSession } from "@/server/auth";
+import { domainConfig } from "@/server/domains/config";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -20,5 +21,12 @@ export default async function SignIn() {
     return redirect("/onboarding");
   }
 
-  return <SignInForm isGoogleAuthEnabled={IS_GOOGLE_AUTH_ENABLED} />;
+  const { enabled, baseDomain, scheme, port } = domainConfig();
+
+  return (
+    <SignInForm
+      isGoogleAuthEnabled={IS_GOOGLE_AUTH_ENABLED}
+      companyAddress={enabled ? { baseDomain, scheme, port } : undefined}
+    />
+  );
 }
