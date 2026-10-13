@@ -32,6 +32,7 @@ export const PreferencesCard = () => {
   const [retention, setRetention] = useState("24");
   const [autoNudge, setAutoNudge] = useState(false);
   const [ndaText, setNdaText] = useState(DEFAULT_NDA_TEXT);
+  const [showNameOnLogin, setShowNameOnLogin] = useState(false);
 
   useEffect(() => {
     if (data) {
@@ -39,6 +40,7 @@ export const PreferencesCard = () => {
       setRetention(toValue(data.viewRetentionMonths));
       setAutoNudge(data.autoNudge);
       setNdaText(data.ndaText ?? DEFAULT_NDA_TEXT);
+      setShowNameOnLogin(data.showNameOnLogin);
     }
   }, [data]);
 
@@ -121,6 +123,23 @@ export const PreferencesCard = () => {
           </p>
         </div>
       </div>
+      <div className="mt-4 flex items-start gap-x-3">
+        <Switch
+          id="show-name-on-login"
+          checked={showNameOnLogin}
+          onCheckedChange={setShowNameOnLogin}
+          disabled={!data}
+        />
+        <div>
+          <label htmlFor="show-name-on-login" className="text-sm font-medium">
+            Show our name and logo on the login page
+          </label>
+          <p className="text-sm text-muted-foreground">
+            When off, people opening your company address see only the address.
+            Turn on to show your company name and logo.
+          </p>
+        </div>
+      </div>
       <div className="mt-4">
         <label htmlFor="nda-text" className="text-sm font-medium">
           Confidentiality notice shown to recipients
@@ -147,6 +166,7 @@ export const PreferencesCard = () => {
           save.mutate({
             timezone,
             autoNudge,
+            showNameOnLogin,
             // the untouched default is not saved as the company's own text
             ndaText: ndaText.trim() === DEFAULT_NDA_TEXT ? null : ndaText,
             viewRetentionMonths:

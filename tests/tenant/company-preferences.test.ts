@@ -72,6 +72,7 @@ describe("company.preferences / updatePreferences", () => {
       viewRetentionMonths: 24,
       autoNudge: false,
       ndaText: null,
+      showNameOnLogin: false,
     });
   });
 
@@ -89,11 +90,41 @@ describe("company.preferences / updatePreferences", () => {
       viewRetentionMonths: 12,
       autoNudge: false,
       ndaText: null,
+      showNameOnLogin: false,
     });
     const audit = await db.audit.findFirst({
       where: { companyId: a.companyId, action: "company.updated" },
     });
     expect(audit?.summary).toContain("changed company preferences");
+  });
+
+  it("showNameOnLogin saves, audits, and is left alone when omitted", async () => {
+    const base = { timezone: "UTC", viewRetentionMonths: 24 as const };
+    const before = await db.audit.count({
+      where: { companyId: a.companyId, action: "company.updated" },
+    });
+    await callerFor(a).company.updatePreferences({
+      ...base,
+      showNameOnLogin: true,
+    });
+    expect((await row(a)).showNameOnLogin).toBe(true);
+    expect(
+      await db.audit.count({
+        where: { companyId: a.companyId, action: "company.updated" },
+      }),
+    ).toBe(before + 1);
+
+    await callerFor(a).company.updatePreferences(base);
+    expect((await row(a)).showNameOnLogin).toBe(true);
+    expect((await row(b)).showNameOnLogin).toBe(false);
+
+    const reader = await memberWith([
+      { subject: "company", actions: ["read"] },
+    ]);
+    await expect(
+      reader.company.updatePreferences({ ...base, showNameOnLogin: false }),
+    ).rejects.toThrow();
+    expect((await row(a)).showNameOnLogin).toBe(true);
   });
 
   it("null means keep forever", async () => {
