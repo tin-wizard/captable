@@ -29,7 +29,6 @@ vi.hoisted(() => {
   Object.assign(process.env, {
     UPLOAD_ENDPOINT: "https://s3.test.invalid",
     UPLOAD_REGION: "us-east-1",
-    UPLOAD_BUCKET_PUBLIC: "public-test",
     UPLOAD_BUCKET_PRIVATE: "private-test",
     UPLOAD_ACCESS_KEY_ID: "test-key",
     UPLOAD_SECRET_ACCESS_KEY: "test-secret",
@@ -806,7 +805,6 @@ beforeAll(async () => {
   const { key: issuedKey } = await getPresignedPutUrl({
     ...pdf,
     identifier: company.publicId,
-    bucketMode: "privateBucket",
   });
 
   fx = {

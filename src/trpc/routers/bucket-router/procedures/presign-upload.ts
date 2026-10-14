@@ -17,11 +17,11 @@ export const presignUploadProcedure = withAccessControl
     return getPresignedPutUrl({
       ...input,
       identifier: publicId,
-      bucketMode: "privateBucket",
     });
   });
 
-// Public images (avatars, company logos) under the session user's id. Only a
+// Public images (avatars, company logos) under the session user's id, served
+// by /api/public-image from the same private bucket. Only a
 // session is needed: a logo is uploaded during onboarding, before any
 // membership exists. No Bucket row is created for these.
 export const presignPublicUploadProcedure = withAuth
@@ -30,6 +30,5 @@ export const presignPublicUploadProcedure = withAuth
     getPresignedPutUrl({
       ...input,
       identifier: session.user.id,
-      bucketMode: "publicBucket",
     }),
   );

@@ -60,14 +60,10 @@ export const uploadFile = async (
   }
 
   const { name, type, size } = file;
-  let fileUrl = bucketUrl;
-
-  const uploadDomain =
-    process.env.NEXT_PUBLIC_UPLOAD_DOMAIN || env.NEXT_PUBLIC_UPLOAD_DOMAIN;
-
-  if (isPublic && uploadDomain) {
-    fileUrl = `${uploadDomain}/${key}`;
-  }
+  // public images are served by the app, not by the (private) bucket
+  const fileUrl = isPublic
+    ? `${env.NEXT_PUBLIC_BASE_URL}/api/public-image/${key}`
+    : bucketUrl;
 
   return {
     key,

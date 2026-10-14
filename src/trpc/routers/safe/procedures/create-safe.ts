@@ -42,14 +42,10 @@ export const createSafeProcedure = withAccessControl
           size: pdfBuffer.byteLength,
         } as unknown as File;
 
-        uploadData = await uploadFile(
-          file,
-          {
-            identifier: "templates",
-            keyPrefix: "new-safes",
-          },
-          "privateBucket",
-        );
+        uploadData = await uploadFile(file, {
+          identifier: "templates",
+          keyPrefix: "new-safes",
+        });
       }
 
       const { template } = await ctx.tenant.db.$transaction(async (tx) => {

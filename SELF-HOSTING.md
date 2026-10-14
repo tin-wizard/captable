@@ -37,17 +37,8 @@ UPLOAD_REGION="us-west-1" # auto when using Cloudflare R2
 UPLOAD_ENDPOINT="https://xxx.r2.cloudflarestorage.com"
 UPLOAD_ACCESS_KEY_ID="xxx"
 UPLOAD_SECRET_ACCESS_KEY="xxx"
-UPLOAD_BUCKET_PUBLIC="public-bucket-name"
 UPLOAD_BUCKET_PRIVATE="private-bucket-name"
 ```
-
-Following environment variables are optional
-
-```bash
-# If you are using custom domain, especially with Cloudflare R2, AWAS S3 with custom domain.
-NEXT_PUBLIC_UPLOAD_DOMAIN="https://custom.your-domain.com" 
-```
-
 
 - **Run the docker container**:
 
@@ -62,10 +53,8 @@ docker run -d \
   -e EMAIL_SERVER="replace" \
   -e UPLOAD_REGION="replace" \
   -e UPLOAD_ENDPOINT="replace" \
-  -e NEXT_PUBLIC_UPLOAD_DOMAIN="replace" \
   -e UPLOAD_ACCESS_KEY_ID="replace" \
   -e UPLOAD_SECRET_ACCESS_KEY="replace" \
-  -e UPLOAD_BUCKET_PUBLIC="replace" \
   -e UPLOAD_BUCKET_PRIVATE="replace" \
   -p 3000:3000 \
   captable/captable

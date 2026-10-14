@@ -25,7 +25,6 @@ vi.hoisted(() => {
   Object.assign(process.env, {
     UPLOAD_ENDPOINT: "https://s3.test.invalid",
     UPLOAD_REGION: "us-east-1",
-    UPLOAD_BUCKET_PUBLIC: "public-test",
     UPLOAD_BUCKET_PRIVATE: "private-test",
     UPLOAD_ACCESS_KEY_ID: "test-key",
     UPLOAD_SECRET_ACCESS_KEY: "test-secret",
@@ -270,7 +269,6 @@ describe("upload size limit", () => {
       size: 10,
       keyPrefix: "signed-esign-doc",
       identifier: "someone",
-      bucketMode: "privateBucket",
     });
     expect(signedHeaders(url)).toContain("content-length");
   });
@@ -300,7 +298,6 @@ describe("getPresignedPutUrl extension", () => {
       size: 1,
       keyPrefix: "generic-documents",
       identifier: "someone",
-      bucketMode: "publicBucket",
     });
     expect(key).toMatch(shape);
     expect(bucketUrl).toMatch(/generic-documents-[\w-]+(\.PDF)?$/);
@@ -638,7 +635,6 @@ describe("upload content type is signed", () => {
       fileName: "a.pdf",
       keyPrefix: "generic-documents",
       identifier: "srv",
-      bucketMode: "privateBucket",
     });
     expect(signed(url)).toContain("content-type");
   });
