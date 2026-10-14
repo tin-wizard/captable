@@ -19,7 +19,6 @@ const accessKeyId = env.UPLOAD_ACCESS_KEY_ID;
 const secretAccessKey = env.UPLOAD_SECRET_ACCESS_KEY;
 const hasCredentials = accessKeyId && secretAccessKey;
 const PrivateBucket = env.UPLOAD_BUCKET_PRIVATE;
-const PublicBucket = env.UPLOAD_BUCKET_PUBLIC;
 
 const S3 = new S3Client({
   region,
@@ -54,7 +53,6 @@ export interface getPresignedUrlOptions {
   keyPrefix: TypeKeyPrefixes;
   // should be companyPublicId or memberId or userId
   identifier: string;
-  bucketMode: "privateBucket" | "publicBucket";
 }
 
 const TEN_MINUTES_IN_SECONDS = 10 * 60;
@@ -66,7 +64,6 @@ export const getPresignedPutUrl = async ({
   fileName,
   keyPrefix,
   identifier,
-  bucketMode,
 }: getPresignedUrlOptions) => {
   const { name, ext: rawExt } = path.parse(fileName);
   // only a plain extension reaches the key and the public fileUrl
@@ -81,15 +78,15 @@ export const getPresignedPutUrl = async ({
   const type = contentType || "application/octet-stream";
 
   const putObjectCommand = new PutObjectCommand({
-    Bucket: bucketMode === "privateBucket" ? PrivateBucket : PublicBucket,
+    Bucket: PrivateBucket,
     Key,
     ContentType: type,
     ContentLength: size,
-    ACL: bucketMode === "privateBucket" ? "private" : "public-read",
+    ACL: "private",
   });
 
   // the presigner hoists nothing for content-type by default: sign it, or the
-  // uploader could store any type (e.g. text/html under a public-read key)
+  // uploader could store any type (e.g. text/html under a served public image)
   const url: string = await getSignedUrl(S3, putObjectCommand, {
     expiresIn: expiresIn ?? TEN_MINUTES_IN_SECONDS,
     signableHeaders: new Set(["content-type"]),
@@ -140,7 +137,6 @@ export const uploadFile = async (
     getPresignedUrlOptions,
     "expiresIn" | "keyPrefix" | "identifier"
   >,
-  bucketMode: "publicBucket" | "privateBucket" = "privateBucket",
 ) => {
   // callers pass File-shaped objects whose .size is not the real length
   // (esign sets 0), so sign the length of the bytes actually sent
@@ -149,7 +145,6 @@ export const uploadFile = async (
     contentType: file.type,
     fileName: file.name,
     size: body.byteLength,
-    bucketMode,
     ...options,
   });
   const res = await fetch(url, {

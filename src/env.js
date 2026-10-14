@@ -62,7 +62,6 @@ export const env = createEnv({
     // upload
     UPLOAD_ENDPOINT: z.string(),
     UPLOAD_REGION: z.string(),
-    UPLOAD_BUCKET_PUBLIC: z.string(),
     UPLOAD_BUCKET_PRIVATE: z.string(),
     UPLOAD_ACCESS_KEY_ID: z.string().optional(),
     UPLOAD_SECRET_ACCESS_KEY: z.string().optional(),
@@ -90,7 +89,6 @@ export const env = createEnv({
    */
   client: {
     NEXT_PUBLIC_BASE_URL: z.string(),
-    NEXT_PUBLIC_UPLOAD_DOMAIN: z.string().optional(),
 
     // stripe
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
@@ -123,13 +121,9 @@ export const env = createEnv({
 
     UPLOAD_ENDPOINT: process.env.UPLOAD_ENDPOINT,
     UPLOAD_REGION: process.env.UPLOAD_REGION,
-    UPLOAD_BUCKET_PUBLIC: process.env.UPLOAD_BUCKET_PUBLIC,
     UPLOAD_BUCKET_PRIVATE: process.env.UPLOAD_BUCKET_PRIVATE,
     UPLOAD_ACCESS_KEY_ID: process.env.UPLOAD_ACCESS_KEY_ID,
     UPLOAD_SECRET_ACCESS_KEY: process.env.UPLOAD_SECRET_ACCESS_KEY,
-    NEXT_PUBLIC_UPLOAD_DOMAIN: readRuntimePublicEnvVariable(
-      "NEXT_PUBLIC_UPLOAD_DOMAIN",
-    ),
 
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
