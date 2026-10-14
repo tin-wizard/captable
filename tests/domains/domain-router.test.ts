@@ -389,7 +389,14 @@ describe("custom domain procedures", () => {
 
     const list = await c.list();
     expect(list.dnsTarget).toBe("dealroom.tin.info");
+    expect(list.serverIps).toEqual(
+      (process.env.CUSTOM_DOMAIN_IPS ?? "")
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean),
+    );
     const platform = list.rows.find((r) => r.kind === "PLATFORM");
+    expect(platform).toMatchObject({ isPrimary: false, status: "ALIAS" });
     expect(list.rows.map((r) => r.hostname)).toContain(custom);
 
     expect(await c.setPrimary({ domainId: platform?.id as string })).toEqual({

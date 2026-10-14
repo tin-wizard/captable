@@ -16,9 +16,14 @@ import { api } from "@/trpc/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
+  aRecordNote,
+  canMakePrimary,
   cnameRecord,
   domainStatusLabel,
+  makePrimaryDialogCopy,
+  removeDialogCopy,
   txtRecord,
+  verifiedCopy,
 } from "./custom-domains-copy";
 
 const ADD_ERRORS: Record<string, string> = {
@@ -34,6 +39,8 @@ const ACTION_ERRORS: Record<string, string> = {
   "not-verified": "Verify this domain before making it primary.",
   "last-address": "You can't remove your last address.",
   taken: "That domain is already connected to another company",
+  "custom-primary":
+    "Your company address is a custom domain. Use Make primary on the default address first.",
 };
 
 const CORS_NOTE =
@@ -44,11 +51,14 @@ const CopyRow = ({
   name,
   value,
 }: { label: string; name: string; value: string }) => {
-  const copy = (text: string, what: string) =>
-    navigator.clipboard
-      .writeText(text)
-      .then(() => toast.success(`${what} copied`))
-      .catch(() => toast.error("Could not copy. Select the text instead."));
+  const copy = async (text: string, what: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${what} copied`);
+    } catch {
+      toast.error("Could not copy. Select the text instead.");
+    }
+  };
   return (
     <div className="space-y-1 text-sm">
       <p className="font-medium">{label}</p>
@@ -95,9 +105,9 @@ export const CustomDomains = () => {
   const [missing, setMissing] = useState<
     Record<string, { owned: boolean; routed: boolean }>
   >({});
-  const [removing, setRemoving] = useState<{
+  const [confirm, setConfirm] = useState<{
+    kind: "remove" | "primary";
     id: string;
-    hostname: string;
   } | null>(null);
   const [corsUnsynced, setCorsUnsynced] = useState(false);
 
@@ -126,7 +136,14 @@ export const CustomDomains = () => {
       if (r.ok) {
         setMissing(({ [domainId]: _, ...rest }) => rest);
         noteCors(r.corsSynced);
-        toast.success("Domain verified and set as your company address");
+        const rows = utils.domain.custom.list.getData()?.rows ?? [];
+        toast.success(
+          verifiedCopy(
+            rows.find((x) => x.id === domainId)?.hostname ?? "The domain",
+            rows.find((x) => x.kind === "PLATFORM" && x.aliasExpiresAt === null)
+              ?.hostname,
+          ),
+        );
         await refresh();
       } else {
         setMissing((m) => ({
@@ -140,27 +157,35 @@ export const CustomDomains = () => {
   const setPrimary = api.domain.custom.setPrimary.useMutation({
     onSuccess: async ({ corsSynced }) => {
       noteCors(corsSynced);
+      setConfirm(null);
       toast.success("Primary address changed");
       await refresh();
     },
-    onError: fail,
+    onError: (e) => {
+      setConfirm(null);
+      fail(e);
+    },
   });
   const remove = api.domain.custom.remove.useMutation({
     onSuccess: async ({ corsSynced }) => {
       noteCors(corsSynced);
-      setRemoving(null);
+      setConfirm(null);
       await refresh();
     },
     onError: (e) => {
-      setRemoving(null);
+      setConfirm(null);
       fail(e);
     },
   });
 
   if (!enabled || !list.data) return null;
 
-  const { rows, dnsTarget } = list.data;
+  const { rows, dnsTarget, serverIps } = list.data;
   const primary = rows.find((r) => r.isPrimary)?.hostname;
+  const platformHost = rows.find(
+    (r) => r.kind === "PLATFORM" && canMakePrimary({ ...r, isPrimary: false }),
+  )?.hostname;
+  const target = rows.find((r) => r.id === confirm?.id);
   const busy =
     add.isPending ||
     verify.isPending ||
@@ -187,32 +212,34 @@ export const CustomDomains = () => {
                   <p className="break-all text-sm font-medium">{r.hostname}</p>
                   <p className="text-xs text-muted-foreground">{label}</p>
                 </div>
-                {r.kind === "CUSTOM" && r.status !== "PENDING" && (
+                {r.status !== "PENDING" && (
                   <div className="flex gap-2">
-                    {!r.isPrimary && (
+                    {canMakePrimary(r) && (
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
                         disabled={busy}
                         aria-label={`Make ${r.hostname} primary`}
-                        onClick={() => setPrimary.mutate({ domainId: r.id })}
+                        onClick={() =>
+                          setConfirm({ kind: "primary", id: r.id })
+                        }
                       >
                         Make primary
                       </Button>
                     )}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={busy}
-                      aria-label={`Remove ${r.hostname}`}
-                      onClick={() =>
-                        setRemoving({ id: r.id, hostname: r.hostname })
-                      }
-                    >
-                      Remove
-                    </Button>
+                    {r.kind === "CUSTOM" && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        aria-label={`Remove ${r.hostname}`}
+                        onClick={() => setConfirm({ kind: "remove", id: r.id })}
+                      >
+                        Remove
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -231,8 +258,7 @@ export const CustomDomains = () => {
                     {...cnameRecord(r.hostname, dnsTarget)}
                   />
                   <p className="text-muted-foreground">
-                    Using the bare domain? Point an A record at our server
-                    instead and tell us.
+                    {aRecordNote(serverIps)}
                   </p>
                   {m && (
                     <div role="alert" className="text-destructive">
@@ -266,9 +292,7 @@ export const CustomDomains = () => {
                       variant="outline"
                       disabled={busy}
                       aria-label={`Remove ${r.hostname}`}
-                      onClick={() =>
-                        setRemoving({ id: r.id, hostname: r.hostname })
-                      }
+                      onClick={() => setConfirm({ kind: "remove", id: r.id })}
                     >
                       Remove
                     </Button>
@@ -312,29 +336,36 @@ export const CustomDomains = () => {
       )}
 
       <AlertDialog
-        open={!!removing}
-        onOpenChange={(o) => !o && setRemoving(null)}
+        open={!!confirm && !!target}
+        onOpenChange={(o) => !o && setConfirm(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {removing?.hostname}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {confirm?.kind === "primary"
+                ? `Make ${target?.hostname} your address?`
+                : `Remove ${target?.hostname}?`}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              People opening this address will be sent to{" "}
-              {primary && primary !== removing?.hostname
-                ? primary
-                : "your remaining primary address"}
-              .
+              {target &&
+                (confirm?.kind === "primary"
+                  ? makePrimaryDialogCopy(target.hostname, primary)
+                  : removeDialogCopy(target, platformHost))}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              disabled={remove.isPending || setPrimary.isPending}
               onClick={(e) => {
                 e.preventDefault();
-                if (removing) remove.mutate({ domainId: removing.id });
+                if (!confirm) return;
+                if (confirm.kind === "primary")
+                  setPrimary.mutate({ domainId: confirm.id });
+                else remove.mutate({ domainId: confirm.id });
               }}
             >
-              Remove domain
+              {confirm?.kind === "primary" ? "Make primary" : "Remove domain"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -6,6 +6,7 @@ import {
   addCustomDomain,
   listDomains,
   removeCustomDomain,
+  serverIps,
   setPrimaryDomain,
   verifyCustomDomain,
 } from "@/server/domains/custom";
@@ -126,6 +127,7 @@ const customRouter = createTRPCRouter({
     custom(async () => ({
       rows: await listDomains(ctx.tenant.companyId),
       dnsTarget: domainConfig().canonicalHost,
+      serverIps: serverIps(),
     })),
   ),
 

@@ -46,7 +46,7 @@ export const CompanyAddress = () => {
           }`;
         } else if (e.message === "custom-primary") {
           msg =
-            "Your company address is a custom domain. Make the default address primary before renaming it.";
+            "Your company address is a custom domain. Use Make primary on your default address before renaming it.";
         } else if (e.data?.code === "BAD_REQUEST" && e.message in REASONS) {
           msg = REASONS[e.message as keyof typeof REASONS];
         }

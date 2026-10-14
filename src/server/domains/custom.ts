@@ -42,6 +42,7 @@ export type DomainRow = {
   isPrimary: boolean;
   verificationToken: string | null;
   verifiedAt: Date | null;
+  aliasExpiresAt: Date | null;
 };
 
 const select = {
@@ -52,6 +53,7 @@ const select = {
   isPrimary: true,
   verificationToken: true,
   verifiedAt: true,
+  aliasExpiresAt: true,
 } satisfies Prisma.CompanyDomainSelect;
 
 // Only ever called with non-RELEASED rows.
@@ -117,7 +119,7 @@ export async function addCustomDomain(i: {
   return asRow(row);
 }
 
-const serverIps = () =>
+export const serverIps = () =>
   (env.CUSTOM_DOMAIN_IPS ?? "")
     .split(",")
     .map((s) => s.trim())
