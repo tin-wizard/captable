@@ -60,13 +60,13 @@ docker compose up -d --force-recreate app
 
 ### Back up the R2 CORS rules before setting `CLOUDFLARE_API_TOKEN`
 
-The sync replaces only its own rule (`id` `dealroom-custom-domains`) and keeps the others. Still, save the current rules of both buckets first, so you can restore them exactly. Run this on the server, with the bucket names from the app `.env` (`UPLOAD_BUCKET_PRIVATE`, `UPLOAD_BUCKET_PUBLIC`):
+The sync replaces only its own rule (`id` `dealroom-custom-domains`) and keeps the others. Still, save the current rules of the bucket first, so you can restore them exactly. Run this on the server, with the bucket names from the app `.env` (`UPLOAD_BUCKET_PRIVATE`):
 
 ```sh
 cd /opt/captable
 read -rs CF_TOKEN            # paste the token; it is not echoed and not in shell history
 CF_ACCOUNT=<CLOUDFLARE_ACCOUNT_ID>
-for B in <UPLOAD_BUCKET_PRIVATE> <UPLOAD_BUCKET_PUBLIC>; do
+for B in <UPLOAD_BUCKET_PRIVATE>; do
   curl -s -H "Authorization: Bearer $CF_TOKEN" \
     "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/r2/buckets/$B/cors" \
     | tee "cors-$B-$(date +%Y%m%d-%H%M).json" | jq '.success, .result.rules | length'
@@ -76,7 +76,7 @@ done
 `wrangler r2 bucket cors list <bucket>` shows the same rules if you prefer Wrangler. Keep the saved JSON files.
 
 **After the first sync**, which runs on the first verify, primary change or removal:
-1. Read both buckets again with the same `curl`.
+1. Read the bucket again with the same `curl`.
 2. Diff them against the saved files: the platform rule must be unchanged, and only a `dealroom-custom-domains` rule may have been added.
 3. Keep the restore command at hand:
 
