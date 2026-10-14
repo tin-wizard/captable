@@ -16,6 +16,7 @@ import { api } from "@/trpc/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useDebounceValue } from "usehooks-ts";
+import { currentPlatformRow } from "./custom-domains-copy";
 
 const REASONS = {
   format: "Use 3-40 lowercase letters, numbers or hyphens.",
@@ -63,9 +64,7 @@ export const CompanyAddress = () => {
   if (!current.data?.enabled) return null;
 
   if (isCustom) {
-    const platformHost = list.data?.rows.find(
-      (r) => r.kind === "PLATFORM",
-    )?.hostname;
+    const platformHost = currentPlatformRow(list.data?.rows ?? [])?.hostname;
     return (
       <div className="mt-10 max-w-xl space-y-4 border-t pt-8">
         <div>

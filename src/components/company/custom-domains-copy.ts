@@ -8,33 +8,77 @@ export const cnameRecord = (hostname: string, target: string) => ({
   value: target,
 });
 
-export const domainStatusLabel = (row: {
-  status: "PENDING" | "ACTIVE" | "ALIAS";
-  isPrimary: boolean;
-}): "Primary" | "Redirects to primary" | "Pending verification" =>
+// Dates may arrive as strings from the API, so every helper re-wraps them.
+const toDate = (d: Date | string) => new Date(d);
+
+export const domainStatusLabel = (
+  row: {
+    status: "PENDING" | "ACTIVE" | "ALIAS";
+    isPrimary: boolean;
+    aliasExpiresAt?: Date | string | null;
+  },
+  formatDate: (d: Date) => string = (d) => d.toLocaleDateString(),
+): string =>
   row.status === "PENDING"
     ? "Pending verification"
     : row.isPrimary
       ? "Primary"
-      : "Redirects to primary";
+      : row.status === "ALIAS" && row.aliasExpiresAt
+        ? `Redirects until ${formatDate(toDate(row.aliasExpiresAt))}`
+        : "Redirects to primary";
 
 type Row = {
   hostname: string;
   kind: "PLATFORM" | "CUSTOM";
   status: "PENDING" | "ACTIVE" | "ALIAS";
   isPrimary: boolean;
-  aliasExpiresAt: Date | null;
+  aliasExpiresAt: Date | string | null;
 };
 
-// Mirrors the server's `promotable`: a live custom row, or the platform row
-// that is current (not an expiring alias left by a rename).
-export const canMakePrimary = (r: Row) =>
+// The company's current platform address: ACTIVE, or the permanent alias kept
+// while a custom domain is primary. Never an expiring alias left by a rename.
+const isCurrentPlatform = (r: Row) =>
+  r.kind === "PLATFORM" &&
+  (r.status === "ACTIVE" ||
+    (r.status === "ALIAS" && r.aliasExpiresAt === null));
+
+export const currentPlatformRow = <R extends Row>(rows: R[]) =>
+  rows.find(isCurrentPlatform);
+
+// Mirrors the server's `promotable`: a live custom row (an alias only until it
+// expires), or the current platform row.
+export const canMakePrimary = (r: Row, now: Date = new Date()) =>
   !r.isPrimary &&
   r.status !== "PENDING" &&
-  (r.kind === "CUSTOM" || r.status === "ACTIVE" || r.aliasExpiresAt === null);
+  (r.kind === "CUSTOM"
+    ? r.aliasExpiresAt === null || toDate(r.aliasExpiresAt) > now
+    : isCurrentPlatform(r));
 
-export const makePrimaryDialogCopy = (target: string, current?: string) =>
-  `${current ?? "Your current address"} will redirect to ${target}.`;
+// A verified custom domain that is not primary yet (verify never promotes).
+export const finishSetupHint = (r: Row) =>
+  r.kind === "CUSTOM" &&
+  r.status === "ALIAS" &&
+  !r.isPrimary &&
+  r.aliasExpiresAt === null
+    ? `Open ${r.hostname} to finish setup, then make it primary`
+    : null;
+
+// expiresInDays: set when the target is the platform address, so the current
+// (custom) primary becomes an expiring alias.
+export const makePrimaryDialogCopy = ({
+  target,
+  current,
+  expiresInDays,
+}: {
+  target: string;
+  current?: string;
+  expiresInDays?: number;
+}) =>
+  expiresInDays
+    ? `${
+        current ?? "Your current address"
+      } will redirect for ${expiresInDays} days, then stop working.`
+    : `${current ?? "Your current address"} will redirect to ${target}.`;
 
 export const removeDialogCopy = (r: Row, platformHost?: string) =>
   r.status === "PENDING"
@@ -45,10 +89,8 @@ export const removeDialogCopy = (r: Row, platformHost?: string) =>
         } becomes your address.`
       : `${r.hostname} will stop working.`;
 
-export const verifiedCopy = (host: string, platformHost?: string) =>
-  `${host} is verified and is now your address.${
-    platformHost ? ` ${platformHost} redirects to it.` : ""
-  }`;
+export const verifiedCopy = (host: string) =>
+  `${host} is verified. Open https://${host} once to finish setup, then choose Make primary.`;
 
 export const aRecordNote = (ips: string[]) =>
   ips.length

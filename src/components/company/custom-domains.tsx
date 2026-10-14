@@ -19,7 +19,9 @@ import {
   aRecordNote,
   canMakePrimary,
   cnameRecord,
+  currentPlatformRow,
   domainStatusLabel,
+  finishSetupHint,
   makePrimaryDialogCopy,
   removeDialogCopy,
   txtRecord,
@@ -98,7 +100,11 @@ export const CustomDomains = () => {
   const utils = api.useUtils();
   const current = api.domain.current.useQuery();
   const enabled = current.data?.enabled === true;
-  const list = api.domain.custom.list.useQuery(undefined, { enabled });
+  // NOT_FOUND when custom domains are unavailable (no TLS_ASK_SECRET): render nothing
+  const list = api.domain.custom.list.useQuery(undefined, {
+    enabled,
+    retry: false,
+  });
 
   const [hostname, setHostname] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
@@ -140,8 +146,6 @@ export const CustomDomains = () => {
         toast.success(
           verifiedCopy(
             rows.find((x) => x.id === domainId)?.hostname ?? "The domain",
-            rows.find((x) => x.kind === "PLATFORM" && x.aliasExpiresAt === null)
-              ?.hostname,
           ),
         );
         await refresh();
@@ -180,11 +184,9 @@ export const CustomDomains = () => {
 
   if (!enabled || !list.data) return null;
 
-  const { rows, dnsTarget, serverIps } = list.data;
+  const { rows, dnsTarget, serverIps, aliasDays } = list.data;
   const primary = rows.find((r) => r.isPrimary)?.hostname;
-  const platformHost = rows.find(
-    (r) => r.kind === "PLATFORM" && canMakePrimary({ ...r, isPrimary: false }),
-  )?.hostname;
+  const platformHost = currentPlatformRow(rows)?.hostname;
   const target = rows.find((r) => r.id === confirm?.id);
   const busy =
     add.isPending ||
@@ -204,6 +206,7 @@ export const CustomDomains = () => {
       <ul className="space-y-3">
         {rows.map((r) => {
           const label = domainStatusLabel(r);
+          const hint = finishSetupHint(r);
           const m = missing[r.id];
           return (
             <li key={r.id} className="space-y-2 rounded-md border p-3">
@@ -211,6 +214,9 @@ export const CustomDomains = () => {
                 <div className="min-w-0">
                   <p className="break-all text-sm font-medium">{r.hostname}</p>
                   <p className="text-xs text-muted-foreground">{label}</p>
+                  {hint && (
+                    <p className="text-xs text-muted-foreground">{hint}</p>
+                  )}
                 </div>
                 {r.status !== "PENDING" && (
                   <div className="flex gap-2">
@@ -349,7 +355,12 @@ export const CustomDomains = () => {
             <AlertDialogDescription>
               {target &&
                 (confirm?.kind === "primary"
-                  ? makePrimaryDialogCopy(target.hostname, primary)
+                  ? makePrimaryDialogCopy({
+                      target: target.hostname,
+                      current: primary,
+                      expiresInDays:
+                        target.kind === "PLATFORM" ? aliasDays : undefined,
+                    })
                   : removeDialogCopy(target, platformHost))}
             </AlertDialogDescription>
           </AlertDialogHeader>
