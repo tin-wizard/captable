@@ -16,7 +16,7 @@ const realDeps = (): Deps => ({
   env: {
     accountId: appEnv.CLOUDFLARE_ACCOUNT_ID,
     token: appEnv.CLOUDFLARE_API_TOKEN,
-    buckets: [appEnv.UPLOAD_BUCKET_PRIVATE, appEnv.UPLOAD_BUCKET_PUBLIC],
+    buckets: [appEnv.UPLOAD_BUCKET_PRIVATE],
   },
 });
 
