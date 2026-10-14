@@ -50,6 +50,12 @@ export const env = createEnv({
     // company subdomains ({label}.<TENANT_BASE_DOMAIN>); "1" turns them on
     DOMAINS_ENABLED: z.enum(["0", "1"]).default("0"),
     TENANT_BASE_DOMAIN: z.string().optional(),
+    // custom company domains: comma list of server IPs for apex A records,
+    // Caddy on-demand TLS ask secret, Cloudflare R2 CORS sync credentials
+    CUSTOM_DOMAIN_IPS: z.string().optional(),
+    TLS_ASK_SECRET: z.string().optional(),
+    CLOUDFLARE_ACCOUNT_ID: z.string().optional(),
+    CLOUDFLARE_API_TOKEN: z.string().optional(),
     EMAIL_SERVER: z.string().optional(),
     EMAIL_FROM: z.string(),
 
@@ -108,6 +114,10 @@ export const env = createEnv({
     PUBLIC_LINK_REQUIRE_EXPIRY: process.env.PUBLIC_LINK_REQUIRE_EXPIRY,
     DOMAINS_ENABLED: process.env.DOMAINS_ENABLED,
     TENANT_BASE_DOMAIN: process.env.TENANT_BASE_DOMAIN,
+    CUSTOM_DOMAIN_IPS: process.env.CUSTOM_DOMAIN_IPS,
+    TLS_ASK_SECRET: process.env.TLS_ASK_SECRET,
+    CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
+    CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN,
     EMAIL_SERVER: process.env.EMAIL_SERVER,
     EMAIL_FROM: process.env.EMAIL_FROM,
 

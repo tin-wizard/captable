@@ -46,12 +46,12 @@ export default defineConfig({
     actionTimeout: 15_000,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    // real DNS on staging; locally *.dealroom.test is mapped to the Caddy proxy
+    // real DNS on staging; locally *.dealroom.test and the custom-domain host are mapped to the Caddy proxy
     launchOptions: staging
       ? {}
       : {
           args: [
-            "--host-resolver-rules=MAP dealroom.test 127.0.0.1, MAP *.dealroom.test 127.0.0.1",
+            "--host-resolver-rules=MAP dealroom.test 127.0.0.1, MAP *.dealroom.test 127.0.0.1, MAP custom-e2e.test 127.0.0.1",
           ],
         },
   },

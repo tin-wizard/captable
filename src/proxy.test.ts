@@ -146,6 +146,40 @@ describe("proxy", () => {
       proxy(req("https://dealroom.tin.info/")).headers.get("x-robots-tag"),
     ).toBeNull();
   });
+  it("redirects canonical-only pages on a custom host to canonical", () => {
+    for (const path of [
+      "/signup?ref=1",
+      "/forgot-password",
+      "/reset-password/tok",
+      "/verify-email",
+      "/logout",
+      "/onboarding",
+      "/company/new",
+    ]) {
+      const res = proxy(req(`https://investors.implexus.io${path}`));
+      expect(res.status).toBe(307);
+      expect(res.headers.get("location")).toBe(
+        `https://dealroom.tin.info${path}`,
+      );
+    }
+  });
+  it("passes login and company pages on a custom host; no label 404, no noindex", () => {
+    for (const path of ["/login", "/abc/stakeholders"]) {
+      const res = proxy(req(`https://investors.implexus.io${path}`));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+      expect(res.headers.get("x-robots-tag")).toBeNull();
+    }
+    // a custom label that would be a malformed platform label is still fine
+    expect(proxy(req("https://a--b.implexus.io/")).status).toBe(200);
+  });
+  it("lets Caddy's internal ask call through (host app:3000)", () => {
+    const res = proxy(
+      req("http://app:3000/api/domains/tls-ask?domain=x.io&secret=s"),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
+  });
   it("403s a cross-origin POST except on exempt paths", () => {
     const post = (path: string) =>
       proxy(

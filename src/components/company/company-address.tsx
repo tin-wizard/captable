@@ -16,6 +16,7 @@ import { api } from "@/trpc/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useDebounceValue } from "usehooks-ts";
+import { currentPlatformRow } from "./custom-domains-copy";
 
 const REASONS = {
   format: "Use 3-40 lowercase letters, numbers or hyphens.",
@@ -44,6 +45,9 @@ export const CompanyAddress = () => {
           msg = `That address was just taken.${
             suggestion ? ` Try ${suggestion}.` : ""
           }`;
+        } else if (e.message === "custom-primary") {
+          msg =
+            "Your company address is a custom domain. Use Make primary on your default address before renaming it.";
         } else if (e.data?.code === "BAD_REQUEST" && e.message in REASONS) {
           msg = REASONS[e.message as keyof typeof REASONS];
         }
@@ -52,7 +56,31 @@ export const CompanyAddress = () => {
     },
   });
 
+  const isCustom = current.data?.primaryKind === "CUSTOM";
+  const list = api.domain.custom.list.useQuery(undefined, {
+    enabled: isCustom,
+  });
+
   if (!current.data?.enabled) return null;
+
+  if (isCustom) {
+    const platformHost = currentPlatformRow(list.data?.rows ?? [])?.hostname;
+    return (
+      <div className="mt-10 max-w-xl space-y-4 border-t pt-8">
+        <div>
+          <h3 className="font-medium">Company address</h3>
+          <p className="text-sm text-muted-foreground">
+            {current.data.hostname}
+          </p>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {platformHost
+            ? `Your default address ${platformHost} redirects to ${current.data.hostname}`
+            : `Your default address redirects to ${current.data.hostname}`}
+        </p>
+      </div>
+    );
+  }
 
   const settled =
     !!debounced && debounced === value.trim() && !check.isFetching;

@@ -32,9 +32,49 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_BASE_URL ||= "http://localhost:3000";
 });
 
+// Custom domain procedures need DOMAINS_ENABLED=1 and TLS_ASK_SECRET. They are
+// switched on only for the duration of those calls (withCustomDomains), so no
+// other case in this file runs with domains enabled.
+const domainEnv = vi.hoisted(() => ({
+  on: false,
+}));
+vi.mock("@/env", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/env")>();
+  return {
+    ...mod,
+    env: new Proxy(mod.env, {
+      get: (t, k) =>
+        k === "DOMAINS_ENABLED"
+          ? domainEnv.on
+            ? "1"
+            : "0"
+          : k === "TLS_ASK_SECRET"
+            ? domainEnv.on
+              ? "cross-tenant-secret"
+              : undefined
+            : t[k as never],
+    }),
+  };
+});
+async function withCustomDomains<T>(fn: () => Promise<T>) {
+  domainEnv.on = true;
+  try {
+    return await fn();
+  } finally {
+    domainEnv.on = false;
+  }
+}
+
 type Caller = ReturnType<typeof callerFor>;
 // bViewEventId: the newer of two B view events, so a B cursor still has a page
-type Ids = { a: AIds; b: BIds; aEmail: string; bViewEventId: string };
+// bDomainId: a verified custom domain of B (hostname carries B_SECRET)
+type Ids = {
+  a: AIds;
+  b: BIds;
+  aEmail: string;
+  bViewEventId: string;
+  bDomainId: string;
+};
 type Case = {
   // "<dotted.procedure> <what A tries>"; the first word drives the coverage guard
   name: string;
@@ -901,6 +941,28 @@ const cases: Case[] = [
     run: (a, { b }) => a.analytics.esign({ cursor: b.templateId }),
   },
 
+  // --- custom domains (A passes B's CompanyDomain id) ----------------------
+  {
+    name: "domain.custom.verify B's custom domain",
+    kind: "update",
+    run: (a, { bDomainId }) =>
+      withCustomDomains(() => a.domain.custom.verify({ domainId: bDomainId })),
+  },
+  {
+    name: "domain.custom.setPrimary B's custom domain",
+    kind: "update",
+    run: (a, { bDomainId }) =>
+      withCustomDomains(() =>
+        a.domain.custom.setPrimary({ domainId: bDomainId }),
+      ),
+  },
+  {
+    name: "domain.custom.remove B's custom domain",
+    kind: "delete",
+    run: (a, { bDomainId }) =>
+      withCustomDomains(() => a.domain.custom.remove({ domainId: bDomainId })),
+  },
+
   // --- user-scoped credentials and stubs ----------------------------------
   {
     name: "passkey.createAuthenticationOptions with B admin's passkey",
@@ -1007,11 +1069,38 @@ describe("cross-tenant isolation", () => {
       });
     await bViewEvent(new Date("2026-01-01T00:00:00Z"));
     const newest = await bViewEvent(new Date("2026-01-02T00:00:00Z"));
+    // B: a platform primary and a verified (pending-free) custom alias.
+    // Removed by the company cascade in cleanupFixtures.
+    await db.companyDomain.create({
+      data: {
+        companyId: tenants.b.companyId,
+        hostname: `ct-b-${nanoid(6)
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "x")}.dealroom.tin.info`,
+        kind: "PLATFORM",
+        status: "ACTIVE",
+        isPrimary: true,
+      },
+    });
+    const bDomain = await db.companyDomain.create({
+      data: {
+        companyId: tenants.b.companyId,
+        hostname: `${B_SECRET}-${nanoid(6)
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "x")}.example.com`,
+        kind: "CUSTOM",
+        status: "ALIAS",
+        isPrimary: false,
+        verificationToken: `${B_SECRET}-token`,
+        verifiedAt: new Date(),
+      },
+    });
     ids = {
       a,
       b,
       aEmail: tenants.a.session.user.email as string,
       bViewEventId: newest.id,
+      bDomainId: bDomain.id,
     };
     callerA = callerFor(tenants.a);
   });
@@ -1030,9 +1119,17 @@ describe("cross-tenant isolation", () => {
     vi.restoreAllMocks();
   });
 
+  // B's domain rows are not in the shared snapshot; compared here, in full
+  const bDomains = () =>
+    db.companyDomain.findMany({
+      where: { companyId: tenants.b.companyId },
+      orderBy: { id: "asc" },
+    });
+
   async function expectIsolated(c: Case) {
     const before = await snapshotB(ids.b);
     const leaksBefore = await leaksToB(ids.b);
+    const domainsBefore = await bDomains();
 
     let result: unknown;
     try {
@@ -1043,6 +1140,7 @@ describe("cross-tenant isolation", () => {
 
     expect(await snapshotB(ids.b)).toEqual(before);
     expect(await leaksToB(ids.b)).toEqual(leaksBefore);
+    expect(await bDomains()).toEqual(domainsBefore);
     expect(stringify(result)).not.toContain(B_SECRET);
   }
 
@@ -1186,6 +1284,43 @@ describe("cross-tenant isolation", () => {
         updateId: ids.b.updateId,
       });
       expect(stringify(res)).toContain(B_SECRET);
+    });
+
+    it("domain.custom.* refuse B's domain as NOT_FOUND, and work on A's own", async () => {
+      for (const p of ["verify", "setPrimary", "remove"] as const) {
+        const err = await withCustomDomains<unknown>(() =>
+          callerA.domain.custom[p]({ domainId: ids.bDomainId }),
+        )
+          .then(() => undefined)
+          .catch((e: unknown) => e);
+        // "not-found" = refused by the ownership lookup, not by the feature flag
+        expect(err).toMatchObject({ code: "NOT_FOUND", message: "not-found" });
+      }
+      expect(
+        await db.companyDomain.findUniqueOrThrow({
+          where: { id: ids.bDomainId },
+        }),
+      ).toMatchObject({
+        status: "ALIAS",
+        isPrimary: false,
+        verificationToken: `${B_SECRET}-token`,
+      });
+
+      // control: A adds and removes its own pending domain
+      const own = await withCustomDomains(() =>
+        callerA.domain.custom.add({
+          hostname: `ct-a-${nanoid(6)
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, "x")}.example.com`,
+        }),
+      );
+      await withCustomDomains(() =>
+        callerA.domain.custom.remove({ domainId: own.id }),
+      );
+      expect(
+        (await db.companyDomain.findUniqueOrThrow({ where: { id: own.id } }))
+          .status,
+      ).toBe("RELEASED");
     });
 
     it("activity.list returns B's viewer to B's own caller, by data room and by cursor", async () => {
