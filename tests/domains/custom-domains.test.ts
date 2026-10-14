@@ -38,6 +38,13 @@ vi.mock("@/server/domains/config", () => ({
   }),
 }));
 
+const cors = vi.hoisted(() => ({
+  sync: vi.fn(async (_o: string[]): Promise<unknown> => ({ skipped: true })),
+}));
+vi.mock("@/server/domains/cors", () => ({
+  syncCustomOriginsCors: cors.sync,
+}));
+
 const tenants: Tenant[] = [];
 afterAll(async () => cleanupTenants(...tenants));
 beforeEach(() => clearResolveCache());
@@ -566,3 +573,75 @@ function expectAboutThirtyDays(d: Date | null) {
   expect(days).toBeGreaterThan(29.9);
   expect(days).toBeLessThanOrEqual(30);
 }
+
+describe("R2 CORS sync side effects", () => {
+  beforeEach(() => {
+    cors.sync.mockClear();
+  });
+
+  it("a sync that throws or fails leaves verify and remove succeeding with corsSynced false", async () => {
+    const a = await fresh();
+    const added = await addCustomDomain({
+      companyId: a.companyId,
+      raw: host(),
+      createdById: a.userId,
+    });
+    cors.sync.mockRejectedValueOnce(new Error("boom"));
+    const res = await verifyCustomDomain(
+      { companyId: a.companyId, domainId: added.id },
+      fakeDns(added.verificationToken),
+    );
+    expect(res).toMatchObject({ ok: true, corsSynced: false });
+    expect((await row(added.id)).status).toBe("ACTIVE");
+
+    cors.sync.mockResolvedValueOnce({ skipped: false, ok: false });
+    expect(
+      await removeCustomDomain({ companyId: a.companyId, domainId: added.id }),
+    ).toEqual({ corsSynced: false });
+    expect((await row(added.id)).status).toBe("RELEASED");
+  });
+
+  it("no sync when verification or the transaction fails", async () => {
+    const a = await fresh();
+    const b = await fresh();
+    const h = host();
+    const added = await addCustomDomain({
+      companyId: a.companyId,
+      raw: h,
+      createdById: a.userId,
+    });
+    // DNS missing
+    expect(
+      await verifyCustomDomain(
+        { companyId: a.companyId, domainId: added.id },
+        fakeDns(null),
+      ),
+    ).toMatchObject({ ok: false });
+    // another company already owns the hostname: the transaction fails
+    const mine = await addCustomDomain({
+      companyId: b.companyId,
+      raw: h,
+      createdById: b.userId,
+    });
+    await verifyCustomDomain(
+      { companyId: b.companyId, domainId: mine.id },
+      fakeDns(mine.verificationToken),
+    );
+    cors.sync.mockClear();
+    expect(
+      await code(
+        verifyCustomDomain(
+          { companyId: a.companyId, domainId: added.id },
+          fakeDns(added.verificationToken),
+        ),
+      ),
+    ).not.toBe("resolved");
+    // removing a foreign / missing row
+    expect(
+      await code(
+        removeCustomDomain({ companyId: a.companyId, domainId: mine.id }),
+      ),
+    ).toBe("not-found");
+    expect(cors.sync).not.toHaveBeenCalled();
+  });
+});

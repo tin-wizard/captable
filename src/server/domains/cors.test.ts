@@ -70,7 +70,7 @@ describe("syncCustomOriginsCors", () => {
         maxAgeSeconds: 3600,
       },
     ]);
-    expect(JSON.stringify(body)).not.toContain('"*"],"methods"');
+    for (const r of body.rules) expect(r.allowed.origins).not.toContain("*");
   });
 
   it("dedupes buckets", async () => {
@@ -107,6 +107,71 @@ describe("syncCustomOriginsCors", () => {
         fetch: boom as never,
         env,
       }),
+    ).toEqual({ skipped: false, ok: false });
+  });
+
+  const getResp = (res: () => Response) =>
+    vi.fn((_u: string, init?: RequestInit) =>
+      init?.method === "PUT" ? Response.json({ success: true }) : res(),
+    );
+  const run = (f: ReturnType<typeof getResp>) =>
+    syncCustomOriginsCors(["https://a.io"], { fetch: f as never, env });
+
+  it("GET 404 JSON success:false means no CORS yet: PUT only the managed rule", async () => {
+    const f = getResp(() =>
+      Response.json(
+        { success: false, errors: [{ code: 10059 }] },
+        { status: 404 },
+      ),
+    );
+    expect(await run(f)).toEqual({ skipped: false, ok: true });
+    const rules = JSON.parse(puts(f)[0]?.[1]?.body as string).rules;
+    expect(rules.map((r: { id: string }) => r.id)).toEqual([MANAGED_CORS_ID]);
+  });
+
+  const bad: [string, () => Response][] = [
+    ["404 non-JSON", () => new Response("nope", { status: 404 })],
+    [
+      "404 NoSuchBucket",
+      () =>
+        Response.json(
+          { success: false, errors: [{ code: 10006 }] },
+          { status: 404 },
+        ),
+    ],
+    ["500", () => Response.json({ success: false }, { status: 500 })],
+    ["200 non-JSON", () => new Response("<html>", { status: 200 })],
+    [
+      "403 success:false",
+      () => Response.json({ success: false }, { status: 403 }),
+    ],
+    ["result null", () => Response.json({ success: true, result: null })],
+    ["result {}", () => Response.json({ success: true, result: {} })],
+    [
+      "rules string",
+      () => Response.json({ success: true, result: { rules: "x" } }),
+    ],
+  ];
+  it.each(bad)("GET %s: no PUT, ok:false", async (_n, res) => {
+    const f = getResp(res);
+    expect(await run(f)).toEqual({ skipped: false, ok: false });
+    expect(puts(f)).toHaveLength(0);
+  });
+
+  it("timeout/abort is ok:false without throwing, and fetches carry a signal", async () => {
+    const abort = vi
+      .fn()
+      .mockRejectedValue(new DOMException("t", "TimeoutError"));
+    expect(await run(abort as never)).toEqual({ skipped: false, ok: false });
+    const f = fakeFetch([]);
+    await run(f as never);
+    for (const [, init] of f.mock.calls)
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("never throws when deps are malformed", async () => {
+    expect(
+      await syncCustomOriginsCors([], { fetch: null, env: null } as never),
     ).toEqual({ skipped: false, ok: false });
   });
 });

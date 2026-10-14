@@ -20,57 +20,92 @@ const realDeps = (): Deps => ({
   },
 });
 
+const TIMEOUT_MS = 5000;
+const NO_SUCH_BUCKET = 10006;
+let warnedSkip = false;
+
+// Existing rules, or null when the response is not an unmistakable answer.
+// Empty is accepted only from a JSON 404 {success:false} (R2 "no CORS
+// configured"; the exact code is not documented, so NoSuchBucket is excluded).
+async function readRules(res: Response): Promise<Rule[] | null> {
+  const j = (await res.json().catch(() => null)) as {
+    success?: boolean;
+    errors?: { code?: number }[];
+    result?: { rules?: unknown } | null;
+  } | null;
+  if (!j || typeof j !== "object") return null;
+  if (res.ok)
+    return j.success === true && Array.isArray(j.result?.rules)
+      ? (j.result.rules as Rule[])
+      : null;
+  const noBucket = j.errors?.some((e) => e?.code === NO_SUCH_BUCKET);
+  return res.status === 404 && j.success === false && !noBucket ? [] : null;
+}
+
 // Best-effort and never throws: replaces only the managed rule, leaving the
-// platform rule (and anything else) as read.
+// platform rule (and anything else) as read. Any unexpected GET aborts that
+// bucket before a PUT, so a bad response can never wipe existing rules.
 export async function syncCustomOriginsCors(
   origins: string[],
-  deps: Deps = realDeps(),
+  deps?: Deps,
 ): Promise<{ skipped: true } | { skipped: false; ok: boolean }> {
-  const { accountId, token, buckets } = deps.env;
-  if (!accountId || !token) return { skipped: true };
-  const unique = [...new Set(origins)].filter((o) => o !== "*").sort();
-  const headers = {
-    authorization: `Bearer ${token}`,
-    "content-type": "application/json",
-  };
-  let ok = true;
-  for (const bucket of new Set(buckets)) {
-    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucket}/cors`;
-    try {
-      const got = await deps.fetch(url, { headers });
-      const j = (await got.json().catch(() => null)) as {
-        success?: boolean;
-        result?: { rules?: Rule[] };
-      } | null;
-      // a bucket with no CORS yet may answer 404; anything else must parse
-      const existing = got.ok && j?.success ? j.result?.rules ?? [] : null;
-      if (existing === null && got.status !== 404)
-        throw new Error(`GET ${got.status}`);
-      const rules = (existing ?? []).filter((r) => r.id !== MANAGED_CORS_ID);
-      if (unique.length)
-        rules.push({
-          id: MANAGED_CORS_ID,
-          allowed: {
-            origins: unique,
-            methods: ["GET", "PUT", "HEAD"],
-            headers: ["*"],
-          },
-          maxAgeSeconds: 3600,
-        });
-      const put = await deps.fetch(url, {
-        method: "PUT",
-        headers,
-        body: JSON.stringify({ rules }),
-      });
-      const pj = (await put.json().catch(() => null)) as {
-        success?: boolean;
-      } | null;
-      if (!put.ok || pj?.success === false)
-        throw new Error(`PUT ${put.status}`);
-    } catch (e) {
-      ok = false;
-      logger.warn({ err: e, bucket }, "R2 CORS sync failed");
+  try {
+    const { fetch: f, env } = deps ?? realDeps();
+    const { accountId, token, buckets } = env;
+    if (!accountId || !token) {
+      if (!warnedSkip) {
+        warnedSkip = true;
+        logger.warn(
+          "R2 CORS sync skipped: CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN missing",
+        );
+      }
+      return { skipped: true };
     }
+    const unique = [...new Set(origins)].filter((o) => o !== "*").sort();
+    const headers = {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    };
+    let ok = true;
+    for (const bucket of new Set(buckets)) {
+      const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucket}/cors`;
+      try {
+        const got = await f(url, {
+          headers,
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        });
+        const existing = await readRules(got);
+        if (!existing) throw new Error(`unexpected GET response ${got.status}`);
+        const rules = existing.filter((r) => r.id !== MANAGED_CORS_ID);
+        if (unique.length)
+          rules.push({
+            id: MANAGED_CORS_ID,
+            allowed: {
+              origins: unique,
+              methods: ["GET", "PUT", "HEAD"],
+              headers: ["*"],
+            },
+            maxAgeSeconds: 3600,
+          });
+        const put = await f(url, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify({ rules }),
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        });
+        const pj = (await put.json().catch(() => null)) as {
+          success?: boolean;
+        } | null;
+        if (!put.ok || pj?.success === false)
+          throw new Error(`PUT ${put.status}`);
+      } catch (e) {
+        ok = false;
+        logger.warn({ err: e, bucket }, "R2 CORS sync failed");
+      }
+    }
+    return { skipped: false, ok };
+  } catch (e) {
+    logger.warn({ err: e }, "R2 CORS sync failed");
+    return { skipped: false, ok: false };
   }
-  return { skipped: false, ok };
 }
