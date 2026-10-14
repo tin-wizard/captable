@@ -231,20 +231,22 @@ Implement `dns.ts` (`realDnsDeps` wraps `node:dns/promises` `resolveTxt`/`resolv
 
 - [ ] **Step 1: Failing tests (router):** a member without `company:update` is refused on all five; admin round trip add -> verify (inject DNS by mocking `@/server/domains/dns` `realDnsDeps`) -> primary changes; flag off -> `NOT_FOUND`; `taken` is `CONFLICT`; audit rows exist; another company's `domainId` is `NOT_FOUND`; `rename` while a custom domain is primary is `BAD_REQUEST` with message `custom-primary`.
 - [ ] **Step 2: Failing tests (proxy):** `https://investors.implexus.io/signup`, `/forgot-password`, `/reset-password/tok`, `/logout`, `/onboarding` redirect 307 to `${canonicalOrigin}<same path+search>` when the host classifies as `custom`; `/login` and `/abc/stakeholders` on a custom host are NOT redirected; a custom host never gets the platform label 404. In `proxy.ts` change the canonical-only branch from `cls.kind === "platform"` to `cls.kind === "platform" || cls.kind === "custom"` and leave the label-format 404 and the `noindex` header platform-only.
-- [ ] **Step 3: Failing tests (ask endpoint)** `tests/domains/tls-ask.test.ts`: with `TLS_ASK_SECRET` unset -> 404 for everything; wrong or missing `secret` -> 404; correct secret + unknown host -> 404; `PENDING` -> 404; `RELEASED` -> 404; `ACTIVE` custom and `ALIAS` custom -> 200; a PLATFORM host -> 404; uppercase `domain` is lowercased; the response body is always empty.
+- [ ] **Step 3: Failing tests (ask endpoint)** `tests/domains/tls-ask.test.ts`: with `TLS_ASK_SECRET` unset -> 404 for everything; wrong or missing `secret` -> 404; correct secret + unknown host -> 404; `PENDING` -> 404; `RELEASED` -> 404; `ACTIVE` custom and live `ALIAS` custom -> 200, expired `ALIAS` -> 404; a same-length multi-byte secret -> 404, never 500; a PLATFORM host -> 404; uppercase `domain` is lowercased; the response body is always empty.
 - [ ] **Step 4: Implement** the route:
 
 ```ts
 // Caddy calls this before it asks Let's Encrypt for a certificate (on-demand TLS).
 import { env } from "@/env";
 import { db } from "@/server/db";
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
+import { liveAliasWhere } from "@/server/domains/registry";
 import type { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const same = (a: string, b: string) =>
-  a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
+// digests are equal-length whatever the input, so this never throws or leaks the length
+const digest = (s: string) => createHash("sha256").update(s).digest();
+const same = (a: string, b: string) => timingSafeEqual(digest(a), digest(b));
 
 export async function GET(request: NextRequest) {
   const secret = env.TLS_ASK_SECRET;
@@ -254,7 +256,7 @@ export async function GET(request: NextRequest) {
   const domain = (params.get("domain") ?? "").toLowerCase();
   const live = domain
     ? await db.companyDomain.count({
-        where: { hostname: domain, kind: "CUSTOM", status: { in: ["ACTIVE", "ALIAS"] } },
+        where: { hostname: domain, kind: "CUSTOM", OR: [{ status: "ACTIVE" }, liveAliasWhere()] },
       })
     : 0;
   return new Response(null, { status: live ? 200 : 404 });

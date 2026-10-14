@@ -18,6 +18,7 @@ import {
   type Tenant,
   callerFor,
   cleanupTenants,
+  seedTenant,
   seedTwoTenants,
 } from "../helpers/seed";
 
@@ -290,6 +291,46 @@ describe("custom domain procedures", () => {
     expect(
       await err(ca().domain.custom.add({ hostname: "x.dealroom.tin.info" })),
     ).toEqual({ code: "BAD_REQUEST", message: "platform" });
+  });
+
+  it("removing the last address is BAD_REQUEST last-address", async () => {
+    // a company whose only address is a custom primary (no platform row)
+    const t = await seedTenant(`last-${run}`);
+    try {
+      const hostname = `last-${run}.implexus.io`;
+      const row = await db.companyDomain.create({
+        data: {
+          companyId: t.companyId,
+          hostname,
+          kind: "CUSTOM",
+          status: "ACTIVE",
+          isPrimary: true,
+        },
+      });
+      const c = appRouter.createCaller({
+        db,
+        session: t.session,
+        requestIp: "127.0.0.1",
+        userAgent: "vitest",
+        headers: new Headers(),
+        host: {
+          kind: "tenant",
+          hostname,
+          companyId: t.companyId,
+          publicId: "p",
+        },
+      } as never);
+      expect(await err(c.domain.custom.remove({ domainId: row.id }))).toEqual({
+        code: "BAD_REQUEST",
+        message: "last-address",
+      });
+      expect(
+        (await db.companyDomain.findUniqueOrThrow({ where: { id: row.id } }))
+          .status,
+      ).toBe("ACTIVE");
+    } finally {
+      await cleanupTenants(t);
+    }
   });
 
   it("admin round trip: add, verify, primary, rename blocked, switch back, remove; audited", async () => {

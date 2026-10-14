@@ -1,13 +1,15 @@
 // Caddy calls this before it asks Let's Encrypt for a certificate (on-demand TLS).
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { env } from "@/env";
 import { db } from "@/server/db";
+import { liveAliasWhere } from "@/server/domains/registry";
 import type { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const same = (a: string, b: string) =>
-  a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
+// digests are equal-length whatever the input, so this never throws or leaks the length
+const digest = (s: string) => createHash("sha256").update(s).digest();
+const same = (a: string, b: string) => timingSafeEqual(digest(a), digest(b));
 
 export async function GET(request: NextRequest) {
   const secret = env.TLS_ASK_SECRET;
@@ -24,7 +26,7 @@ export async function GET(request: NextRequest) {
         where: {
           hostname: domain,
           kind: "CUSTOM",
-          status: { in: ["ACTIVE", "ALIAS"] },
+          OR: [{ status: "ACTIVE" }, liveAliasWhere()],
         },
       })
     : 0;

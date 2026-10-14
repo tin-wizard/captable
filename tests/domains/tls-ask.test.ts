@@ -41,6 +41,8 @@ const h = (s: string) => `${s}-${run}.implexus.io`;
 const hosts = {
   active: h("active"),
   alias: h("alias"),
+  aliasLive: h("alias-live"),
+  aliasExpired: h("alias-expired"),
   pending: h("pending"),
   released: h("released"),
   platform: `ask-${run}.dealroom.tin.info`,
@@ -54,11 +56,33 @@ beforeAll(async () => {
     kind: "PLATFORM" | "CUSTOM",
     status: "ACTIVE" | "ALIAS" | "PENDING" | "RELEASED",
     isPrimary = false,
-  ) => ({ companyId: t.companyId, hostname, kind, status, isPrimary });
+    aliasExpiresAt: Date | null = null,
+  ) => ({
+    companyId: t.companyId,
+    hostname,
+    kind,
+    status,
+    isPrimary,
+    aliasExpiresAt,
+  });
   await db.companyDomain.createMany({
     data: [
       row(hosts.active, "CUSTOM", "ACTIVE", true),
       row(hosts.alias, "CUSTOM", "ALIAS"),
+      row(
+        hosts.aliasLive,
+        "CUSTOM",
+        "ALIAS",
+        false,
+        new Date(Date.now() + 864e5),
+      ),
+      row(
+        hosts.aliasExpired,
+        "CUSTOM",
+        "ALIAS",
+        false,
+        new Date(Date.now() - 864e5),
+      ),
       row(hosts.pending, "CUSTOM", "PENDING"),
       row(hosts.released, "CUSTOM", "RELEASED"),
       row(hosts.platform, "PLATFORM", "ALIAS"),
@@ -105,9 +129,20 @@ describe("TLS ask endpoint", () => {
     expect(lookups.n).toBe(0);
   });
 
+  it("is 404 with an empty body for a same-length multi-byte or wrong-length secret", async () => {
+    // same UTF-16 length as the secret, twice the UTF-8 bytes
+    expect(
+      await ask({ domain: hosts.active, secret: "é".repeat(secret.length) }),
+    ).toBe(404);
+    expect(await ask({ domain: hosts.active, secret: `${secret}x` })).toBe(404);
+    expect(await ask({ domain: hosts.active, secret })).toBe(200);
+  });
+
   it("answers 200 only for live custom hostnames", async () => {
     expect(await ask({ domain: hosts.active, secret })).toBe(200);
-    expect(await ask({ domain: hosts.alias, secret })).toBe(200);
+    expect(await ask({ domain: hosts.alias, secret })).toBe(200); // permanent
+    expect(await ask({ domain: hosts.aliasLive, secret })).toBe(200);
+    expect(await ask({ domain: hosts.aliasExpired, secret })).toBe(404);
     expect(await ask({ domain: hosts.pending, secret })).toBe(404);
     expect(await ask({ domain: hosts.released, secret })).toBe(404);
     expect(await ask({ domain: hosts.platform, secret })).toBe(404);
