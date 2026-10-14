@@ -1,6 +1,7 @@
 // Seeds the e2e database (local/CI Postgres only, never Neon):
-//   admin@e2e.test (member of "Seed Co" and "Legacy Co"), outsider@e2e.test ("Outsider Co").
+//   admin@e2e.test (member of "Seed Co", "Legacy Co" and "Custom Co"), outsider@e2e.test ("Outsider Co").
 // "Legacy Co" starts with no subdomain and gets one from the production backfill.
+// "Custom Co" has a verified custom domain as primary; its platform address is a permanent alias.
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import bcrypt from "bcryptjs";
@@ -56,6 +57,8 @@ async function company(name: string, publicId: string, userId: string) {
   return c;
 }
 
+const CUSTOM_HOST = "custom-e2e.test"; // mapped in playwright.config.ts, served by e2e/Caddyfile
+
 async function main() {
   const admin = await user("admin@e2e.test", "E2E Admin");
   const outsider = await user("outsider@e2e.test", "E2E Outsider");
@@ -68,9 +71,41 @@ async function main() {
   const dom = await db.companyDomain.findFirstOrThrow({
     where: { companyId: legacy.id, isPrimary: true },
   });
+
+  const custom = await company("Custom Co", "e2ecustomco1", admin.id);
+  await backfillSubdomains({ apply: true, companyIds: [custom.id] });
+  const platform = await db.companyDomain.findFirstOrThrow({
+    where: {
+      companyId: custom.id,
+      kind: "PLATFORM",
+      status: { not: "RELEASED" },
+    },
+  });
+  if (
+    !(await db.companyDomain.findFirst({ where: { hostname: CUSTOM_HOST } }))
+  ) {
+    await db.$transaction([
+      db.companyDomain.update({
+        where: { id: platform.id },
+        data: { isPrimary: false, status: "ALIAS", aliasExpiresAt: null },
+      }),
+      db.companyDomain.create({
+        data: {
+          companyId: custom.id,
+          hostname: CUSTOM_HOST,
+          kind: "CUSTOM",
+          status: "ACTIVE",
+          isPrimary: true,
+          verifiedAt: new Date(),
+        },
+      }),
+    ]);
+  }
   const out = {
     E2E_LEGACY_PUBLIC_ID: legacy.publicId,
     E2E_LEGACY_LABEL: dom.hostname.split(".")[0],
+    E2E_CUSTOM_HOST: CUSTOM_HOST,
+    E2E_CUSTOM_LABEL: platform.hostname.split(".")[0],
   };
   writeFileSync(
     path.join(import.meta.dirname, ".seed.json"),

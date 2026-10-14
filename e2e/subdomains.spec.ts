@@ -319,3 +319,25 @@ test("several companies: login shows the chooser, picking one opens its host", a
     new RegExp(`^${esc(host(legacyLabel))}/${legacy}`),
   );
 });
+
+test("custom domain: platform address redirects to it, login is its own, signup is canonical", async ({
+  browser,
+}) => {
+  const custom = process.env.E2E_CUSTOM_HOST as string;
+  const label = process.env.E2E_CUSTOM_LABEL as string;
+  expect(custom, "E2E_CUSTOM_HOST (run e2e/seed.ts)").toBeTruthy();
+  const page = await (await browser.newContext()).newPage();
+
+  // (a) the platform address is a permanent alias of the custom primary
+  await page.goto(`${host(label)}/login`);
+  await page.waitForURL(`https://${custom}/login`);
+
+  // (b) the company login page, titled with the custom host
+  await expect(
+    page.getByRole("heading", { name: custom, exact: true }),
+  ).toBeVisible();
+
+  // (c) signup is canonical-only
+  await page.goto(`https://${custom}/signup`);
+  await page.waitForURL(new RegExp(`^${esc(ROOT)}/signup`));
+});

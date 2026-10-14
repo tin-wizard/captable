@@ -1,7 +1,7 @@
 {
 	local_certs
 }
-dealroom.test, *.dealroom.test {
+dealroom.test, *.dealroom.test, custom-e2e.test {
 	tls internal
 	reverse_proxy 127.0.0.1:3000
 }
