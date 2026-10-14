@@ -2,6 +2,7 @@ import { db } from "@/server/db";
 import {
   CustomDomainError,
   addCustomDomain,
+  listDomains,
   liveCustomHostnames,
   removeCustomDomain,
   setPrimaryDomain,
@@ -89,7 +90,12 @@ const code = (p: Promise<unknown>) =>
     (e) => (e instanceof CustomDomainError ? e.code : e),
   );
 
-async function addAndVerify(t: Tenant, hostname = host()) {
+// Verify never promotes (controller ruling); `primary` then runs Make primary.
+async function addAndVerify(
+  t: Tenant,
+  hostname = host(),
+  { primary = true } = {},
+) {
   const added = await addCustomDomain({
     companyId: t.companyId,
     raw: hostname,
@@ -100,6 +106,8 @@ async function addAndVerify(t: Tenant, hostname = host()) {
     fakeDns(added.verificationToken),
   );
   expect(res.ok).toBe(true);
+  if (primary)
+    await setPrimaryDomain({ companyId: t.companyId, domainId: added.id });
   return added;
 }
 
@@ -212,7 +220,8 @@ describe("custom domains", () => {
     expect(await primaryHostname(db, b.companyId)).toBe(b.platformHost);
     expect(await row(ra.id)).toMatchObject({
       companyId: a.companyId,
-      status: "ACTIVE",
+      status: "ALIAS",
+      aliasExpiresAt: null,
     });
 
     // and a new claim by another company is refused outright
@@ -238,7 +247,7 @@ describe("custom domains", () => {
     ).toBe("not-found");
   });
 
-  it("(d) verification needs DNS, then makes the custom host primary and the platform host a permanent alias", async () => {
+  it("(d) verification needs DNS, makes a permanent non-primary alias; Make primary then turns the platform host into a permanent alias", async () => {
     const a = await fresh();
     const h = host();
     const added = await addCustomDomain({
@@ -254,28 +263,48 @@ describe("custom domains", () => {
     ).toEqual({ ok: false, owned: false, routed: false });
     expect((await row(added.id)).status).toBe("PENDING");
 
+    // verify: ALIAS, permanent, not primary; it redirects to the current primary
+    // and can get its certificate on the first visit
     const res = await verifyCustomDomain(
       { companyId: a.companyId, domainId: added.id },
       fakeDns(added.verificationToken),
     );
     expect(res).toMatchObject({
       ok: true,
-      row: { hostname: h, status: "ACTIVE", isPrimary: true },
+      row: { hostname: h, status: "ALIAS", isPrimary: false },
     });
-    const custom = await row(added.id);
-    expect(custom).toMatchObject({ status: "ACTIVE", isPrimary: true });
-    expect(custom.verifiedAt).toBeInstanceOf(Date);
-    const platform = await db.companyDomain.findFirstOrThrow({
-      where: { companyId: a.companyId, kind: "PLATFORM" },
-    });
-    expect(platform).toMatchObject({
+    const verified = await row(added.id);
+    expect(verified).toMatchObject({
       status: "ALIAS",
       isPrimary: false,
       aliasExpiresAt: null,
     });
-
+    expect(verified.verifiedAt).toBeInstanceOf(Date);
+    const platform = await db.companyDomain.findFirstOrThrow({
+      where: { companyId: a.companyId, kind: "PLATFORM" },
+    });
+    expect(platform).toMatchObject({ status: "ACTIVE", isPrimary: true });
+    expect(await primaryHostname(db, a.companyId)).toBe(a.platformHost);
     expect(await resolveHostname(h)).toMatchObject({
       companyId: a.companyId,
+      status: "ALIAS",
+      primaryHostname: a.platformHost,
+    });
+    expect(await liveCustomHostnames()).toContain(h);
+
+    // Make primary
+    await setPrimaryDomain({ companyId: a.companyId, domainId: added.id });
+    expect(await row(added.id)).toMatchObject({
+      status: "ACTIVE",
+      isPrimary: true,
+      aliasExpiresAt: null,
+    });
+    expect(await row(platform.id)).toMatchObject({
+      status: "ALIAS",
+      isPrimary: false,
+      aliasExpiresAt: null,
+    });
+    expect(await resolveHostname(h)).toMatchObject({
       status: "ACTIVE",
       primaryHostname: h,
     });
@@ -454,10 +483,20 @@ describe("custom domains", () => {
       createdById: a.userId,
     });
     expect(await resolveHostname(added.hostname)).toBeNull(); // cached miss
+    expect(await resolveHostname(a.platformHost)).toMatchObject({
+      status: "ACTIVE",
+    }); // cached hit
     await verifyCustomDomain(
       { companyId: a.companyId, domainId: added.id },
       fakeDns(added.verificationToken),
     );
+    expect(await resolveHostname(added.hostname)).toMatchObject({
+      status: "ALIAS",
+    });
+    expect(await resolveHostname(added.hostname)).toMatchObject({
+      status: "ALIAS",
+    }); // now a cached hit
+    await setPrimaryDomain({ companyId: a.companyId, domainId: added.id });
     expect(await resolveHostname(added.hostname)).toMatchObject({
       status: "ACTIVE",
     });
@@ -567,6 +606,74 @@ describe("expiring custom aliases", () => {
   });
 });
 
+describe("listing and several custom domains", () => {
+  it("(o) listDomains leaves out an expired alias", async () => {
+    const a = await fresh();
+    const added = await addAndVerify(a);
+    const platform = await db.companyDomain.findFirstOrThrow({
+      where: { companyId: a.companyId, kind: "PLATFORM" },
+    });
+    await setPrimaryDomain({ companyId: a.companyId, domainId: platform.id });
+    expect((await listDomains(a.companyId)).map((r) => r.id)).toContain(
+      added.id,
+    );
+
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 31 * 864e5);
+    const ids = (await listDomains(a.companyId)).map((r) => r.id);
+    expect(ids).not.toContain(added.id);
+    expect(ids).toContain(platform.id);
+  });
+
+  it("(p) two custom domains: verify both, make B primary, then the platform address", async () => {
+    const a = await fresh();
+    const da = await addAndVerify(a, host(), { primary: false });
+    const db_ = await addAndVerify(a, host(), { primary: false });
+    const platform = await db.companyDomain.findFirstOrThrow({
+      where: { companyId: a.companyId, kind: "PLATFORM" },
+    });
+    // verified, not primary: both permanent aliases of the platform address
+    for (const d of [da, db_])
+      expect(await row(d.id)).toMatchObject({
+        status: "ALIAS",
+        isPrimary: false,
+        aliasExpiresAt: null,
+      });
+
+    await setPrimaryDomain({ companyId: a.companyId, domainId: db_.id });
+    expect(await row(db_.id)).toMatchObject({
+      status: "ACTIVE",
+      isPrimary: true,
+    });
+    expect(await row(platform.id)).toMatchObject({
+      status: "ALIAS",
+      aliasExpiresAt: null,
+    });
+    expect(await row(da.id)).toMatchObject({
+      status: "ALIAS",
+      aliasExpiresAt: null,
+    });
+
+    await setPrimaryDomain({ companyId: a.companyId, domainId: platform.id });
+    expect(await row(platform.id)).toMatchObject({
+      status: "ACTIVE",
+      isPrimary: true,
+      aliasExpiresAt: null,
+    });
+    // the demoted primary expires (back on a platform address)
+    const b = await row(db_.id);
+    expect(b).toMatchObject({ status: "ALIAS", isPrimary: false });
+    expectAboutThirtyDays(b.aliasExpiresAt);
+    // Task 1 ruling: only the row demoted by a change of primary gets an
+    // expiry; A was never primary, so it stays a permanent, DNS-proven alias
+    expect(await row(da.id)).toMatchObject({
+      status: "ALIAS",
+      isPrimary: false,
+      aliasExpiresAt: null,
+    });
+  });
+});
+
 function expectAboutThirtyDays(d: Date | null) {
   expect(d).toBeInstanceOf(Date);
   const days = ((d as Date).getTime() - Date.now()) / 864e5;
@@ -592,7 +699,7 @@ describe("R2 CORS sync side effects", () => {
       fakeDns(added.verificationToken),
     );
     expect(res).toMatchObject({ ok: true, corsSynced: false });
-    expect((await row(added.id)).status).toBe("ACTIVE");
+    expect((await row(added.id)).status).toBe("ALIAS");
 
     cors.sync.mockResolvedValueOnce({ skipped: false, ok: false });
     expect(

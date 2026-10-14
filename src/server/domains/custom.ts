@@ -62,9 +62,13 @@ const asRow = (r: Prisma.CompanyDomainGetPayload<{ select: typeof select }>) =>
 
 const LIVE_OR_PENDING = { not: "RELEASED" } as const;
 
+// Expired aliases are left out even before the lazy release marks them RELEASED.
 export async function listDomains(companyId: string): Promise<DomainRow[]> {
   const rows = await db.companyDomain.findMany({
-    where: { companyId, status: LIVE_OR_PENDING },
+    where: {
+      companyId,
+      OR: [{ status: "PENDING" }, { status: "ACTIVE" }, liveAliasWhere()],
+    },
     select,
     orderBy: [{ kind: "asc" }, { createdAt: "asc" }],
   });
@@ -210,13 +214,20 @@ export async function verifyCustomDomain(
   await releaseExpiredAliases(row.hostname);
   try {
     await db.$transaction(async (tx) => {
-      // re-check inside the transaction: the row may have been removed meanwhile
+      // Verify never promotes: the domain becomes a permanent alias of the
+      // current primary, so it can get its certificate on the first visit;
+      // the admin then chooses Make primary. Re-checked inside the
+      // transaction: the row may have been removed meanwhile.
       const { count } = await tx.companyDomain.updateMany({
         where: { id: domainId, companyId, status: "PENDING" },
-        data: { status: "ACTIVE", verifiedAt: new Date() },
+        data: {
+          status: "ALIAS",
+          aliasExpiresAt: null,
+          isPrimary: false,
+          verifiedAt: new Date(),
+        },
       });
       if (count !== 1) throw new CustomDomainError("not-found");
-      await makePrimary(tx, companyId, { id: domainId, kind: "CUSTOM" });
     });
   } catch (e) {
     if (isHostnameConflict(e)) throw new CustomDomainError("taken");

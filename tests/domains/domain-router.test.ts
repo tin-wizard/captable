@@ -47,6 +47,20 @@ vi.mock("@/server/domains/dns", async (importOriginal) => ({
   },
 }));
 
+// custom domains are only offered when the TLS ask secret is configured
+const env = vi.hoisted(() => ({
+  TLS_ASK_SECRET: "s3cret" as string | undefined,
+}));
+vi.mock("@/env", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/env")>();
+  return {
+    ...mod,
+    env: new Proxy(mod.env, {
+      get: (t, k) => (k in env ? env[k as keyof typeof env] : t[k as never]),
+    }),
+  };
+});
+
 const cors = vi.hoisted(() => ({
   sync: vi.fn(async (_o: string[]) => ({ skipped: false, ok: true })),
 }));
@@ -291,6 +305,31 @@ describe("custom domain procedures", () => {
     }
   });
 
+  it("TLS_ASK_SECRET unset: all five are NOT_FOUND, nothing is written", async () => {
+    env.TLS_ASK_SECRET = undefined;
+    try {
+      const c = ca().domain.custom;
+      const id = { domainId: "x" };
+      for (const p of [
+        () => c.list(),
+        () => c.add({ hostname: `unset-${run}.implexus.io` }),
+        () => c.verify(id),
+        () => c.setPrimary(id),
+        () => c.remove(id),
+      ])
+        expect((await err(p()))?.code).toBe("NOT_FOUND");
+      expect(
+        await db.companyDomain.count({
+          where: { hostname: `unset-${run}.implexus.io` },
+        }),
+      ).toBe(0);
+    } finally {
+      env.TLS_ASK_SECRET = "s3cret";
+    }
+    // set again: available
+    expect((await ca().domain.custom.list()).aliasDays).toBe(30);
+  });
+
   it("maps hostname errors to BAD_REQUEST with the code as message", async () => {
     expect(await err(ca().domain.custom.add({ hostname: "Bad Host" }))).toEqual(
       { code: "BAD_REQUEST", message: "format" },
@@ -340,7 +379,7 @@ describe("custom domain procedures", () => {
     }
   });
 
-  it("admin round trip: add, verify, primary, rename blocked, switch back, remove; audited", async () => {
+  it("admin round trip: add, verify (not primary), make primary, rename blocked, switch back, remove; audited", async () => {
     const c = ca().domain.custom;
     const row = await c.add({ hostname: custom });
     expect(row).toMatchObject({ hostname: custom, status: "PENDING" });
@@ -363,6 +402,20 @@ describe("custom domain procedures", () => {
     expect(cors.sync).toHaveBeenLastCalledWith(
       expect.arrayContaining([`https://${custom}`]),
     );
+    // verify does not promote: a permanent alias of the platform address
+    expect(await ca().domain.current()).toMatchObject({
+      hostname: `${labels.a}.dealroom.tin.info`,
+      primaryKind: "PLATFORM",
+    });
+    expect((await c.list()).rows.find((r) => r.id === row.id)).toMatchObject({
+      status: "ALIAS",
+      isPrimary: false,
+      aliasExpiresAt: null,
+    });
+
+    expect(await c.setPrimary({ domainId: row.id })).toEqual({
+      corsSynced: true,
+    });
     const cur = await ca().domain.current();
     expect(cur).toMatchObject({ hostname: custom, primaryKind: "CUSTOM" });
 
@@ -422,18 +475,23 @@ describe("custom domain procedures", () => {
       const audits = await db.audit.findMany({
         where: { companyId: a.companyId, action },
       });
-      expect(audits).toHaveLength(1);
+      // primary changed twice: to the custom host, then back
+      expect(audits).toHaveLength(action === "domain.primary-changed" ? 2 : 1);
     }
     const summaries = await db.audit.findMany({
       where: { companyId: a.companyId, action: { startsWith: "domain." } },
       select: { action: true, summary: true },
     });
     for (const s of summaries)
-      expect(s.summary).toContain(
-        s.action === "domain.primary-changed"
-          ? `${labels.a}.dealroom.tin.info`
-          : custom,
-      );
+      if (s.action !== "domain.primary-changed")
+        expect(s.summary).toContain(custom);
+    expect(
+      summaries
+        .filter((s) => s.action === "domain.primary-changed")
+        .map((s) => s.summary?.split(" to ")[1]),
+    ).toEqual(
+      expect.arrayContaining([custom, `${labels.a}.dealroom.tin.info`]),
+    );
   });
 });
 

@@ -1,3 +1,4 @@
+import { env } from "@/env";
 import { Audit } from "@/server/audit";
 import { domainConfig, tenantOrigin } from "@/server/domains/config";
 import { validateLabel } from "@/server/domains/core/subdomain";
@@ -11,6 +12,7 @@ import {
   verifyCustomDomain,
 } from "@/server/domains/custom";
 import {
+  ALIAS_DAYS,
   DomainTakenError,
   InvalidLabelError,
   PlatformRenameBlockedError,
@@ -72,10 +74,13 @@ type AdminCtx = {
   requestIp: string;
 };
 
-// The flag check runs past the access check, like rename. CustomDomainError
-// codes become the message so the client can map its own copy.
+// The flag check runs past the access check, like rename. Without
+// TLS_ASK_SECRET no custom host could ever get a certificate, so the feature
+// is off too (the Settings card renders nothing when list is NOT_FOUND).
+// CustomDomainError codes become the message so the client can map its own copy.
 async function custom<T>(fn: () => Promise<T>) {
-  if (!domainConfig().enabled) throw new TRPCError({ code: "NOT_FOUND" });
+  if (!domainConfig().enabled || !env.TLS_ASK_SECRET)
+    throw new TRPCError({ code: "NOT_FOUND" });
   try {
     return await fn();
   } catch (e) {
@@ -128,6 +133,7 @@ const customRouter = createTRPCRouter({
       rows: await listDomains(ctx.tenant.companyId),
       dnsTarget: domainConfig().canonicalHost,
       serverIps: serverIps(),
+      aliasDays: ALIAS_DAYS,
     })),
   ),
 
@@ -155,7 +161,7 @@ const customRouter = createTRPCRouter({
       await audit(
         ctx,
         "domain.verified",
-        `verified the domain ${r.row.hostname}, now the company address`,
+        `verified the domain ${r.row.hostname}`,
       );
       return { ok: true as const, corsSynced: r.corsSynced };
     }),
