@@ -1,4 +1,5 @@
 import { CompanyAddress } from "@/components/company/company-address";
+import { CustomDomains } from "@/components/company/custom-domains";
 import { PreferencesCard } from "@/components/company/preferences-card";
 import { CompanyForm } from "@/components/onboarding/company-form";
 import { UnAuthorizedState } from "@/components/ui/un-authorized-state";
@@ -25,6 +26,7 @@ const CompanySettingsPage = async () => {
     <>
       <CompanyForm data={data} type="edit" />
       <CompanyAddress />
+      <CustomDomains />
       <PreferencesCard />
     </>
   );

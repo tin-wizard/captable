@@ -44,6 +44,9 @@ export const CompanyAddress = () => {
           msg = `That address was just taken.${
             suggestion ? ` Try ${suggestion}.` : ""
           }`;
+        } else if (e.message === "custom-primary") {
+          msg =
+            "Your company address is a custom domain. Make the default address primary before renaming it.";
         } else if (e.data?.code === "BAD_REQUEST" && e.message in REASONS) {
           msg = REASONS[e.message as keyof typeof REASONS];
         }
@@ -52,7 +55,33 @@ export const CompanyAddress = () => {
     },
   });
 
+  const isCustom = current.data?.primaryKind === "CUSTOM";
+  const list = api.domain.custom.list.useQuery(undefined, {
+    enabled: isCustom,
+  });
+
   if (!current.data?.enabled) return null;
+
+  if (isCustom) {
+    const platformHost = list.data?.rows.find(
+      (r) => r.kind === "PLATFORM",
+    )?.hostname;
+    return (
+      <div className="mt-10 max-w-xl space-y-4 border-t pt-8">
+        <div>
+          <h3 className="font-medium">Company address</h3>
+          <p className="text-sm text-muted-foreground">
+            {current.data.hostname}
+          </p>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {platformHost
+            ? `Your default address ${platformHost} redirects to ${current.data.hostname}`
+            : `Your default address redirects to ${current.data.hostname}`}
+        </p>
+      </div>
+    );
+  }
 
   const settled =
     !!debounced && debounced === value.trim() && !check.isFetching;
