@@ -47,6 +47,13 @@ vi.mock("@/server/domains/dns", async (importOriginal) => ({
   },
 }));
 
+const cors = vi.hoisted(() => ({
+  sync: vi.fn(async (_o: string[]) => ({ skipped: false, ok: true })),
+}));
+vi.mock("@/server/domains/cors", () => ({
+  syncCustomOriginsCors: cors.sync,
+}));
+
 let a: Tenant;
 let b: Tenant;
 let memberUser: { id: string };
@@ -348,7 +355,14 @@ describe("custom domain procedures", () => {
 
     dns.txt = [[row.verificationToken as string]];
     dns.cname = ["dealroom.tin.info"];
-    expect(await c.verify({ domainId: row.id })).toEqual({ ok: true });
+    expect(await c.verify({ domainId: row.id })).toEqual({
+      ok: true,
+      corsSynced: true,
+    });
+    // synced after commit with the live custom hostnames as https origins
+    expect(cors.sync).toHaveBeenLastCalledWith(
+      expect.arrayContaining([`https://${custom}`]),
+    );
     const cur = await ca().domain.current();
     expect(cur).toMatchObject({ hostname: custom, primaryKind: "CUSTOM" });
 
@@ -378,13 +392,18 @@ describe("custom domain procedures", () => {
     const platform = list.rows.find((r) => r.kind === "PLATFORM");
     expect(list.rows.map((r) => r.hostname)).toContain(custom);
 
-    await c.setPrimary({ domainId: platform?.id as string });
+    expect(await c.setPrimary({ domainId: platform?.id as string })).toEqual({
+      corsSynced: true,
+    });
     expect(await ca().domain.current()).toMatchObject({
       hostname: `${labels.a}.dealroom.tin.info`,
       primaryKind: "PLATFORM",
     });
 
-    await c.remove({ domainId: row.id });
+    cors.sync.mockClear();
+    expect(await c.remove({ domainId: row.id })).toEqual({ corsSynced: true });
+    expect(cors.sync).toHaveBeenCalledOnce();
+    expect(cors.sync.mock.calls[0]?.[0]).not.toContain(`https://${custom}`);
     expect((await c.list()).rows.map((r) => r.hostname)).not.toContain(custom);
 
     for (const action of [

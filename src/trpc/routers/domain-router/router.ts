@@ -155,29 +155,37 @@ const customRouter = createTRPCRouter({
         "domain.verified",
         `verified the domain ${r.row.hostname}, now the company address`,
       );
-      return { ok: true as const };
+      return { ok: true as const, corsSynced: r.corsSynced };
     }),
   ),
 
   setPrimary: adminOnly.input(domainIdInput).mutation(({ ctx, input }) =>
     custom(async () => {
       const { companyId } = ctx.tenant;
-      await setPrimaryDomain({ companyId, domainId: input.domainId });
+      const { corsSynced } = await setPrimaryDomain({
+        companyId,
+        domainId: input.domainId,
+      });
       const hostname = await hostnameOf(ctx, input.domainId);
       await audit(
         ctx,
         "domain.primary-changed",
         `changed the company address to ${hostname}`,
       );
+      return { corsSynced };
     }),
   ),
 
   remove: adminOnly.input(domainIdInput).mutation(({ ctx, input }) =>
     custom(async () => {
       const { companyId } = ctx.tenant;
-      await removeCustomDomain({ companyId, domainId: input.domainId });
+      const { corsSynced } = await removeCustomDomain({
+        companyId,
+        domainId: input.domainId,
+      });
       const hostname = await hostnameOf(ctx, input.domainId);
       await audit(ctx, "domain.removed", `removed the domain ${hostname}`);
+      return { corsSynced };
     }),
   ),
 });

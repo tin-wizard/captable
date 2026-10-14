@@ -4,6 +4,7 @@ import { type TPrismaOrTransaction, db } from "@/server/db";
 import { Prisma } from "@prisma/client";
 import { domainConfig } from "./config";
 import { normalizeCustomHostname } from "./core/custom-hostname";
+import { syncCustomOriginsCors } from "./cors";
 import { type DnsDeps, checkDomainDns, realDnsDeps } from "./dns";
 import {
   ALIAS_DAYS,
@@ -167,11 +168,23 @@ const isHostnameConflict = (e: unknown) =>
   e.code === "P2002" &&
   JSON.stringify(e.meta ?? {}).includes("hostname");
 
+// After the domain transaction has committed; never throws. true = synced.
+async function syncCors(): Promise<boolean> {
+  try {
+    const hosts = await liveCustomHostnames();
+    const r = await syncCustomOriginsCors(hosts.map((h) => `https://${h}`));
+    return !r.skipped && r.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function verifyCustomDomain(
   i: { companyId: string; domainId: string },
   deps: DnsDeps = realDnsDeps,
 ): Promise<
-  { ok: true; row: DomainRow } | { ok: false; owned: boolean; routed: boolean }
+  | { ok: true; row: DomainRow; corsSynced: boolean }
+  | { ok: false; owned: boolean; routed: boolean }
 > {
   const { companyId, domainId } = i;
   const row = await db.companyDomain.findFirst({
@@ -213,7 +226,7 @@ export async function verifyCustomDomain(
     where: { id: domainId, companyId },
     select,
   });
-  return { ok: true, row: asRow(verified) };
+  return { ok: true, row: asRow(verified), corsSynced: await syncCors() };
 }
 
 export async function setPrimaryDomain(i: {
@@ -233,6 +246,7 @@ export async function setPrimaryDomain(i: {
   } finally {
     clearResolveCache();
   }
+  return { corsSynced: await syncCors() };
 }
 
 export async function removeCustomDomain(i: {
@@ -275,6 +289,7 @@ export async function removeCustomDomain(i: {
   } finally {
     clearResolveCache();
   }
+  return { corsSynced: await syncCors() };
 }
 
 // ACTIVE and ALIAS custom rows across all companies: the CORS allow-list and TLS ask.
