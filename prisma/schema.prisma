@@ -1292,10 +1292,11 @@ enum DomainKind {
 }
 
 enum DomainStatus {
-  PENDING
   ACTIVE
   ALIAS
   RELEASED
+  // last: ALTER TYPE ... ADD VALUE appends, so this matches the database order
+  PENDING
 }
 
 // Partial unique indexes live in migration 20261012000000_company_domains; delete any generated DROP of them.
