@@ -42,6 +42,24 @@ async function readRules(res: Response): Promise<Rule[] | null> {
   return res.status === 404 && j.success === false && !noBucket ? [] : null;
 }
 
+// An explicit controller and timer (always cleared) instead of AbortSignal.timeout:
+// the timer also covers reading the body, and nothing is left pending after the call.
+async function timed<T>(
+  f: typeof fetch,
+  url: string,
+  init: RequestInit,
+  read: (r: Response) => Promise<T>,
+): Promise<{ res: Response; value: T }> {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), TIMEOUT_MS);
+  try {
+    const res = await f(url, { ...init, signal: c.signal });
+    return { res, value: await read(res) };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 // Best-effort and never throws: replaces only the managed rule, leaving the
 // platform rule (and anything else) as read. Any unexpected GET aborts that
 // bucket before a PUT, so a bad response can never wipe existing rules.
@@ -70,11 +88,12 @@ export async function syncCustomOriginsCors(
     for (const bucket of new Set(buckets)) {
       const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucket}/cors`;
       try {
-        const got = await f(url, {
-          headers,
-          signal: AbortSignal.timeout(TIMEOUT_MS),
-        });
-        const existing = await readRules(got);
+        const { res: got, value: existing } = await timed(
+          f,
+          url,
+          { headers },
+          readRules,
+        );
         if (!existing) throw new Error(`unexpected GET response ${got.status}`);
         const rules = existing.filter((r) => r.id !== MANAGED_CORS_ID);
         if (unique.length)
@@ -87,15 +106,15 @@ export async function syncCustomOriginsCors(
             },
             maxAgeSeconds: 3600,
           });
-        const put = await f(url, {
-          method: "PUT",
-          headers,
-          body: JSON.stringify({ rules }),
-          signal: AbortSignal.timeout(TIMEOUT_MS),
-        });
-        const pj = (await put.json().catch(() => null)) as {
-          success?: boolean;
-        } | null;
+        const { res: put, value: pj } = await timed(
+          f,
+          url,
+          { method: "PUT", headers, body: JSON.stringify({ rules }) },
+          async (r) =>
+            (await r.json().catch(() => null)) as {
+              success?: boolean;
+            } | null,
+        );
         if (!put.ok || pj?.success === false)
           throw new Error(`PUT ${put.status}`);
       } catch (e) {
