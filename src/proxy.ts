@@ -81,7 +81,7 @@ export function proxy(request: NextRequest) {
   ) {
     return new NextResponse("Not found", { status: 404 });
   }
-  if (cls.kind === "platform") {
+  if (cls.kind === "platform" || cls.kind === "custom") {
     const target = tenantAuthRedirect(pathname);
     if (target?.startsWith("canonical:")) {
       return NextResponse.redirect(

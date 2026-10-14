@@ -619,6 +619,16 @@ const cases: Case[] = [
     adminPastAclOnly: true,
     run: (c) => c.domain.rename({ label: `roles-${nanoid(6)}` }),
   },
+  ...(["add", "verify", "setPrimary", "remove"] as const).map((p) => ({
+    proc: `domain.custom.${p}`,
+    perm: ["company", "update"] as [TSubjects, TActions],
+    // NOT_FOUND past the ACL while DOMAINS_ENABLED is off in tests
+    adminPastAclOnly: true as const,
+    run: (c: Caller) =>
+      p === "add"
+        ? c.domain.custom.add({ hostname: "roles.example.com" })
+        : c.domain.custom[p]({ domainId: "x" }),
+  })),
   {
     proc: "bankAccounts.create",
     perm: ["bank-accounts", "create"],
@@ -1128,9 +1138,8 @@ describe("policy coverage guard", () => {
   it("every policy is enforced (no-role caller, empty input)", async () => {
     const unenforced: string[] = [];
     for (const n of Object.keys(procedures).filter(hasPolicy)) {
-      const [router, proc] = n.split(".") as [string, string];
       // biome-ignore lint/suspicious/noExplicitAny: dynamic dispatch by name
-      const fn = (noRole as any)[router][proc] as (
+      const fn = n.split(".").reduce((o, k) => o[k], noRole as any) as (
         i: unknown,
       ) => Promise<unknown>;
       if ((await code(fn({}))) !== "UNAUTHORIZED") unenforced.push(n);
