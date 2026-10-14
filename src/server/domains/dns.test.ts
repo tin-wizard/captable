@@ -100,4 +100,24 @@ describe("checkDomainDns", () => {
       ).routed,
     ).toBe(false);
   });
+  it("runs the TXT, CNAME and A lookups concurrently", async () => {
+    // each lookup waits until all three have started: a sequential check would hang
+    let started = 0;
+    let release = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const wait = async <T>(v: T) => {
+      if (++started === 3) release();
+      await gate;
+      return v;
+    };
+    expect(
+      await checkDomainDns(base, {
+        resolveTxt: () => wait([["tok123"]]),
+        resolveCname: () => wait(["dealroom.tin.info"]),
+        resolve4: () => wait(["1.2.3.4"]),
+      }),
+    ).toEqual({ owned: true, routed: true });
+  }, 2_000);
 });

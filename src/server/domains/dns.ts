@@ -42,23 +42,28 @@ export async function checkDomainDns(
   const ours = (h: string) =>
     h === canonicalHost || h === baseDomain || h.endsWith(`.${baseDomain}`);
 
-  const txt = await orEmpty(deps.resolveTxt(challengeName(hostname)));
-  const owned = txt.some((chunks) => chunks.join("") === token);
-
-  let routed = false;
+  const owned = orEmpty(deps.resolveTxt(challengeName(hostname))).then((txt) =>
+    txt.some((chunks) => chunks.join("") === token),
+  );
   // follow the CNAME chain a few hops; any hop landing on a platform host routes
-  let name = hostname;
-  for (let i = 0; i < MAX_CNAME_HOPS && !routed; i++) {
-    const target = (await orEmpty(deps.resolveCname(name)))[0]
-      ?.toLowerCase()
-      .replace(/\.$/, "");
-    if (!target) break;
-    routed = ours(target);
-    name = target;
-  }
-  if (!routed && serverIps.length) {
-    const ips = await orEmpty(deps.resolve4(hostname));
-    routed = ips.some((ip) => serverIps.includes(ip));
-  }
-  return { owned, routed };
+  const byCname = (async () => {
+    let name = hostname;
+    for (let i = 0; i < MAX_CNAME_HOPS; i++) {
+      const target = (await orEmpty(deps.resolveCname(name)))[0]
+        ?.toLowerCase()
+        .replace(/\.$/, "");
+      if (!target) return false;
+      if (ours(target)) return true;
+      name = target;
+    }
+    return false;
+  })();
+  const byA = serverIps.length
+    ? orEmpty(deps.resolve4(hostname)).then((ips) =>
+        ips.some((ip) => serverIps.includes(ip)),
+      )
+    : Promise.resolve(false);
+  // concurrent, so the worst case is about one lookup timeout, not one per lookup
+  const [o, c, a] = await Promise.all([owned, byCname, byA]);
+  return { owned: o, routed: c || a };
 }

@@ -320,11 +320,10 @@ describe("custom domains", () => {
       isPrimary: true,
       aliasExpiresAt: null,
     });
-    expect(await row(added.id)).toMatchObject({
-      status: "ALIAS",
-      isPrimary: false,
-      aliasExpiresAt: null,
-    });
+    // back on the platform address: the custom host is an expiring alias, not a permanent one
+    const demoted = await row(added.id);
+    expect(demoted).toMatchObject({ status: "ALIAS", isPrimary: false });
+    expectAboutThirtyDays(demoted.aliasExpiresAt);
     expect(await resolveHostname(added.hostname)).toMatchObject({
       status: "ALIAS",
       primaryHostname: a.platformHost,
@@ -470,4 +469,100 @@ describe("custom domains", () => {
     await removeCustomDomain({ companyId: a.companyId, domainId: added.id });
     expect(await resolveHostname(added.hostname)).toBeNull();
   });
+
+  it("(l) setPrimary cannot hold old platform labels: only the current platform row can be promoted", async () => {
+    const a = await fresh();
+    const y = await db.companyDomain.findFirstOrThrow({
+      where: { companyId: a.companyId, kind: "PLATFORM", isPrimary: true },
+    });
+    const xLabel = `cd-${rand()}`;
+    await db.$transaction((tx) =>
+      renamePlatformSubdomain(tx, {
+        companyId: a.companyId,
+        label: xLabel,
+        createdById: a.userId,
+      }),
+    );
+    // Y is now an expiring rename alias; promoting it would re-hold it (and X) forever
+    expect(
+      await code(setPrimaryDomain({ companyId: a.companyId, domainId: y.id })),
+    ).toBe("not-found");
+    const yAfter = await row(y.id);
+    expect(yAfter).toMatchObject({ status: "ALIAS", isPrimary: false });
+    expectAboutThirtyDays(yAfter.aliasExpiresAt);
+    const x = await db.companyDomain.findFirstOrThrow({
+      where: { companyId: a.companyId, isPrimary: true },
+    });
+    expect(x).toMatchObject({
+      hostname: `${xLabel}.dealroom.tin.info`,
+      status: "ACTIVE",
+      aliasExpiresAt: null,
+    });
+
+    // via a custom primary: X becomes the permanent alias, Y stays expiring,
+    // and switching back to X leaves the custom host expiring, not permanent
+    const added = await addAndVerify(a);
+    expect(await row(x.id)).toMatchObject({
+      status: "ALIAS",
+      aliasExpiresAt: null,
+    });
+    expectAboutThirtyDays((await row(y.id)).aliasExpiresAt);
+    expect(
+      await code(setPrimaryDomain({ companyId: a.companyId, domainId: y.id })),
+    ).toBe("not-found");
+    await setPrimaryDomain({ companyId: a.companyId, domainId: x.id });
+    expect(await row(x.id)).toMatchObject({
+      status: "ACTIVE",
+      isPrimary: true,
+      aliasExpiresAt: null,
+    });
+    expectAboutThirtyDays((await row(added.id)).aliasExpiresAt);
+    expectAboutThirtyDays((await row(y.id)).aliasExpiresAt);
+  });
+
+  it("(m) removing the only live address is refused and leaves the row unchanged", async () => {
+    const t = await seedTenant(`cd-${rand()}`);
+    tenants.push(t);
+    const added = await addAndVerify(t); // no platform row: the custom host is the only address
+    expect(
+      await code(
+        removeCustomDomain({ companyId: t.companyId, domainId: added.id }),
+      ),
+    ).toBe("last-address");
+    expect(await row(added.id)).toMatchObject({
+      status: "ACTIVE",
+      isPrimary: true,
+      releasedAt: null,
+    });
+    expect(await primaryHostname(db, t.companyId)).toBe(added.hostname);
+  });
 });
+
+describe("expiring custom aliases", () => {
+  it("(n) once a demoted custom host expires it stops resolving and another company can claim it", async () => {
+    const a = await fresh();
+    const b = await fresh();
+    const added = await addAndVerify(a);
+    const platform = await db.companyDomain.findFirstOrThrow({
+      where: { companyId: a.companyId, kind: "PLATFORM" },
+    });
+    await setPrimaryDomain({ companyId: a.companyId, domainId: platform.id });
+    expect(await liveCustomHostnames()).toContain(added.hostname);
+
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 31 * 864e5);
+    clearResolveCache();
+    expect(await resolveHostname(added.hostname)).toBeNull();
+    expect(await liveCustomHostnames()).not.toContain(added.hostname);
+    await addAndVerify(b, added.hostname);
+    expect((await row(added.id)).status).toBe("RELEASED");
+    expect(await primaryHostname(db, b.companyId)).toBe(added.hostname);
+  });
+});
+
+function expectAboutThirtyDays(d: Date | null) {
+  expect(d).toBeInstanceOf(Date);
+  const days = ((d as Date).getTime() - Date.now()) / 864e5;
+  expect(days).toBeGreaterThan(29.9);
+  expect(days).toBeLessThanOrEqual(30);
+}

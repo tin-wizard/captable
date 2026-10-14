@@ -5,7 +5,12 @@ import { Prisma } from "@prisma/client";
 import { domainConfig } from "./config";
 import { normalizeCustomHostname } from "./core/custom-hostname";
 import { type DnsDeps, checkDomainDns, realDnsDeps } from "./dns";
-import { clearResolveCache, liveAliasWhere } from "./registry";
+import {
+  ALIAS_DAYS,
+  clearResolveCache,
+  liveAliasWhere,
+  releaseExpiredAliases,
+} from "./registry";
 
 // Hostnames are global, so like registry.ts this uses the unscoped db and puts
 // companyId in every where itself.
@@ -19,7 +24,8 @@ export type CustomDomainErrorCode =
   | "taken"
   | "limit"
   | "not-found"
-  | "not-verified";
+  | "not-verified"
+  | "last-address";
 
 export class CustomDomainError extends Error {
   constructor(public code: CustomDomainErrorCode) {
@@ -71,6 +77,8 @@ export async function addCustomDomain(i: {
   if (!res.ok) throw new CustomDomainError(res.reason);
   const { hostname } = res;
   const { companyId } = i;
+  // custom aliases can expire too (after switching back to the platform address)
+  await releaseExpiredAliases(hostname);
 
   const existing = await db.companyDomain.findFirst({
     where: { companyId, hostname, status: LIVE_OR_PENDING },
@@ -105,7 +113,6 @@ export async function addCustomDomain(i: {
     },
     select,
   });
-  clearResolveCache();
   return asRow(row);
 }
 
@@ -115,15 +122,39 @@ const serverIps = () =>
     .map((s) => s.trim())
     .filter(Boolean);
 
-// The previous primary becomes a permanent alias that redirects here.
+// Rows that may become primary: any live CUSTOM row, but of the PLATFORM rows
+// only the current one (ACTIVE, or the permanent alias kept while a custom
+// domain is primary), never an expiring alias left by a rename.
+const promotable = () =>
+  ({
+    OR: [
+      { kind: "CUSTOM", OR: [{ status: "ACTIVE" }, liveAliasWhere()] },
+      {
+        kind: "PLATFORM",
+        OR: [{ status: "ACTIVE" }, { status: "ALIAS", aliasExpiresAt: null }],
+      },
+    ],
+  }) satisfies Prisma.CompanyDomainWhereInput;
+
+// The previous primary becomes an alias that redirects here. It is permanent
+// only while a custom domain is primary (that keeps the platform address);
+// back on a platform address, the demoted row expires like a rename alias.
 async function makePrimary(
   tx: TPrismaOrTransaction,
   companyId: string,
-  domainId: string,
+  target: { id: string; kind: "PLATFORM" | "CUSTOM" },
 ) {
+  const domainId = target.id;
   await tx.companyDomain.updateMany({
     where: { companyId, isPrimary: true, id: { not: domainId } },
-    data: { isPrimary: false, status: "ALIAS", aliasExpiresAt: null },
+    data: {
+      isPrimary: false,
+      status: "ALIAS",
+      aliasExpiresAt:
+        target.kind === "CUSTOM"
+          ? null
+          : new Date(Date.now() + ALIAS_DAYS * 864e5),
+    },
   });
   await tx.companyDomain.update({
     where: { id: domainId, companyId },
@@ -161,6 +192,7 @@ export async function verifyCustomDomain(
   );
   if (!flags.owned || !flags.routed) return { ok: false, ...flags };
 
+  await releaseExpiredAliases(row.hostname);
   try {
     await db.$transaction(async (tx) => {
       // re-check inside the transaction: the row may have been removed meanwhile
@@ -169,7 +201,7 @@ export async function verifyCustomDomain(
         data: { status: "ACTIVE", verifiedAt: new Date() },
       });
       if (count !== 1) throw new CustomDomainError("not-found");
-      await makePrimary(tx, companyId, domainId);
+      await makePrimary(tx, companyId, { id: domainId, kind: "CUSTOM" });
     });
   } catch (e) {
     if (isHostnameConflict(e)) throw new CustomDomainError("taken");
@@ -192,15 +224,11 @@ export async function setPrimaryDomain(i: {
   try {
     await db.$transaction(async (tx) => {
       const target = await tx.companyDomain.findFirst({
-        where: {
-          id: domainId,
-          companyId,
-          OR: [{ status: "ACTIVE" }, liveAliasWhere()],
-        },
-        select: { id: true },
+        where: { id: domainId, companyId, ...promotable() },
+        select: { id: true, kind: true },
       });
       if (!target) throw new CustomDomainError("not-found");
-      await makePrimary(tx, companyId, domainId);
+      await makePrimary(tx, companyId, target);
     });
   } finally {
     clearResolveCache();
@@ -224,25 +252,25 @@ export async function removeCustomDomain(i: {
         select: { isPrimary: true },
       });
       if (!target) throw new CustomDomainError("not-found");
+      // never zero addresses: pick the successor before releasing anything;
+      // the current platform row sorts first
+      const next = target.isPrimary
+        ? await tx.companyDomain.findFirst({
+            where: { companyId, id: { not: domainId }, ...promotable() },
+            orderBy: [
+              { kind: "asc" },
+              { aliasExpiresAt: { sort: "desc", nulls: "first" } },
+            ],
+            select: { id: true, kind: true },
+          })
+        : null;
+      if (target.isPrimary && !next)
+        throw new CustomDomainError("last-address");
       await tx.companyDomain.update({
         where: { id: domainId, companyId },
         data: { status: "RELEASED", releasedAt: new Date(), isPrimary: false },
       });
-      if (!target.isPrimary) return;
-      // never zero addresses: the platform row sorts first, permanent aliases before expiring ones
-      const next = await tx.companyDomain.findFirst({
-        where: {
-          companyId,
-          id: { not: domainId },
-          OR: [{ status: "ACTIVE" }, liveAliasWhere()],
-        },
-        orderBy: [
-          { kind: "asc" },
-          { aliasExpiresAt: { sort: "desc", nulls: "first" } },
-        ],
-        select: { id: true },
-      });
-      if (next) await makePrimary(tx, companyId, next.id);
+      if (next) await makePrimary(tx, companyId, next);
     });
   } finally {
     clearResolveCache();
@@ -252,7 +280,7 @@ export async function removeCustomDomain(i: {
 // ACTIVE and ALIAS custom rows across all companies: the CORS allow-list and TLS ask.
 export async function liveCustomHostnames(): Promise<string[]> {
   const rows = await db.companyDomain.findMany({
-    where: { kind: "CUSTOM", status: { in: ["ACTIVE", "ALIAS"] } },
+    where: { kind: "CUSTOM", OR: [{ status: "ACTIVE" }, liveAliasWhere()] },
     select: { hostname: true },
     distinct: ["hostname"],
     orderBy: { hostname: "asc" },

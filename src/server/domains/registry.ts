@@ -8,7 +8,7 @@ import {
   validateLabel,
 } from "./core/subdomain";
 
-const ALIAS_DAYS = 30;
+export const ALIAS_DAYS = 30;
 
 export class InvalidLabelError extends Error {
   constructor(public reason: "format" | "reserved") {
@@ -45,7 +45,7 @@ const LIVE = { not: "RELEASED" } as const;
 // Hostnames are global: uniqueness reads/releases always use the unscoped db,
 // never the caller's (possibly tenant-scoped) client. Release is idempotent.
 // Expired aliases are released lazily, right before anyone can claim their hostname.
-async function releaseExpiredAliases(hostname?: string) {
+export async function releaseExpiredAliases(hostname?: string) {
   await globalDb.companyDomain.updateMany({
     where: {
       status: "ALIAS",

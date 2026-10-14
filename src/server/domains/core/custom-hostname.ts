@@ -28,11 +28,8 @@ export function normalizeCustomHostname(
     BAD_TLDS.has(tld)
   )
     return { ok: false, reason: "format" };
-  if (
-    h === cfg.canonicalHost ||
-    h === cfg.baseDomain ||
-    h.endsWith(`.${cfg.baseDomain}`)
-  )
+  const under = (d: string) => h === d || h.endsWith(`.${d}`);
+  if (under(cfg.canonicalHost) || under(cfg.baseDomain))
     return { ok: false, reason: "platform" };
   return { ok: true, hostname: h };
 }

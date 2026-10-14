@@ -30,6 +30,24 @@ describe("normalizeCustomHostname", () => {
     ])
       expect(ok(h)).toEqual({ ok: false, reason: "platform" });
   });
+  it("refuses the canonical host and anything under it when it differs from the base domain", () => {
+    const split = {
+      canonicalHost: "app.tin.info",
+      baseDomain: "dealroom.tin.info",
+    };
+    for (const h of [
+      "app.tin.info",
+      "x.app.tin.info",
+      "acme.dealroom.tin.info",
+    ])
+      expect(normalizeCustomHostname(h, split)).toEqual({
+        ok: false,
+        reason: "platform",
+      });
+    expect(normalizeCustomHostname("tin.info", split)).toMatchObject({
+      ok: true,
+    });
+  });
   it("refuses empty and badly formed input", () => {
     expect(ok("")).toEqual({ ok: false, reason: "empty" });
     for (const bad of [
