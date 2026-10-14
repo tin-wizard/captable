@@ -3,8 +3,6 @@
 import {
   RiEqualizer2Fill,
   RiEqualizer2Line,
-  RiFileTextFill,
-  RiFileTextLine,
   RiFolder5Fill,
   RiFolder5Line,
   RiFolderChart2Fill,
@@ -190,20 +188,8 @@ const company = [
     icon: RiEqualizer2Line,
     activeIcon: RiEqualizer2Fill,
   },
-  {
-    id: 3,
-    name: "Form 3921",
-    href: "/3921",
-    icon: RiFileTextLine,
-    activeIcon: RiFileTextFill,
-  },
-  {
-    id: 4,
-    name: "409A Valuation",
-    href: "/409a",
-    icon: RiFileTextLine,
-    activeIcon: RiFileTextFill,
-  },
+  // Form 3921 (/3921) and 409A Valuation (/409a) are unbuilt stubs: add their
+  // links back here when the pages exist.
 ];
 
 interface SideBarProps {
