@@ -21,6 +21,22 @@ export class DomainTakenError extends Error {
   }
 }
 
+// Thrown while a custom domain is primary: a rename would create a second primary.
+export class PlatformRenameBlockedError extends Error {
+  constructor() {
+    super(
+      "platform address cannot be renamed while a custom domain is primary",
+    );
+  }
+}
+
+// An alias redirects until it expires; aliasExpiresAt = null is permanent.
+export const liveAliasWhere = () =>
+  ({
+    status: "ALIAS",
+    OR: [{ aliasExpiresAt: null }, { aliasExpiresAt: { gt: new Date() } }],
+  }) satisfies Prisma.CompanyDomainWhereInput;
+
 export const hostnameFor = (label: string) =>
   `${label}.${domainConfig().baseDomain}`;
 
@@ -74,10 +90,7 @@ export async function suggestAvailableLabel(
           hostname: { startsWith: prefix },
           ...(opts.readonly
             ? {
-                OR: [
-                  { status: "ACTIVE" },
-                  { status: "ALIAS", aliasExpiresAt: { gt: new Date() } },
-                ],
+                OR: [{ status: "ACTIVE" }, liveAliasWhere()],
               }
             : { status: LIVE }),
         },
@@ -139,10 +152,11 @@ export async function renamePlatformSubdomain(
   tx: TPrismaOrTransaction,
   input: { companyId: string; label: string; createdById: string },
 ) {
-  const hostname = hostnameFor(input.label);
   const current = await tx.companyDomain.findFirst({
     where: { companyId: input.companyId, isPrimary: true },
   });
+  if (current?.kind === "CUSTOM") throw new PlatformRenameBlockedError();
+  const hostname = hostnameFor(input.label);
   if (current?.hostname === hostname) return { hostname };
   await tx.companyDomain.updateMany({
     where: { companyId: input.companyId, isPrimary: true, kind: "PLATFORM" },
@@ -157,8 +171,7 @@ export async function renamePlatformSubdomain(
     where: {
       companyId: input.companyId,
       hostname,
-      status: "ALIAS",
-      aliasExpiresAt: { gt: new Date() },
+      ...liveAliasWhere(),
     },
     data: { status: "ACTIVE", isPrimary: true, aliasExpiresAt: null },
   });
@@ -237,10 +250,7 @@ export async function resolveHostname(
   const row = await globalDb.companyDomain.findFirst({
     where: {
       hostname,
-      OR: [
-        { status: "ACTIVE" },
-        { status: "ALIAS", aliasExpiresAt: { gt: new Date() } },
-      ],
+      OR: [{ status: "ACTIVE" }, liveAliasWhere()],
     },
     select: {
       companyId: true,

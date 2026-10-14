@@ -6,6 +6,7 @@ import {
   InvalidLabelError,
   hostnameFor,
   isLabelAvailable,
+  liveAliasWhere,
   renamePlatformSubdomain,
   suggestAvailableLabel,
 } from "@/server/domains/registry";
@@ -36,8 +37,7 @@ async function availability(
       where: {
         companyId: ownCompanyId,
         hostname: hostnameFor(label),
-        status: "ALIAS",
-        aliasExpiresAt: { gt: new Date() },
+        ...liveAliasWhere(),
       },
     }));
   if (own || (await isLabelAvailable(db, label)))
@@ -79,10 +79,7 @@ export const domainRouter = createTRPCRouter({
     const rows = await ctx.tenant.db.companyDomain.findMany({
       where: {
         companyId,
-        OR: [
-          { isPrimary: true, status: "ACTIVE" },
-          { status: "ALIAS", aliasExpiresAt: { gt: new Date() } },
-        ],
+        OR: [{ isPrimary: true, status: "ACTIVE" }, liveAliasWhere()],
       },
       select: {
         hostname: true,

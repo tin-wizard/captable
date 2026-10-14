@@ -1292,6 +1292,7 @@ enum DomainKind {
 }
 
 enum DomainStatus {
+  PENDING
   ACTIVE
   ALIAS
   RELEASED
@@ -1299,18 +1300,21 @@ enum DomainStatus {
 
 // Partial unique indexes live in migration 20261012000000_company_domains; delete any generated DROP of them.
 model CompanyDomain {
-  id             String       @id @default(cuid())
-  companyId      String
-  hostname       String
-  kind           DomainKind
-  status         DomainStatus
-  isPrimary      Boolean      @default(false)
-  aliasExpiresAt DateTime?
-  createdById    String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  releasedAt     DateTime?
-  company        Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id                String       @id @default(cuid())
+  companyId         String
+  hostname          String
+  kind              DomainKind
+  status            DomainStatus
+  isPrimary         Boolean      @default(false)
+  aliasExpiresAt    DateTime?
+  createdById       String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  releasedAt        DateTime?
+  // CUSTOM rows: TXT challenge value, and when DNS proved ownership
+  verificationToken String?
+  verifiedAt        DateTime?
+  company           Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
   @@index([hostname])
