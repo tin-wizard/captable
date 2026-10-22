@@ -34,15 +34,15 @@ h3,
     --primary: 215 49% 33%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 14% 97%;
+    --secondary: 216 22% 93%;
     --secondary-foreground: 210 14% 9%;
 
     --muted: 210 14% 97%;
     --muted-foreground: 213 8% 43%;
 
-    /* accent is the hover/selected surface in shadcn (bg-accent), so it is the
-       subtle surface, not the steel blue, to keep text readable */
-    --accent: 210 14% 97%;
+    /* accent and secondary are the hover/active surface (about #e9ecf0), one step
+       darker than --muted, not the steel blue, to keep text readable */
+    --accent: 216 22% 93%;
     --accent-foreground: 210 14% 9%;
 
     --destructive: 0 84.2% 60.2%;
