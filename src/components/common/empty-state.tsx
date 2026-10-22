@@ -31,26 +31,30 @@ const EmptyState = ({
   return (
     <div role="alert" className="overflow-hidden">
       <div className="container mx-auto px-4">
-        <div
-          className={cn(
-            bordered && "rounded-lg border",
-            "bg-white px-6 shadow-sm",
-          )}
-        >
-          <div className="mx-auto w-full max-w-2xl py-16 text-center">
+        <div className={cn(bordered && "rounded-lg border", "bg-card px-6")}>
+          <div className="mx-auto w-full max-w-md py-10 text-center">
             <div
               className={cn(
-                "mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full",
+                "mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg",
                 error ? "bg-rose-100" : "bg-muted",
               )}
             >
-              <span className={cn(error ? "text-rose-500" : "text-primary")}>
+              <span
+                className={cn(
+                  "[&_svg]:h-5 [&_svg]:w-5",
+                  error ? "text-rose-500" : "text-primary",
+                )}
+              >
                 {icon}
               </span>
             </div>
 
-            {title && <h3 className="mb-5 text-3xl font-semibold">{title}</h3>}
-            <p className="mb-6">{subtitle}</p>
+            {title && (
+              <h3 className="mb-2 text-base font-semibold tracking-tight">
+                {title}
+              </h3>
+            )}
+            <p className="mb-5 text-sm text-muted-foreground">{subtitle}</p>
             {children}
           </div>
         </div>
