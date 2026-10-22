@@ -220,13 +220,13 @@ export const columns: ColumnDef<Safe[number]>[] = [
                     className="mx-3 cursor-pointer text-muted-foreground hover:text-primary/80"
                   />
                   {doc.name.slice(0, 12)}
-                  <p className="mx-4 rounded-full bg-slate-100 text-xs text-slate-500">
+                  <p className="mx-4 rounded-full bg-muted text-xs text-muted-foreground">
                     {doc?.uploader?.user.name}
                   </p>
                 </DropdownMenuItem>
               ))
             ) : (
-              <p className="mx-2 rounded-full py-2 text-xs text-slate-500">
+              <p className="mx-2 rounded-full py-2 text-xs text-muted-foreground">
                 No documents found.
               </p>
             )}

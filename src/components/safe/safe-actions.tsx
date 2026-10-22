@@ -21,7 +21,7 @@ export function SafeActions() {
           <li>
             <Button
               variant="link"
-              className="hover:no-underline hover:text-gray-700"
+              className="hover:no-underline hover:text-foreground"
               size="sm"
               type="submit"
               onClick={() => {
@@ -39,7 +39,7 @@ export function SafeActions() {
           <li>
             <Button
               variant="link"
-              className="hover:no-underline hover:text-gray-900"
+              className="hover:no-underline hover:text-foreground"
               size="sm"
               type="submit"
               onClick={() => {
