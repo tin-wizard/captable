@@ -16,7 +16,7 @@ export function NavBar({ publicId, companies, canonicalOrigin }: SideBarProps) {
   const canonicalHost = enabled ? host : null;
   return (
     <div className="sticky top-0 z-50 w-full border-b">
-      <header className="flex h-14 items-center bg-gray-50 px-4 lg:px-8">
+      <header className="flex h-12 items-center bg-background px-4 lg:px-8">
         <div className="flex w-full items-center justify-between">
           <MobileDrawer
             publicId={publicId}

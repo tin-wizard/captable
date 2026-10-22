@@ -193,11 +193,11 @@ export function CommandMenu({ companyPublicId }: CommandMenuProps) {
     <div className={cn("ml-8 hidden flex-1 gap-x-6 md:flex md:justify-center")}>
       <Button
         variant="outline"
-        className="flex w-80 items-center justify-between rounded text-muted-foreground"
+        className="flex h-8 w-80 items-center justify-between rounded bg-background font-normal text-muted-foreground"
         onClick={() => setOpen((s) => !s)}
       >
         <div className="flex items-center">
-          <RiSearchLine className="mr-2 h-5 w-5" />
+          <RiSearchLine className="mr-2 h-4 w-4" />
           <span>Type a command or search</span>
         </div>
         <Kbd>
@@ -233,13 +233,13 @@ export function CommandMenu({ companyPublicId }: CommandMenuProps) {
               >
                 <div
                   className={cn(
-                    "rounded-lg p-0.5",
-                    page.id === "ai" ? "bg-navy-100" : "bg-gray-200",
+                    "rounded p-0.5",
+                    page.id === "ai" ? "bg-primary/10" : "bg-secondary",
                   )}
                 >
                   {page.id === "ai" ? (
                     <page.icon
-                      className="h-4 w-4 p-0.5 text-navy-600"
+                      className="h-4 w-4 p-0.5 text-primary"
                       aria-hidden="true"
                     />
                   ) : (
