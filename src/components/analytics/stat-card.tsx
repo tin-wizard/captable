@@ -106,7 +106,7 @@ export const StatCard = ({
       </div>
       <div className="flex min-w-0 items-end justify-between gap-3">
         <div className="min-w-0">
-          <div className="min-w-0 truncate text-[28px] font-medium leading-tight max-sm:text-xl tabular-nums tracking-tight">
+          <div className="min-w-0 truncate font-serif text-[36px] font-medium leading-tight max-sm:text-2xl tabular-nums tracking-tight">
             {value}
           </div>
           {delta && (

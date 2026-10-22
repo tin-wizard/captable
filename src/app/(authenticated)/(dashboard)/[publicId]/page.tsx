@@ -30,7 +30,9 @@ const OverviewPage = async (props: {
   return (
     <>
       <header>
-        <h3 className="font-medium">Overview</h3>
+        <h3 className="font-serif text-[32px] font-medium leading-tight">
+          Overview
+        </h3>
         <p className="text-sm text-muted-foreground">
           Ownership, activity and what needs your attention
         </p>
