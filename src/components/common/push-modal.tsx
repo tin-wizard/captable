@@ -45,7 +45,7 @@ const Modal = ({
           scrollable ? "overflow-scroll" : "",
         )}
       >
-        <header className="border-b border-gray-200 p-5">
+        <header className="border-b border-border p-5">
           <div className="">
             <DialogHeader>
               <div className="flex justify-center">
@@ -61,7 +61,7 @@ const Modal = ({
           </div>
         </header>
 
-        <section className=" bg-gray-100 px-8 py-5">
+        <section className=" bg-muted px-8 py-5">
           <div className="">{children}</div>
         </section>
       </div>

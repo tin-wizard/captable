@@ -50,7 +50,7 @@ export const OptionalMessageModal = ({
           <FormItem>
             <FormLabel>
               Message
-              <span className="text-xs text-gray-400"> (Optional)</span>
+              <span className="text-xs text-muted-foreground"> (Optional)</span>
             </FormLabel>
             <FormControl>
               <Textarea
@@ -72,7 +72,7 @@ export const OptionalMessageModal = ({
           Send for signatures
         </Button>
       </div>
-      <p className="py-1 text-center text-xs text-gray-500">
+      <p className="py-1 text-center text-xs text-muted-foreground">
         We{`'`}ll send your recipients an email with a link to complete and sign
         the document.
       </p>

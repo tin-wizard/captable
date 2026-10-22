@@ -55,7 +55,7 @@ const Folders = ({ companyPublicId, folders, stats = {} }: FolderProps) => {
             >
               <Link
                 href={`/${companyPublicId}/documents/data-rooms/${folder.publicId}`}
-                className="col-span-1 flex cursor-pointer rounded-md shadow-sm hover:shadow-lg"
+                className="col-span-1 flex cursor-pointer rounded-md shadow-sm"
               >
                 <div
                   className={cn(
@@ -67,12 +67,12 @@ const Folders = ({ companyPublicId, folders, stats = {} }: FolderProps) => {
                     aria-hidden="true"
                   />
                 </div>
-                <div className="flex flex-1 items-center justify-between truncate rounded-r-md border-y border-r border-gray-200 bg-white">
+                <div className="flex flex-1 items-center justify-between truncate rounded-r-md border-y border-r border-border bg-card">
                   <div className="flex-1 truncate px-4 py-2 text-sm">
-                    <span className="font-medium text-gray-900 hover:text-gray-600">
+                    <span className="font-medium text-foreground hover:text-muted-foreground">
                       {folder.name}
                     </span>
-                    <p className="text-gray-500">
+                    <p className="text-muted-foreground">
                       {folder._count.documents === 1
                         ? `${folder._count.documents} file`
                         : `${folder._count.documents} files`}
@@ -81,7 +81,7 @@ const Folders = ({ companyPublicId, folders, stats = {} }: FolderProps) => {
                   <div className="flex-shrink-0 pr-2">
                     <button
                       type="button"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-transparent bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-transparent focus:ring-offset-2"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-transparent bg-card text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-transparent focus:ring-offset-2"
                     >
                       <span className="sr-only">Open options</span>
                       <MoreIcon className="h-5 w-5" aria-hidden="true" />
@@ -90,7 +90,7 @@ const Folders = ({ companyPublicId, folders, stats = {} }: FolderProps) => {
                 </div>
               </Link>
               {stats[folder.id] && (
-                <div className="rounded-b-md border-x border-b border-gray-200 bg-white">
+                <div className="rounded-b-md border-x border-b border-border bg-card">
                   <RoomStats stats={stats[folder.id] as DocumentsSummaryItem} />
                 </div>
               )}

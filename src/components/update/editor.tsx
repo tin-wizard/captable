@@ -281,7 +281,7 @@ const UpdatesEditor = ({
               name="title"
               required
               type="text"
-              className="h4 min-w-[300px] bg-transparent px-2 text-gray-800 outline-none focus:ring-0	focus:ring-offset-0"
+              className="h4 min-w-[300px] bg-transparent px-2 text-foreground outline-none focus:ring-0	focus:ring-offset-0"
               placeholder={`Investor update - ${formattedDate}`}
               defaultValue={title}
               onChange={(e) => {

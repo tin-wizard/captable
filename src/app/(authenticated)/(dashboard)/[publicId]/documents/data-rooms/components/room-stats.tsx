@@ -6,10 +6,10 @@ import type { DocumentsSummaryItem } from "@/server/analytics/document";
 // The numbers under a room's name on the list: who looked, for how long, when,
 // and how many recipients have not opened it yet.
 export const RoomStats = ({ stats }: { stats: DocumentsSummaryItem }) => (
-  <div className="flex items-center justify-between gap-3 border-t px-4 py-2 text-xs text-gray-500">
+  <div className="flex items-center justify-between gap-3 border-t px-4 py-2 text-xs text-muted-foreground">
     <div className="min-w-0">
       <p className="truncate">
-        <span className="font-medium text-gray-900">{stats.viewers}</span>{" "}
+        <span className="font-medium text-foreground">{stats.viewers}</span>{" "}
         viewer{stats.viewers === 1 ? "" : "s"} ·{" "}
         {formatDuration(stats.avgActiveSeconds)} avg ·{" "}
         {stats.lastViewedAt
