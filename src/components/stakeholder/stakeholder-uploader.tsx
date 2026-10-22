@@ -57,7 +57,7 @@ const StakeholderUploader = () => {
           href="/sample/csv/captable-stakeholders-template.csv"
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded bg-secondary px-2 py-1 text-xs font-medium hover:bg-accent"
+          className="rounded bg-secondary px-2 py-1 text-xs font-medium hover:bg-secondary/70"
         >
           <span className="mr-1">sample csv file</span>
           <span aria-hidden="true"> &darr;</span>

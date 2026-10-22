@@ -55,7 +55,7 @@ const Folders = ({ companyPublicId, folders, stats = {} }: FolderProps) => {
             >
               <Link
                 href={`/${companyPublicId}/documents/data-rooms/${folder.publicId}`}
-                className="col-span-1 flex cursor-pointer rounded-md shadow-sm"
+                className="group col-span-1 flex cursor-pointer rounded-md shadow-sm"
               >
                 <div
                   className={cn(
@@ -67,7 +67,7 @@ const Folders = ({ companyPublicId, folders, stats = {} }: FolderProps) => {
                     aria-hidden="true"
                   />
                 </div>
-                <div className="flex flex-1 items-center justify-between truncate rounded-r-md border-y border-r border-border bg-card">
+                <div className="flex flex-1 items-center justify-between truncate rounded-r-md border-y border-r border-border bg-card transition-colors group-hover:bg-muted">
                   <div className="flex-1 truncate px-4 py-2 text-sm">
                     <span className="font-medium text-foreground hover:text-muted-foreground">
                       {folder.name}
@@ -81,7 +81,7 @@ const Folders = ({ companyPublicId, folders, stats = {} }: FolderProps) => {
                   <div className="flex-shrink-0 pr-2">
                     <button
                       type="button"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-transparent bg-card text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-transparent focus:ring-offset-2"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-card text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-transparent focus:ring-offset-2"
                     >
                       <span className="sr-only">Open options</span>
                       <MoreIcon className="h-5 w-5" aria-hidden="true" />

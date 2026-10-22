@@ -32,7 +32,7 @@ const Tldr = ({ message, cta }: TldrProps) => {
                   href={cta.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded bg-secondary px-2 py-1.5 text-xs font-medium text-primary hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-muted"
+                  className="rounded border bg-secondary px-2 py-1.5 text-xs font-medium text-primary hover:bg-secondary/70 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-muted"
                 >
                   <span className="mr-1">{cta.label}</span>
                   <span aria-hidden="true"> &rarr;</span>
