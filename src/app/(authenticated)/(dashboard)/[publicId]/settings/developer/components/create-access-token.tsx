@@ -83,7 +83,7 @@ const CreateAccessToken = () => {
               {accessToken}
             </code>
           </Card>
-          <span className="text-xs text-gray-700">
+          <span className="text-xs text-muted-foreground">
             Click the access token above to copy
           </span>
         </Fragment>

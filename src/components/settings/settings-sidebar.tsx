@@ -127,7 +127,7 @@ export function SettingsSidebar({
         );
       })}
 
-      <div className="mt-3 text-xs font-semibold leading-6 text-gray-400">
+      <div className="mt-3 text-xs font-semibold leading-6 text-muted-foreground">
         Account
       </div>
 
