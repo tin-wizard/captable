@@ -80,12 +80,12 @@ export const StatCard = ({
   const body = (
     <Card
       className={cn(
-        "flex h-full flex-col justify-between gap-2 p-4",
-        href && "transition-colors hover:bg-muted/40",
+        "flex h-full flex-col justify-between gap-2 px-[18px] py-4",
+        href && "transition-colors hover:bg-muted",
         className,
       )}
     >
-      <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
         <span>{label}</span>
         {hint && (
           <TooltipProvider delayDuration={100}>
@@ -106,7 +106,9 @@ export const StatCard = ({
       </div>
       <div className="flex items-end justify-between gap-3">
         <div>
-          <div className="text-2xl font-semibold tracking-tight">{value}</div>
+          <div className="text-[28px] font-medium leading-tight tabular-nums tracking-tight">
+            {value}
+          </div>
           {delta && (
             <div
               className={cn(

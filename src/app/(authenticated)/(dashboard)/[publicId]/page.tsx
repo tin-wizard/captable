@@ -39,7 +39,7 @@ const OverviewPage = async (props: {
       {holdings && (
         <section
           aria-label="Key numbers"
-          className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4"
+          className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded border bg-border lg:grid-cols-4 [&>*>*]:rounded-none [&>*>*]:border-0"
         >
           <StatCard
             label="Issued shares"
@@ -82,7 +82,7 @@ const OverviewPage = async (props: {
           {engagement && (
             <section
               aria-label="This week"
-              className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+              className="grid grid-cols-1 divide-y overflow-hidden rounded border sm:grid-cols-3 sm:divide-x sm:divide-y-0 [&>*>*]:rounded-none [&>*>*]:border-0"
             >
               <StatCard
                 label="Views this week"
@@ -117,7 +117,10 @@ const OverviewPage = async (props: {
         <div className="lg:col-span-4">
           {stakeholders !== null && (
             <p className="mb-4 text-sm text-muted-foreground">
-              <Link href={`${base}/stakeholders`} className="underline">
+              <Link
+                href={`${base}/stakeholders`}
+                className="text-primary underline underline-offset-2"
+              >
                 {formatCount(stakeholders)} stakeholder
                 {stakeholders === 1 ? "" : "s"}
               </Link>
@@ -126,7 +129,7 @@ const OverviewPage = async (props: {
           )}
           <ActivitiesCard
             publicId={publicId}
-            className="border-none bg-transparent shadow-none"
+            className="rounded border bg-card"
           />
         </div>
       </div>

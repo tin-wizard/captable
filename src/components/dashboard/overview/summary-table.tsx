@@ -36,7 +36,7 @@ export const SummaryTable = ({ rows }: { rows: Row[] }) => {
   const totalValue = rows.reduce((n, r) => n + r.issuedValue, 0);
 
   return (
-    <Card className="mt-4 overflow-x-auto">
+    <Card className="mt-4 overflow-x-auto tabular-nums">
       <Table>
         <TableHeader>
           <TableRow>
@@ -49,7 +49,7 @@ export const SummaryTable = ({ rows }: { rows: Row[] }) => {
         </TableHeader>
         <TableBody>
           {rows.map((r) => (
-            <TableRow key={r.shareClassId} className="border-none">
+            <TableRow key={r.shareClassId}>
               <TableCell className="font-medium">{r.name}</TableCell>
               <TableCell>{formatCompact(r.authorized)}</TableCell>
               <TableCell>{formatCount(r.shares)}</TableCell>
