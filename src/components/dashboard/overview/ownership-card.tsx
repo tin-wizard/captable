@@ -13,8 +13,8 @@ import { useState } from "react";
 
 type Slice = { name: string; shares: number; pct: number };
 
-// Ownership of issued shares, by share class or by stakeholder. Every slice is
-// also listed next to the chart, so the values never depend on colour.
+// Ownership of issued shares, by share class or by stakeholder; each row shows
+// its percentage as text next to the bar, so values never depend on colour.
 export const OwnershipCard = ({
   byClass,
   byStakeholder,
@@ -81,7 +81,10 @@ export const OwnershipCard = ({
           <TableBody>
             {slices.map((s) => (
               <TableRow key={s.name}>
-                <TableCell className="max-w-[16rem] truncate px-4 py-[11px] font-medium">
+                <TableCell
+                  title={s.name}
+                  className="max-w-[16rem] truncate px-4 py-[11px] font-medium"
+                >
                   {s.name}
                 </TableCell>
                 <TableCell className="px-4 py-[11px] text-right tabular-nums">
@@ -95,7 +98,7 @@ export const OwnershipCard = ({
                     <span
                       className="block h-1.5 rounded-[1px] bg-primary/85"
                       style={{
-                        width: `${Math.min(100, Math.max(0, s.pct * 100))}%`,
+                        width: `${Math.max(2, Math.min(100, s.pct * 100))}%`,
                       }}
                     />
                   </span>
