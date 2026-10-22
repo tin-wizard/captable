@@ -138,7 +138,7 @@ export const StatCard = ({
             index="index"
             categories={["value"]}
             colors={["blue"]}
-            className="h-9 w-24 shrink-0"
+            className="h-9 w-24 shrink-0 max-sm:w-12"
             aria-hidden
           />
         )}
