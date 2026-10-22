@@ -32,16 +32,16 @@ export const ChartCard = ({
   className,
 }: Props) => (
   <Card className={className} aria-busy={state === "loading"}>
-    <div className="flex items-start justify-between gap-3 p-4 pb-2">
+    <div className="flex items-start justify-between gap-3 border-b px-4 py-3">
       <div>
-        <h3 className="text-sm font-semibold">{title}</h3>
+        <h3 className="text-[13.5px] font-semibold">{title}</h3>
         {description && (
           <p className="text-xs text-muted-foreground">{description}</p>
         )}
       </div>
       {actions}
     </div>
-    <div className="p-4 pt-2">
+    <div className="p-4">
       {state === "loading" && (
         <div className="h-48 animate-pulse rounded bg-muted/60" />
       )}

@@ -83,7 +83,7 @@ const EquityPlanTable = ({
                     <Tldr message="Equity plans are used to distribute ownership of your company using stock options, RSUs, and other instruments among employees and stakeholders." />
                   }
                   trigger={
-                    <RiEqualizer2Line className="h-5 w-5 cursor-pointer text-gray-500 hover:text-gray-700" />
+                    <RiEqualizer2Line className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground" />
                   }
                 />
               </TableCell>

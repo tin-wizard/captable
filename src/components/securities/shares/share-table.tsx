@@ -78,9 +78,9 @@ const StatusColorProvider = (type: string) => {
     case "DRAFT":
       return "bg-yellow-50 text-yellow-600 ring-yellow-600/20";
     case "SIGNED":
-      return "bg-blue-50 text-blue-600 ring-blue-600/20";
+      return "bg-muted text-primary ring-primary/20";
     case "PENDING":
-      return "bg-gray-50 text-gray-600 ring-gray-600/20";
+      return "bg-muted text-muted-foreground ring-border";
     default:
       return "";
   }
@@ -277,7 +277,7 @@ export const columns: ColumnDef<Share[number]>[] = [
                   className="mx-3 cursor-pointer text-muted-foreground hover:text-primary/80"
                 />
                 {doc.name.slice(0, 12)}
-                <p className="mx-4 rounded-full bg-slate-100 text-xs text-slate-500">
+                <p className="mx-4 rounded-full bg-muted text-xs text-muted-foreground">
                   {doc?.uploader?.user?.name}
                 </p>
               </DropdownMenuItem>

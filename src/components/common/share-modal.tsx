@@ -105,7 +105,7 @@ const Share = ({
               placeholder="Search stakeholders, members or add email addresses"
               creatable
               emptyIndicator={
-                <p className="text-center text-sm leading-10 text-gray-600 dark:text-gray-400">
+                <p className="text-center text-sm leading-10 text-muted-foreground">
                   No results found!
                 </p>
               }

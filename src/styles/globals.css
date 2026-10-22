@@ -21,67 +21,68 @@ h3,
 
 @layer base {
   :root {
-    /* TIN-inspired palette (tin.info): navy ink and primary, orange focus
-       accent, a faintly blue background. Shifted slightly from TIN's exact values. */
-    --background: 220 33% 99%;
-    --foreground: 220 52% 14%;
+    /* Swiss institutional: white ground, graphite text, one steel blue, hairline borders. */
+    --background: 0 0% 100%;
+    --foreground: 210 14% 9%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 52% 14%;
+    --card-foreground: 210 14% 9%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 52% 14%;
+    --popover-foreground: 210 14% 9%;
 
-    --primary: 219 54% 28%;
+    --primary: 215 49% 33%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 217 42% 94%;
-    --secondary-foreground: 219 54% 24%;
+    --secondary: 216 22% 93%;
+    --secondary-foreground: 210 14% 9%;
 
-    --muted: 217 33% 96%;
-    --muted-foreground: 218 18% 44%;
+    --muted: 210 14% 97%;
+    --muted-foreground: 213 8% 43%;
 
-    --accent: 217 42% 94%;
-    --accent-foreground: 219 54% 24%;
+    /* accent and secondary are the hover/active surface (about #e9ecf0), one step
+       darker than --muted, not the steel blue, to keep text readable */
+    --accent: 216 22% 93%;
+    --accent-foreground: 210 14% 9%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 217 30% 88%;
-    --input: 217 30% 88%;
-    --ring: 19 86% 55%;
+    --border: 216 11% 90%;
+    --input: 216 11% 90%;
+    --ring: 215 49% 33%;
 
-    --radius: 0.5rem;
+    --radius: 0.25rem;
   }
 
   .dark {
-    --background: 221 58% 9%;
-    --foreground: 216 50% 96%;
+    --background: 210 14% 8%;
+    --foreground: 210 14% 96%;
 
-    --card: 221 52% 11%;
-    --card-foreground: 216 50% 96%;
+    --card: 210 14% 10%;
+    --card-foreground: 210 14% 96%;
 
-    --popover: 221 52% 11%;
-    --popover-foreground: 216 50% 96%;
+    --popover: 210 14% 10%;
+    --popover-foreground: 210 14% 96%;
 
-    --primary: 218 58% 62%;
-    --primary-foreground: 221 58% 9%;
+    --primary: 215 55% 68%;
+    --primary-foreground: 210 14% 8%;
 
-    --secondary: 220 42% 17%;
-    --secondary-foreground: 216 50% 96%;
+    --secondary: 210 10% 14%;
+    --secondary-foreground: 210 14% 96%;
 
-    --muted: 220 42% 17%;
-    --muted-foreground: 218 30% 72%;
+    --muted: 210 10% 14%;
+    --muted-foreground: 213 8% 65%;
 
-    --accent: 220 42% 17%;
-    --accent-foreground: 216 50% 96%;
+    --accent: 210 10% 14%;
+    --accent-foreground: 210 14% 96%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 220 38% 20%;
-    --input: 220 38% 20%;
-    --ring: 19 86% 60%;
+    --border: 210 10% 20%;
+    --input: 210 10% 20%;
+    --ring: 215 55% 68%;
   }
 }
 
@@ -96,22 +97,22 @@ h3,
 
   h1,
   .h1 {
-    @apply text-5xl sm:text-6xl;
+    @apply text-3xl;
   }
 
   h2,
   h2 {
-    @apply text-4xl sm:text-5xl;
+    @apply text-2xl;
   }
 
   h3,
   .h3 {
-    @apply text-2xl font-medium sm:text-3xl;
+    @apply text-2xl font-semibold tracking-tight;
   }
 
   h4,
   .h4 {
-    @apply text-lg font-medium sm:text-xl;
+    @apply text-base font-semibold;
   }
 }
 
@@ -122,6 +123,10 @@ h3,
 }
 
 @layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
   /* Hide scrollbar for Chrome, Safari and Opera */
   .no-scrollbar::-webkit-scrollbar {
     display: none;

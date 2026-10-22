@@ -176,7 +176,7 @@ function RoleForm(props: FormProps) {
                     <Input {...field} />
                   </FormControl>
 
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-muted-foreground">
                     The name of the role, eg. "Billing", "Investor", "Employee"
                   </span>
 

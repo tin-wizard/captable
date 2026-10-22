@@ -20,13 +20,13 @@ const ActivityCard = async ({ className, publicId }: Props) => {
 
   return (
     <Card className={className}>
-      <CardHeader className="pt-0">
-        <CardDescription className="text-md font-semibold text-primary">
+      <CardHeader className="space-y-0 border-b px-4 py-3">
+        <CardDescription className="text-[13.5px] font-semibold text-foreground">
           Activities
         </CardDescription>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="p-4">
         {activity.data.length ? (
           <>
             <ul className="-mb-8">
@@ -34,7 +34,7 @@ const ActivityCard = async ({ className, publicId }: Props) => {
                 <li key={activityItem.id} className="group">
                   <div className="relative pb-8">
                     <span
-                      className="absolute left-5 top-5 -ml-px h-full w-0.5 bg-gray-200 group-last:hidden"
+                      className="absolute left-5 top-5 -ml-px h-full w-px bg-border group-last:hidden"
                       aria-hidden="true"
                     />
 
@@ -42,17 +42,17 @@ const ActivityCard = async ({ className, publicId }: Props) => {
                       <>
                         <div>
                           <div className="relative px-1">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-100 ring-8 ring-white">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted ring-8 ring-card">
                               <RiAccountCircleFill
-                                className="h-5 w-5 text-navy-500"
+                                className="h-5 w-5 text-muted-foreground"
                                 aria-hidden="true"
                               />
                             </div>
                           </div>
                         </div>
                         <div className="min-w-0 flex-1 py-1.5">
-                          <div className="text-sm text-gray-500">
-                            <span className="font-medium text-primary/80">
+                          <div className="text-sm text-muted-foreground">
+                            <span className="font-medium text-foreground">
                               {activityItem.summary}
                             </span>{" "}
                             <br />
@@ -71,7 +71,7 @@ const ActivityCard = async ({ className, publicId }: Props) => {
             <div className="mt-6">
               <Link
                 href={`/${publicId}/audits`}
-                className="flex w-full items-center justify-center rounded-md border border-gray-300 bg-white py-1 text-sm text-primary/85 hover:bg-gray-50"
+                className="flex w-full items-center justify-center rounded border bg-card py-1.5 text-sm text-primary hover:bg-muted"
               >
                 View all activity
               </Link>

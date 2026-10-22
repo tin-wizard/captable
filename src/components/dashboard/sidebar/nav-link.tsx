@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { type RiHome4Line } from "@remixicon/react";
+import type { RiHome4Line } from "@remixicon/react";
 import Link from "next/link";
 
 type Icon = typeof RiHome4Line;
@@ -23,9 +23,9 @@ export function NavLink({ active, href, icon, name, className }: NavLinkProps) {
           className={cn(
             className,
             active
-              ? "bg-gray-50 font-semibold text-primary"
-              : "text-gray-700 hover:bg-gray-50 hover:text-primary",
-            "group flex gap-x-3 rounded-md p-1 text-sm leading-6",
+              ? "bg-secondary font-semibold text-foreground"
+              : "text-foreground/80 hover:bg-secondary hover:text-foreground",
+            "group flex gap-x-2.5 rounded px-2.5 py-1.5 text-[13.5px] leading-5",
           )}
         >
           {Icon && (
@@ -33,8 +33,8 @@ export function NavLink({ active, href, icon, name, className }: NavLinkProps) {
               className={cn(
                 active
                   ? "text-primary"
-                  : "text-gray-400 group-hover:text-primary",
-                "h-6 w-6 shrink-0",
+                  : "text-muted-foreground group-hover:text-foreground",
+                "h-4 w-4 shrink-0",
               )}
               aria-hidden="true"
             />
@@ -42,13 +42,14 @@ export function NavLink({ active, href, icon, name, className }: NavLinkProps) {
           {name}
         </Link>
       ) : (
+        // biome-ignore lint/a11y/useButtonType: pre-existing, design-only change
         <button
           className={cn(
             className,
             active
-              ? "bg-gray-50 font-semibold text-primary"
-              : "text-gray-700 hover:bg-gray-50 hover:text-primary",
-            "group flex gap-x-3 rounded-md p-2 text-sm leading-6",
+              ? "bg-secondary font-semibold text-foreground"
+              : "text-foreground/80 hover:bg-secondary hover:text-foreground",
+            "group flex gap-x-2.5 rounded px-2.5 py-2.5 text-[13.5px] leading-5",
           )}
         >
           {Icon && (
@@ -56,8 +57,8 @@ export function NavLink({ active, href, icon, name, className }: NavLinkProps) {
               className={cn(
                 active
                   ? "text-primary"
-                  : "text-gray-400 group-hover:text-primary",
-                "h-6 w-6 shrink-0",
+                  : "text-muted-foreground group-hover:text-foreground",
+                "h-4 w-4 shrink-0",
               )}
               aria-hidden="true"
             />

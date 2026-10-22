@@ -222,7 +222,7 @@ export const TeamMemberModal = ({
             {rest.isEditMode === true ? "Update team member" : "Send an invite"}
           </Button>
 
-          <p className="text-center text-xs text-gray-500">
+          <p className="text-center text-xs text-muted-foreground">
             We{`'`}ll send an email to your team member with a link to create an
             account.
           </p>

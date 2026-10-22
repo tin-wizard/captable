@@ -219,7 +219,7 @@ export const ProfileSettings = ({ memberProfile }: ProfileType) => {
                   onChange={handleFileChangeAndUpload}
                   ref={fileInputRef}
                 />
-                <p className="mt-2 text-xs text-gray-700">
+                <p className="mt-2 text-xs text-muted-foreground">
                   JPG, GIF or PNG. 1MB max.
                 </p>
               </div>

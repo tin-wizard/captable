@@ -68,7 +68,7 @@ const TeamMemberUploader = ({ setOpen }: TeamMemberUploaderType) => {
           href="/sample-csv/captable-team-members-template.csv"
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded bg-gray-300/70 px-2 py-1 text-xs font-medium hover:bg-gray-400/50"
+          className="rounded bg-secondary px-2 py-1 text-xs font-medium hover:bg-secondary/70"
         >
           <span className="mr-1">sample csv file</span>
           <span aria-hidden="true"> &darr;</span>
@@ -78,7 +78,7 @@ const TeamMemberUploader = ({ setOpen }: TeamMemberUploaderType) => {
 
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: <explanation> */}
       <div
-        className="flex h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-gray-300"
+        className="flex h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-border"
         onClick={() => fileInputRef.current?.click()}
       >
         <RiUploadLine className="h-7 w-7 text-neutral-500" />
@@ -99,7 +99,7 @@ const TeamMemberUploader = ({ setOpen }: TeamMemberUploaderType) => {
           target="_blank"
           rel="noopener noreferrer"
           href={""}
-          className="text-navy-700 underline"
+          className="text-primary underline"
         >
           Learn more
         </Link>{" "}

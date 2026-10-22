@@ -72,7 +72,7 @@ export const Documents = () => {
           }}
         />
         {documentsList?.length ? (
-          <Alert className="mt-5 bg-navy-100" variant="default">
+          <Alert className="mt-5 bg-muted" variant="default">
             <AlertTitle>
               {documentsList.length > 1
                 ? `${documentsList.length} documents uploaded`

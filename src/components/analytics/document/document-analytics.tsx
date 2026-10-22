@@ -60,7 +60,7 @@ type Props = {
 const LABEL_STYLE = {
   hot: "bg-rose-50 text-rose-800",
   warm: "bg-amber-50 text-amber-800",
-  cold: "bg-slate-100 text-slate-700",
+  cold: "bg-muted text-muted-foreground",
 } as const;
 
 // ranges are UTC days: format them in UTC so the label matches the series

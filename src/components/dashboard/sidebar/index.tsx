@@ -215,7 +215,7 @@ export function SideBar({
       <div className={cn("pb-12", className)}>
         <div className="fixed gap-y-4 py-4">
           {/* the column is fixed, so it can't inherit the 16rem sidebar's width */}
-          <div className="w-[14.5rem] border-b border-gray-200 pb-3">
+          <div className="w-[14.5rem] border-b border-border pb-3">
             <CompanySwitcher
               companies={companies}
               publicId={publicId}
@@ -224,7 +224,7 @@ export function SideBar({
           </div>
 
           <div className="overflow-auto py-2">
-            <ul className="space-y-1">
+            <ul className="space-y-0.5">
               {navigation.map((item) => {
                 const href = basePath + item.href;
                 const isActive =
@@ -241,18 +241,18 @@ export function SideBar({
                             {isActive ? (
                               <item.activeIcon
                                 className={cn(
-                                  "ml-1 mr-1 mt-1 inline-block",
+                                  "ml-2.5 mr-0 mt-2 inline-block",
                                   "text-primary",
-                                  "h-6 w-6 shrink-0",
+                                  "h-4 w-4 shrink-0",
                                 )}
                                 aria-hidden="true"
                               />
                             ) : (
                               <item.icon
                                 className={cn(
-                                  "ml-1 mr-1 mt-1 inline-block",
-                                  "text-gray-400 group-hover:text-primary",
-                                  "h-6 w-6 shrink-0",
+                                  "ml-2.5 mr-0 mt-2 inline-block",
+                                  "text-muted-foreground group-hover:text-foreground",
+                                  "h-4 w-4 shrink-0",
                                 )}
                                 aria-hidden="true"
                               />
@@ -261,9 +261,9 @@ export function SideBar({
                             <AccordionTrigger
                               className={cn(
                                 isActive
-                                  ? "bg-gray-50 font-semibold text-primary"
-                                  : "text-gray-700 hover:bg-gray-50 hover:text-primary",
-                                "group flex gap-x-3 rounded-md px-2 py-1 text-sm leading-6 hover:no-underline",
+                                  ? "bg-secondary font-semibold text-foreground"
+                                  : "text-foreground/80 hover:bg-secondary hover:text-foreground",
+                                "group flex gap-x-2.5 rounded px-2.5 py-1.5 text-[13.5px] leading-5 hover:no-underline",
                               )}
                             >
                               {item.name}
@@ -271,7 +271,7 @@ export function SideBar({
                           </div>
 
                           <AccordionContent>
-                            <ul className="space-y-1">
+                            <ul className="space-y-0.5">
                               {item.subNav.map((subItem) => {
                                 const href =
                                   basePath + item.href + subItem.href;
@@ -311,10 +311,10 @@ export function SideBar({
             </ul>
 
             <div className="py-3">
-              <div className="text-xs font-semibold leading-6 text-gray-400">
+              <div className="px-2.5 pb-1 pt-2 text-[10.5px] font-semibold uppercase tracking-[.1em] text-muted-foreground">
                 Company
               </div>
-              <ul className="space-y-1">
+              <ul className="space-y-0.5">
                 {company.map((item) => {
                   const href = basePath + item.href;
                   const isActive =

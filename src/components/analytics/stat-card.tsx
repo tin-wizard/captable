@@ -80,12 +80,12 @@ export const StatCard = ({
   const body = (
     <Card
       className={cn(
-        "flex h-full flex-col justify-between gap-2 p-4",
-        href && "transition-colors hover:bg-muted/40",
+        "flex h-full min-w-0 flex-col justify-between gap-2 px-[18px] py-4",
+        href && "transition-colors hover:bg-muted",
         className,
       )}
     >
-      <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
         <span>{label}</span>
         {hint && (
           <TooltipProvider delayDuration={100}>
@@ -104,9 +104,11 @@ export const StatCard = ({
           </TooltipProvider>
         )}
       </div>
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <div className="text-2xl font-semibold tracking-tight">{value}</div>
+      <div className="flex min-w-0 items-end justify-between gap-3">
+        <div className="min-w-0">
+          <div className="min-w-0 truncate text-[28px] font-medium leading-tight max-sm:text-xl tabular-nums tracking-tight">
+            {value}
+          </div>
           {delta && (
             <div
               className={cn(
@@ -136,7 +138,7 @@ export const StatCard = ({
             index="index"
             categories={["value"]}
             colors={["blue"]}
-            className="h-9 w-24 shrink-0"
+            className="h-9 w-24 shrink-0 max-sm:w-12"
             aria-hidden
           />
         )}
@@ -145,11 +147,15 @@ export const StatCard = ({
   );
 
   return href ? (
-    <Link href={href} aria-label={`${label}: ${value}`} className="block">
+    <Link
+      href={href}
+      aria-label={`${label}: ${value}`}
+      className="block min-w-0"
+    >
       {body}
     </Link>
   ) : (
-    <div role="group" aria-label={`${label}: ${value}`}>
+    <div role="group" aria-label={`${label}: ${value}`} className="min-w-0">
       {body}
     </div>
   );

@@ -50,7 +50,7 @@ export const OwnershipCard = ({
         <div
           role="group"
           aria-label="Group ownership by"
-          className="inline-flex rounded-md border bg-card p-0.5 text-xs"
+          className="inline-flex rounded border bg-card p-0.5 text-xs"
         >
           {(["class", "stakeholder"] as const).map((k) => (
             <button
@@ -90,7 +90,7 @@ export const OwnershipCard = ({
                 />
                 <span className="truncate font-medium">{s.name}</span>
               </span>
-              <span className="shrink-0 text-muted-foreground">
+              <span className="shrink-0 tabular-nums text-muted-foreground">
                 {formatCompact(s.shares)} · {formatPercent(s.pct)}
               </span>
             </li>
