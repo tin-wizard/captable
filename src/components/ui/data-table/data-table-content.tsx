@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Table } from "../table";
 
 interface DataTableContentProps {
@@ -7,7 +7,7 @@ interface DataTableContentProps {
 
 export function DataTableContent({ children }: DataTableContentProps) {
   return (
-    <div className="mt-6 rounded-md border">
+    <div className="mt-6 rounded-lg border">
       <Table>{children}</Table>
     </div>
   );
