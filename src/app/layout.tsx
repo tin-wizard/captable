@@ -6,7 +6,7 @@ import { NextAuthProvider } from "@/providers/next-auth";
 import { ProgressBarProvider } from "@/providers/progress-bar";
 import { getServerComponentAuthSession } from "@/server/auth";
 import { domainConfig } from "@/server/domains/config";
-import { inter, interTight, newsreader, robotoMono } from "@/styles/fonts";
+import { inter, robotoMono } from "@/styles/fonts";
 import "@/styles/globals.css";
 import { TRPCReactProvider } from "@/trpc/react";
 import type { Metadata } from "next";
@@ -37,15 +37,7 @@ export default async function RootLayout({
   const { enabled, canonicalHost } = domainConfig();
 
   return (
-    <html
-      lang="en"
-      className={cn(
-        inter.variable,
-        interTight.variable,
-        newsreader.variable,
-        robotoMono.variable,
-      )}
-    >
+    <html lang="en" className={cn(inter.variable, robotoMono.variable)}>
       <head>
         <PublicEnvScript />
       </head>

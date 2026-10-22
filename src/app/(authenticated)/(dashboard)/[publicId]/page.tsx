@@ -30,7 +30,7 @@ const OverviewPage = async (props: {
   return (
     <>
       <header>
-        <h3 className="font-serif text-[32px] font-medium leading-tight">
+        <h3 className="text-[28px] font-semibold leading-tight tracking-[-0.015em]">
           Overview
         </h3>
         <p className="text-sm text-muted-foreground">
@@ -41,8 +41,8 @@ const OverviewPage = async (props: {
       {holdings && (
         <section
           aria-label="Key numbers"
-          // styles StatCard internals (value .font-serif, label row .gap-1); update if StatCard markup changes
-          className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded border bg-border lg:grid-cols-4 [&>*>*]:rounded-none [&>*>*]:border-0 sm:[&_.font-serif]:text-2xl [&_div.gap-1]:text-sm"
+          // styles StatCard internals (value div.truncate, label row .gap-1); update if StatCard markup changes
+          className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded border bg-border lg:grid-cols-4 [&>*>*]:rounded-none [&>*>*]:border-0 sm:[&_div.truncate]:text-2xl [&_div.gap-1]:text-sm"
         >
           <StatCard
             label="Issued shares"
@@ -85,8 +85,8 @@ const OverviewPage = async (props: {
           {engagement && (
             <section
               aria-label="This week"
-              // styles StatCard internals (value .font-serif, label row .gap-1); update if StatCard markup changes
-              className="grid grid-cols-1 divide-y overflow-hidden rounded border sm:auto-cols-fr sm:grid-flow-col sm:divide-x sm:divide-y-0 [&>*>*]:rounded-none [&>*>*]:border-0 sm:[&_.font-serif]:text-2xl [&_div.gap-1]:text-sm"
+              // styles StatCard internals (value div.truncate, label row .gap-1); update if StatCard markup changes
+              className="grid grid-cols-1 divide-y overflow-hidden rounded border sm:auto-cols-fr sm:grid-flow-col sm:divide-x sm:divide-y-0 [&>*>*]:rounded-none [&>*>*]:border-0 sm:[&_div.truncate]:text-2xl [&_div.gap-1]:text-sm"
             >
               <StatCard
                 label="Views this week"
