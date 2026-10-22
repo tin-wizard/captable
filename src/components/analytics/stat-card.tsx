@@ -80,7 +80,7 @@ export const StatCard = ({
   const body = (
     <Card
       className={cn(
-        "flex h-full flex-col justify-between gap-2 px-[18px] py-4",
+        "flex h-full min-w-0 flex-col justify-between gap-2 px-[18px] py-4",
         href && "transition-colors hover:bg-muted",
         className,
       )}
@@ -104,9 +104,9 @@ export const StatCard = ({
           </TooltipProvider>
         )}
       </div>
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <div className="text-[28px] font-medium leading-tight tabular-nums tracking-tight">
+      <div className="flex min-w-0 items-end justify-between gap-3">
+        <div className="min-w-0">
+          <div className="min-w-0 truncate text-[28px] font-medium leading-tight max-sm:text-xl tabular-nums tracking-tight">
             {value}
           </div>
           {delta && (
@@ -147,11 +147,15 @@ export const StatCard = ({
   );
 
   return href ? (
-    <Link href={href} aria-label={`${label}: ${value}`} className="block">
+    <Link
+      href={href}
+      aria-label={`${label}: ${value}`}
+      className="block min-w-0"
+    >
       {body}
     </Link>
   ) : (
-    <div role="group" aria-label={`${label}: ${value}`}>
+    <div role="group" aria-label={`${label}: ${value}`} className="min-w-0">
       {body}
     </div>
   );

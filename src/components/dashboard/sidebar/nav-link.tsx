@@ -49,7 +49,7 @@ export function NavLink({ active, href, icon, name, className }: NavLinkProps) {
             active
               ? "bg-secondary font-semibold text-foreground"
               : "text-foreground/80 hover:bg-secondary hover:text-foreground",
-            "group flex gap-x-2.5 rounded px-2.5 py-1.5 text-[13.5px] leading-5",
+            "group flex gap-x-2.5 rounded px-2.5 py-2.5 text-[13.5px] leading-5",
           )}
         >
           {Icon && (

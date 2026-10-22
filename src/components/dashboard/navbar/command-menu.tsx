@@ -193,7 +193,7 @@ export function CommandMenu({ companyPublicId }: CommandMenuProps) {
     <div className={cn("ml-8 hidden flex-1 gap-x-6 md:flex md:justify-center")}>
       <Button
         variant="outline"
-        className="flex h-8 w-80 items-center justify-between rounded bg-background font-normal text-muted-foreground"
+        className="flex w-80 items-center justify-between rounded bg-background font-normal text-muted-foreground"
         onClick={() => setOpen((s) => !s)}
       >
         <div className="flex items-center">

@@ -67,7 +67,7 @@ const Folders = ({ companyPublicId, folders, stats = {} }: FolderProps) => {
                     aria-hidden="true"
                   />
                 </div>
-                <div className="flex flex-1 items-center justify-between truncate rounded-r-md border-y border-r border-border bg-card transition-colors group-hover:bg-muted">
+                <div className="flex flex-1 items-center justify-between truncate rounded-r-md border-y border-r border-border bg-card transition-colors group-hover:bg-secondary">
                   <div className="flex-1 truncate px-4 py-2 text-sm">
                     <span className="font-medium text-foreground hover:text-muted-foreground">
                       {folder.name}

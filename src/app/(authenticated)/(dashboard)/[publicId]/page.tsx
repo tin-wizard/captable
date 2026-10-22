@@ -82,7 +82,7 @@ const OverviewPage = async (props: {
           {engagement && (
             <section
               aria-label="This week"
-              className="grid grid-cols-1 divide-y overflow-hidden rounded border sm:grid-cols-3 sm:divide-x sm:divide-y-0 [&>*>*]:rounded-none [&>*>*]:border-0"
+              className="grid grid-cols-1 divide-y overflow-hidden rounded border sm:auto-cols-fr sm:grid-flow-col sm:divide-x sm:divide-y-0 [&>*>*]:rounded-none [&>*>*]:border-0"
             >
               <StatCard
                 label="Views this week"
