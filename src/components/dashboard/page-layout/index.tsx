@@ -17,7 +17,7 @@ export function PageLayout({
     <div className="flex flex-col gap-y-5">
       <div className="flex items-center justify-between gap-y-3 ">
         <div className="gap-y-3">
-          <h3 className="font-serif text-[32px] font-medium leading-tight">
+          <h3 className="text-[28px] font-semibold leading-tight tracking-[-0.015em]">
             {title}
           </h3>
           {description && (

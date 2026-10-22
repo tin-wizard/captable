@@ -34,7 +34,7 @@ export const ChartCard = ({
   <Card className={className} aria-busy={state === "loading"}>
     <div className="flex items-start justify-between gap-3 border-b px-4 py-3">
       <div>
-        <h3 className="font-serif text-[19px] font-medium">{title}</h3>
+        <h3 className="text-[15px] font-semibold text-foreground">{title}</h3>
         {description && (
           <p className="text-xs text-muted-foreground">{description}</p>
         )}
