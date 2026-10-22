@@ -1,29 +1,20 @@
 "use client";
 
+import { ChartCard, formatCount, formatPercent } from "@/components/analytics";
 import {
-  ChartCard,
-  formatCompact,
-  formatPercent,
-} from "@/components/analytics";
-import { DonutChart } from "@tremor/react";
-import { useEffect, useState } from "react";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useState } from "react";
 
 type Slice = { name: string; shares: number; pct: number };
 
-const COLORS = [
-  "blue",
-  "orange",
-  "emerald",
-  "violet",
-  "amber",
-  "cyan",
-  "rose",
-  "indigo",
-  "slate",
-] as const;
-
-// Ownership of issued shares, by share class or by stakeholder. Every slice is
-// also listed next to the chart, so the values never depend on colour.
+// Ownership of issued shares, by share class or by stakeholder; each row shows
+// its percentage as text next to the bar, so values never depend on colour.
 export const OwnershipCard = ({
   byClass,
   byStakeholder,
@@ -32,8 +23,6 @@ export const OwnershipCard = ({
   byStakeholder: Slice[];
 }) => {
   const [by, setBy] = useState<"class" | "stakeholder">("class");
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
 
   const slices = (by === "class" ? byClass : byStakeholder).filter(
     (s) => s.shares > 0,
@@ -74,39 +63,53 @@ export const OwnershipCard = ({
         rows: slices.map((s) => [s.name, s.shares, formatPercent(s.pct)]),
       }}
     >
-      <div className="grid items-center gap-4 sm:grid-cols-2">
-        <ul className="space-y-2 text-sm">
-          {slices.map((s, i) => (
-            <li
-              key={s.name}
-              className="flex items-center justify-between gap-3"
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <span
-                  aria-hidden
-                  className={`h-2.5 w-2.5 shrink-0 rounded-full bg-${
-                    COLORS[i % COLORS.length]
-                  }-500`}
-                />
-                <span className="truncate font-medium">{s.name}</span>
-              </span>
-              <span className="shrink-0 tabular-nums text-muted-foreground">
-                {formatCompact(s.shares)} · {formatPercent(s.pct)}
-              </span>
-            </li>
-          ))}
-        </ul>
-        {mounted && (
-          <DonutChart
-            className="h-48"
-            data={slices.map((s) => ({ name: s.name, value: s.shares }))}
-            category="value"
-            index="name"
-            colors={slices.map((_, i) => COLORS[i % COLORS.length] ?? "blue")}
-            showLabel={false}
-            valueFormatter={(v) => formatCompact(v)}
-          />
-        )}
+      <div className="-m-4">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="h-auto px-4 py-2 text-xs font-medium text-muted-foreground">
+                Holder
+              </TableHead>
+              <TableHead className="h-auto px-4 py-2 text-right text-xs font-medium text-muted-foreground">
+                Shares
+              </TableHead>
+              <TableHead className="h-auto px-4 py-2 text-right text-xs font-medium text-muted-foreground">
+                Ownership
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {slices.map((s) => (
+              <TableRow key={s.name}>
+                <TableCell className="px-4 py-[11px] font-medium">
+                  <span
+                    className="block max-w-[9rem] truncate sm:max-w-[16rem]"
+                    title={s.name}
+                  >
+                    {s.name}
+                  </span>
+                </TableCell>
+                <TableCell className="px-4 py-[11px] text-right tabular-nums">
+                  {formatCount(s.shares)}
+                </TableCell>
+                <TableCell className="px-4 py-[11px] text-right tabular-nums">
+                  <span
+                    aria-hidden
+                    className="mr-2 inline-block h-1.5 w-10 align-middle sm:w-20"
+                  >
+                    <span
+                      className="block h-1.5 rounded-[1px] bg-primary/85"
+                      style={{
+                        width: `${Math.max(2, Math.min(100, s.pct * 100))}%`,
+                      }}
+                    />
+                  </span>
+                  {formatPercent(s.pct)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
     </ChartCard>
   );

@@ -22,6 +22,7 @@ const config = {
       fontFamily: {
         mono: ["var(--font-roboto-mono)", "monospace"],
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        serif: ["var(--font-newsreader)", "Georgia", "serif"],
         display: ["var(--font-inter-tight)", "var(--font-inter)", "sans-serif"],
       },
       colors: {

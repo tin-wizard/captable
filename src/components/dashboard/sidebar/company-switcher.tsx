@@ -112,7 +112,7 @@ export function CompanySwitcher({
       >
         <CompanyAvatar name={currentName ?? ""} logo={current?.company.logo} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold leading-5 text-foreground">
+          <span className="block truncate font-serif text-[15px] font-medium leading-5 text-foreground">
             <SelectValue>{currentName}</SelectValue>
           </span>
           <span className="block text-xs leading-4 text-muted-foreground">
