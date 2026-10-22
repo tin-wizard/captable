@@ -11,16 +11,16 @@ type TldrProps = {
 
 const Tldr = ({ message, cta }: TldrProps) => {
   return (
-    <div className="mt-3 rounded-md bg-navy-50 p-4 text-left">
+    <div className="mt-3 rounded-md bg-muted p-4 text-left">
       <div className="flex">
         <div className="flex-shrink-0">
           <RiInformationLine
-            className="h-5 w-5 text-navy-600"
+            className="h-5 w-5 text-primary"
             aria-hidden="true"
           />
         </div>
         <div className="ml-3">
-          <div className="text-sm text-navy-600">
+          <div className="text-sm text-primary">
             <p>{message}</p>
           </div>
 
@@ -32,7 +32,7 @@ const Tldr = ({ message, cta }: TldrProps) => {
                   href={cta.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded bg-navy-100 px-2 py-1.5 text-xs font-medium text-navy-700 hover:bg-navy-200 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:ring-offset-2 focus:ring-offset-navy-50"
+                  className="rounded bg-secondary px-2 py-1.5 text-xs font-medium text-primary hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-muted"
                 >
                   <span className="mr-1">{cta.label}</span>
                   <span aria-hidden="true"> &rarr;</span>

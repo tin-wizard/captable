@@ -139,7 +139,7 @@ function StepList() {
       <div
         className={cn(
           "absolute left-4 top-4 -ml-1 mt-0.5 h-full w-0.5 group-last:hidden",
-          stepId < currentStep ? "bg-ember-500" : "bg-gray-300",
+          stepId < currentStep ? "bg-primary" : "bg-border",
         )}
         aria-hidden="true"
       />
@@ -148,10 +148,10 @@ function StepList() {
           <span
             className={cn(
               "relative z-10 flex h-6 w-6 items-center justify-center rounded-full ",
-              currentStep === stepId && "border-2 border-ember-500 bg-white",
+              currentStep === stepId && "border-2 border-primary bg-background",
               stepId > currentStep &&
-                "border-2 border-gray-300 bg-white group-hover:border-gray-400",
-              stepId < currentStep && "bg-ember-500 group-hover:bg-ember-600",
+                "border-2 border-border bg-background group-hover:border-muted-foreground",
+              stepId < currentStep && "bg-primary group-hover:bg-primary/90",
             )}
           >
             {stepId < currentStep ? (
@@ -160,9 +160,9 @@ function StepList() {
               <span
                 className={cn(
                   "h-2.5 w-2.5 rounded-full",
-                  currentStep === stepId && "bg-ember-500",
+                  currentStep === stepId && "bg-primary",
                   stepId > currentStep &&
-                    "bg-transparent group-hover:bg-gray-300",
+                    "bg-transparent group-hover:bg-border",
                 )}
               />
             )}
@@ -172,8 +172,8 @@ function StepList() {
           <span
             className={cn(
               "text-sm font-medium",
-              currentStep === stepId && "text-ember-500",
-              stepId > currentStep && "text-gray-500",
+              currentStep === stepId && "text-primary",
+              stepId > currentStep && "text-muted-foreground",
             )}
           >
             {step.data.title}

@@ -33,7 +33,7 @@ const EmptyState = ({
       <div className="container mx-auto px-4">
         <div
           className={cn(
-            bordered && "rounded-xl border",
+            bordered && "rounded-lg border",
             "bg-white px-6 shadow-sm",
           )}
         >
@@ -41,10 +41,10 @@ const EmptyState = ({
             <div
               className={cn(
                 "mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full",
-                error ? "bg-rose-100" : "bg-navy-100",
+                error ? "bg-rose-100" : "bg-muted",
               )}
             >
-              <span className={cn(error ? "text-rose-500" : "text-navy-500")}>
+              <span className={cn(error ? "text-rose-500" : "text-primary")}>
                 {icon}
               </span>
             </div>
