@@ -15,6 +15,7 @@ export const getCompanyList = async (userId: string) => {
           id: true,
           publicId: true,
           name: true,
+          logo: true,
         },
       },
     },

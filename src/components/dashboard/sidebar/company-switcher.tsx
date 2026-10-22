@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -9,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { cn } from "@/lib/utils";
 import type { TGetCompanyList } from "@/server/company";
 import { companySwitchUrl } from "@/server/domains/core/host";
 import { api } from "@/trpc/react";
@@ -18,6 +20,7 @@ import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { companyInitials } from "./company-initials";
 
 interface CompanySwitcherProps {
   companies: TGetCompanyList;
@@ -27,6 +30,25 @@ interface CompanySwitcherProps {
 }
 
 const createCompanyValue = "cap-co-create-company";
+
+function CompanyAvatar({
+  name,
+  logo,
+  className,
+}: {
+  name: string;
+  logo?: string | null;
+  className?: string;
+}) {
+  return (
+    <Avatar className={cn("size-8 rounded-lg", className)}>
+      {logo && <AvatarImage src={logo} alt="" />}
+      <AvatarFallback className="rounded-lg bg-navy-100 text-xs font-semibold text-navy-700">
+        {companyInitials(name)}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
 
 export function CompanySwitcher({
   companies,
@@ -39,9 +61,8 @@ export function CompanySwitcher({
   const pathname = usePathname();
 
   const switchCompany = api.company.switchCompany.useMutation();
-  const currentName = companies.find(
-    (item) => item.company.publicId === publicId,
-  )?.company.name;
+  const current = companies.find((item) => item.company.publicId === publicId);
+  const currentName = current?.company.name;
 
   return (
     <Select
@@ -87,14 +108,15 @@ export function CompanySwitcher({
     >
       <SelectPrimitive.Trigger
         title={currentName}
-        className="group flex w-full items-center gap-x-2 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-gray-100"
+        className="group flex w-full items-center gap-x-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-gray-100"
       >
+        <CompanyAvatar name={currentName ?? ""} logo={current?.company.logo} />
         <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-medium uppercase tracking-wider text-gray-500">
-            Workspace
-          </span>
-          <span className="line-clamp-2 break-words text-xl font-semibold leading-tight tracking-tight text-gray-900">
+          <span className="block truncate text-sm font-semibold leading-5 text-gray-900">
             <SelectValue>{currentName}</SelectValue>
+          </span>
+          <span className="block text-xs leading-4 text-gray-500">
+            Workspace
           </span>
         </span>
         <RiExpandUpDownLine
@@ -105,7 +127,14 @@ export function CompanySwitcher({
       <SelectContent>
         {companies.map((item) => (
           <SelectItem key={item.company.publicId} value={item.company.publicId}>
-            {item.company.name}
+            <span className="flex items-center gap-x-2">
+              <CompanyAvatar
+                name={item.company.name}
+                logo={item.company.logo}
+                className="size-6 text-[10px]"
+              />
+              <span className="truncate">{item.company.name}</span>
+            </span>
           </SelectItem>
         ))}
 
