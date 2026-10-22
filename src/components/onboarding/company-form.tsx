@@ -516,6 +516,9 @@ export const CompanyForm = ({ type, data }: CompanyFormProps) => {
                     <div>
                       <LinearCombobox
                         options={incorpTypeOpts}
+                        defaultOption={incorpTypeOpts.find(
+                          (o) => o.value === field.value,
+                        )}
                         onValueChange={(option) => {
                           field.onChange(option.value);
                         }}
