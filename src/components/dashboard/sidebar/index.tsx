@@ -330,10 +330,7 @@ export function SideBar({
             </ul>
 
             <div className="py-3">
-              <div
-                aria-hidden="true"
-                className="px-2.5 pb-1.5 pt-3.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-muted-foreground"
-              >
+              <div className="px-2.5 pb-1.5 pt-3.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
                 Company
               </div>
               <ul className="space-y-0.5">

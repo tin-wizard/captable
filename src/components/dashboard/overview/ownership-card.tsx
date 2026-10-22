@@ -81,11 +81,13 @@ export const OwnershipCard = ({
           <TableBody>
             {slices.map((s) => (
               <TableRow key={s.name}>
-                <TableCell
-                  title={s.name}
-                  className="max-w-[16rem] truncate px-4 py-[11px] font-medium"
-                >
-                  {s.name}
+                <TableCell className="px-4 py-[11px] font-medium">
+                  <span
+                    className="block max-w-[9rem] truncate sm:max-w-[16rem]"
+                    title={s.name}
+                  >
+                    {s.name}
+                  </span>
                 </TableCell>
                 <TableCell className="px-4 py-[11px] text-right tabular-nums">
                   {formatCount(s.shares)}
@@ -93,7 +95,7 @@ export const OwnershipCard = ({
                 <TableCell className="px-4 py-[11px] text-right tabular-nums">
                   <span
                     aria-hidden
-                    className="mr-2 inline-block h-1.5 w-20 align-middle"
+                    className="mr-2 inline-block h-1.5 w-10 align-middle sm:w-20"
                   >
                     <span
                       className="block h-1.5 rounded-[1px] bg-primary/85"

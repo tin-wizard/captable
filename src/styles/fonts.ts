@@ -15,6 +15,7 @@ export const interTight = Inter_Tight({
 
 export const newsreader = Newsreader({
   subsets: ["latin"],
+  axes: ["opsz"],
   display: "swap",
   variable: "--font-newsreader",
 });

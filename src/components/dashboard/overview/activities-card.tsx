@@ -20,7 +20,7 @@ const ActivityCard = async ({ className, publicId }: Props) => {
   return (
     <Card className={className}>
       <CardHeader className="space-y-0 border-b px-4 py-3">
-        <CardDescription className="text-[13.5px] font-semibold text-foreground">
+        <CardDescription className="font-serif text-[19px] font-medium text-foreground">
           Activities
         </CardDescription>
       </CardHeader>
