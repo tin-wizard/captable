@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/accordion";
 
 import { usePathname } from "next/navigation";
+import { Fragment } from "react";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -192,6 +193,12 @@ const company = [
   // links back here when the pages exist.
 ];
 
+// static group labels, rendered before the item with this name
+const groupBefore: Record<string, string> = {
+  Overview: "Equity",
+  Fundraise: "Deals",
+};
+
 interface SideBarProps {
   className?: string;
   publicId: string;
@@ -232,86 +239,101 @@ export function SideBar({
                   (currentPath === basePath && item.href === "/") ||
                   (currentPath.includes(`${item.href}/`) && item.href !== "/");
 
+                const groupLabel = groupBefore[item.name];
+
                 return (
-                  <li key={item.name}>
-                    {item.subNav ? (
-                      <Accordion type="single" collapsible>
-                        <AccordionItem value="item-1" className="border-none">
-                          <div className="flex">
-                            {isActive ? (
-                              <item.activeIcon
-                                className={cn(
-                                  "ml-2.5 mr-0 mt-2 inline-block",
-                                  "text-primary",
-                                  "h-4 w-4 shrink-0",
-                                )}
-                                aria-hidden="true"
-                              />
-                            ) : (
-                              <item.icon
-                                className={cn(
-                                  "ml-2.5 mr-0 mt-2 inline-block",
-                                  "text-muted-foreground group-hover:text-foreground",
-                                  "h-4 w-4 shrink-0",
-                                )}
-                                aria-hidden="true"
-                              />
-                            )}
-
-                            <AccordionTrigger
-                              className={cn(
-                                isActive
-                                  ? "bg-secondary font-semibold text-foreground"
-                                  : "text-foreground/80 hover:bg-secondary hover:text-foreground",
-                                "group flex gap-x-2.5 rounded px-2.5 py-1.5 text-[13.5px] leading-5 hover:no-underline",
-                              )}
-                            >
-                              {item.name}
-                            </AccordionTrigger>
-                          </div>
-
-                          <AccordionContent>
-                            <ul className="space-y-0.5">
-                              {item.subNav.map((subItem) => {
-                                const href =
-                                  basePath + item.href + subItem.href;
-                                const isActive =
-                                  (subItem.href !== "/" &&
-                                    currentPath.includes(
-                                      item.href + subItem.href,
-                                    )) ||
-                                  href === `${currentPath}/`;
-
-                                return (
-                                  <li key={subItem.name}>
-                                    <NavLink
-                                      active={isActive}
-                                      name={subItem.name}
-                                      href={href}
-                                      className="ml-9"
-                                    />
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </AccordionContent>
-                        </AccordionItem>
-                      </Accordion>
-                    ) : (
-                      <NavLink
-                        active={isActive}
-                        name={item.name}
-                        href={href}
-                        icon={isActive ? item.activeIcon : item.icon}
-                      />
+                  <Fragment key={item.name}>
+                    {groupLabel && (
+                      <li
+                        aria-hidden="true"
+                        className="px-2.5 pb-1.5 pt-3.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-muted-foreground"
+                      >
+                        {groupLabel}
+                      </li>
                     )}
-                  </li>
+                    <li>
+                      {item.subNav ? (
+                        <Accordion type="single" collapsible>
+                          <AccordionItem value="item-1" className="border-none">
+                            <div className="flex">
+                              {isActive ? (
+                                <item.activeIcon
+                                  className={cn(
+                                    "ml-2.5 mr-0 mt-2 inline-block",
+                                    "text-primary",
+                                    "h-4 w-4 shrink-0",
+                                  )}
+                                  aria-hidden="true"
+                                />
+                              ) : (
+                                <item.icon
+                                  className={cn(
+                                    "ml-2.5 mr-0 mt-2 inline-block",
+                                    "text-muted-foreground group-hover:text-foreground",
+                                    "h-4 w-4 shrink-0",
+                                  )}
+                                  aria-hidden="true"
+                                />
+                              )}
+
+                              <AccordionTrigger
+                                className={cn(
+                                  isActive
+                                    ? "bg-secondary font-medium text-foreground"
+                                    : "text-foreground/80 hover:bg-secondary hover:text-foreground",
+                                  "group flex gap-x-2.5 rounded px-2.5 py-1.5 text-[14.5px] leading-5 hover:no-underline",
+                                )}
+                              >
+                                {item.name}
+                              </AccordionTrigger>
+                            </div>
+
+                            <AccordionContent>
+                              <ul className="space-y-0.5">
+                                {item.subNav.map((subItem) => {
+                                  const href =
+                                    basePath + item.href + subItem.href;
+                                  const isActive =
+                                    (subItem.href !== "/" &&
+                                      currentPath.includes(
+                                        item.href + subItem.href,
+                                      )) ||
+                                    href === `${currentPath}/`;
+
+                                  return (
+                                    <li key={subItem.name}>
+                                      <NavLink
+                                        active={isActive}
+                                        name={subItem.name}
+                                        href={href}
+                                        className="ml-9"
+                                      />
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
+                      ) : (
+                        <NavLink
+                          active={isActive}
+                          name={item.name}
+                          href={href}
+                          icon={isActive ? item.activeIcon : item.icon}
+                        />
+                      )}
+                    </li>
+                  </Fragment>
                 );
               })}
             </ul>
 
             <div className="py-3">
-              <div className="px-2.5 pb-1 pt-2 text-[10.5px] font-semibold uppercase tracking-[.1em] text-muted-foreground">
+              <div
+                aria-hidden="true"
+                className="px-2.5 pb-1.5 pt-3.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-muted-foreground"
+              >
                 Company
               </div>
               <ul className="space-y-0.5">
